@@ -6,6 +6,8 @@
 
 **项目复刻指南：[完整操作流程 README](hr-delivery/docs/replication/README.md)** — 一张 ASCII 表说明新项目初始化、数据接入、业务口径、语义建模、Agent 问数、验证和仪表盘交付的全部步骤。
 
+**Agent 工作指南：[AGENTS.md](AGENTS.md)** — 项目目录职责、问数流程、模型修改、验证命令和已知限制。
+
 - HR 演示数据库（PostgreSQL，25 张表 / 25.3 万行中文仿真数据，八大业务域）
 - Wren MDL 语义层（25 模型 / 32 关系 / 6 视图 / 6 cube / 业务口径 / 语义记忆）
 - 端到端验证：41 个 HR 问题双路径自动比对，41/41 PASS（P0 口径题 11/11），一键回归 `hr-delivery/validation/v2/run_all.py`
