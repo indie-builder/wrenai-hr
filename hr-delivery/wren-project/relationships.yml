@@ -1,0 +1,162 @@
+relationships:
+  # 员工 → 部门
+  - name: employees_department
+    models: [employees, departments]
+    join_type: many_to_one
+    condition: employees.dept_id = departments.dept_id
+  # 员工 → 直属上级 (自关联)
+  - name: employees_manager
+    models: [employees, employees]
+    join_type: many_to_one
+    condition: employees.manager_id = employees.emp_id
+  # 薪资 → 员工
+  - name: salary_payments_employee
+    models: [salary_payments, employees]
+    join_type: many_to_one
+    condition: salary_payments.emp_id = employees.emp_id
+  # 考勤 → 员工
+  - name: attendance_employee
+    models: [attendance_records, employees]
+    join_type: many_to_one
+    condition: attendance_records.emp_id = employees.emp_id
+  # 请假 → 员工
+  - name: leave_requests_employee
+    models: [leave_requests, employees]
+    join_type: many_to_one
+    condition: leave_requests.emp_id = employees.emp_id
+  # 请假 → 审批人 (自关联)
+  - name: leave_requests_approver
+    models: [leave_requests, employees]
+    join_type: many_to_one
+    condition: leave_requests.approver_id = employees.emp_id
+  # 招聘岗位 → 部门
+  - name: job_openings_department
+    models: [job_openings, departments]
+    join_type: many_to_one
+    condition: job_openings.dept_id = departments.dept_id
+  # 候选人 → 岗位
+  - name: candidates_opening
+    models: [candidates, job_openings]
+    join_type: many_to_one
+    condition: candidates.opening_id = job_openings.opening_id
+  # 候选人 → 入职员工
+  - name: candidates_hired_employee
+    models: [candidates, employees]
+    join_type: many_to_one
+    condition: candidates.hired_emp_id = employees.emp_id
+  # 面试 → 候选人
+  - name: interviews_candidate
+    models: [interviews, candidates]
+    join_type: many_to_one
+    condition: interviews.cand_id = candidates.cand_id
+  # 面试 → 面试官
+  - name: interviews_interviewer
+    models: [interviews, employees]
+    join_type: many_to_one
+    condition: interviews.interviewer_id = employees.emp_id
+  # 绩效 → 员工
+  - name: performance_reviews_employee
+    models: [performance_reviews, employees]
+    join_type: many_to_one
+    condition: performance_reviews.emp_id = employees.emp_id
+  # 绩效 → 考核人 (自关联)
+  - name: performance_reviews_reviewer
+    models: [performance_reviews, employees]
+    join_type: many_to_one
+    condition: performance_reviews.reviewer_id = employees.emp_id
+  # 培训 → 员工
+  - name: training_records_employee
+    models: [training_records, employees]
+    join_type: many_to_one
+    condition: training_records.emp_id = employees.emp_id
+  # 调动 → 员工
+  - name: transfers_employee
+    models: [transfers, employees]
+    join_type: many_to_one
+    condition: transfers.emp_id = employees.emp_id
+  # 调动 → 原部门
+  - name: transfers_from_department
+    models: [transfers, departments]
+    join_type: many_to_one
+    condition: transfers.from_dept_id = departments.dept_id
+  # 调动 → 新部门
+  - name: transfers_to_department
+    models: [transfers, departments]
+    join_type: many_to_one
+    condition: transfers.to_dept_id = departments.dept_id
+  # ---- v2 扩展关系 ----
+  # 编制规划 → 部门
+  - name: headcount_plan_department
+    models: [headcount_plan, departments]
+    join_type: many_to_one
+    condition: headcount_plan.dept_id = departments.dept_id
+  # 晋升 → 员工
+  - name: promotions_employee
+    models: [promotions, employees]
+    join_type: many_to_one
+    condition: promotions.emp_id = employees.emp_id
+  # 合同 → 员工
+  - name: contracts_employee
+    models: [contracts, employees]
+    join_type: many_to_one
+    condition: contracts.emp_id = employees.emp_id
+  # 调薪 → 员工
+  - name: salary_changes_employee
+    models: [salary_changes, employees]
+    join_type: many_to_one
+    condition: salary_changes.emp_id = employees.emp_id
+  # 社保 → 员工
+  - name: insurance_payments_employee
+    models: [insurance_payments, employees]
+    join_type: many_to_one
+    condition: insurance_payments.emp_id = employees.emp_id
+  # 奖惩 → 员工
+  - name: awards_penalties_employee
+    models: [awards_penalties, employees]
+    join_type: many_to_one
+    condition: awards_penalties.emp_id = employees.emp_id
+  # 奖惩 → 审批人
+  - name: awards_penalties_approver
+    models: [awards_penalties, employees]
+    join_type: many_to_one
+    condition: awards_penalties.approver_id = employees.emp_id
+  # 加班 → 员工
+  - name: overtime_requests_employee
+    models: [overtime_requests, employees]
+    join_type: many_to_one
+    condition: overtime_requests.emp_id = employees.emp_id
+  # 假期余额 → 员工
+  - name: leave_balances_employee
+    models: [leave_balances, employees]
+    join_type: many_to_one
+    condition: leave_balances.emp_id = employees.emp_id
+  # Offer → 候选人
+  - name: offers_candidate
+    models: [offers, candidates]
+    join_type: many_to_one
+    condition: offers.cand_id = candidates.cand_id
+  # 绩效目标 → 员工
+  - name: performance_goals_employee
+    models: [performance_goals, employees]
+    join_type: many_to_one
+    condition: performance_goals.emp_id = employees.emp_id
+  # 人才池 → 员工
+  - name: talent_pool_employee
+    models: [talent_pool, employees]
+    join_type: many_to_one
+    condition: talent_pool.emp_id = employees.emp_id
+  # 人才池 → 提名人
+  - name: talent_pool_nominator
+    models: [talent_pool, employees]
+    join_type: many_to_one
+    condition: talent_pool.nominated_by = employees.emp_id
+  # 敬业度 → 员工
+  - name: engagement_surveys_employee
+    models: [engagement_surveys, employees]
+    join_type: many_to_one
+    condition: engagement_surveys.emp_id = employees.emp_id
+  # 离职面谈 → 员工
+  - name: exit_interviews_employee
+    models: [exit_interviews, employees]
+    join_type: many_to_one
+    condition: exit_interviews.emp_id = employees.emp_id

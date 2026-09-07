@@ -1,0 +1,30 @@
+name: departments
+table_reference:
+  catalog: ""
+  schema: public
+  table: departments
+primary_key: dept_id
+properties:
+  description: "部门维度表: 公司组织架构中的各部门 (9个一级部门)"
+columns:
+  - name: dept_id
+    type: INTEGER
+    not_null: true
+    properties:
+      description: "部门ID(主键)"
+  - name: dept_name
+    type: VARCHAR
+    properties:
+      description: "部门名称, 如: 技术部/产品部/人事部"
+  - name: parent_id
+    type: INTEGER
+    properties:
+      description: "上级部门ID, 顶级部门为空"
+  - name: location
+    type: VARCHAR
+    properties:
+      description: "部门主要办公地: 北京/上海/成都"
+  - name: established_date
+    type: DATE
+    properties:
+      description: "部门成立日期"

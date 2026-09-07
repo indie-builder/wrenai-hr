@@ -1,0 +1,38 @@
+name: performance_reviews
+table_reference:
+  catalog: ""
+  schema: public
+  table: performance_reviews
+primary_key: review_id
+properties:
+  description: "绩效考核事实表: 每半年一次(2023H1起), 等级S/A/B/C/D"
+columns:
+  - name: review_id
+    type: INTEGER
+    not_null: true
+    properties:
+      description: "考核记录ID(主键)"
+  - name: emp_id
+    type: INTEGER
+    properties:
+      description: "被考核员工ID"
+  - name: review_period
+    type: VARCHAR
+    properties:
+      description: "考核周期, 格式如 2025H1/2025H2"
+  - name: score
+    type: DOUBLE
+    properties:
+      description: "绩效得分(0-100)"
+  - name: grade
+    type: VARCHAR
+    properties:
+      description: "绩效等级: S/A/B/C/D"
+  - name: reviewer_id
+    type: INTEGER
+    properties:
+      description: "考核人(直属上级)员工ID"
+  - name: comment
+    type: VARCHAR
+    properties:
+      description: "考核评语"

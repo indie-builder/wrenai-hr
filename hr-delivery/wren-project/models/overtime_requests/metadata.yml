@@ -1,0 +1,46 @@
+name: overtime_requests
+table_reference:
+  catalog: ""
+  schema: public
+  table: overtime_requests
+primary_key: ot_id
+properties:
+  description: "加班申请与审批"
+columns:
+  - name: ot_id
+    type: INTEGER
+    not_null: true
+    properties:
+      description: "加班单ID(主键)"
+  - name: emp_id
+    type: INTEGER
+    properties:
+      description: "员工ID"
+  - name: ot_date
+    type: DATE
+    properties:
+      description: "加班日期"
+  - name: planned_hours
+    type: DOUBLE
+    properties:
+      description: "申请加班时长(小时)"
+  - name: actual_hours
+    type: DOUBLE
+    properties:
+      description: "实际加班时长(小时), 未完成为空"
+  - name: reason
+    type: VARCHAR
+    properties:
+      description: "加班事由"
+  - name: status
+    type: VARCHAR
+    properties:
+      description: "审批状态: 已批准/已拒绝/待审批"
+  - name: compensation
+    type: VARCHAR
+    properties:
+      description: "补偿方式: 调休/加班费/无"
+  - name: applied_at
+    type: DATE
+    properties:
+      description: "申请日期(加班前)"

@@ -1,0 +1,102 @@
+name: employees
+table_reference:
+  catalog: ""
+  schema: public
+  table: employees
+primary_key: emp_id
+properties:
+  description: "员工主表: 全量在职与离职员工档案 (截至2026-08-31)"
+columns:
+  - name: emp_id
+    type: INTEGER
+    not_null: true
+    properties:
+      description: "员工ID(主键)"
+  - name: emp_no
+    type: VARCHAR
+    properties:
+      description: "员工工号, 格式 EMP0001"
+  - name: name
+    type: VARCHAR
+    properties:
+      description: "员工姓名"
+  - name: gender
+    type: VARCHAR
+    properties:
+      description: "性别: 男/女"
+  - name: birth_date
+    type: DATE
+    properties:
+      description: "出生日期"
+  - name: hire_date
+    type: DATE
+    properties:
+      description: "入职日期"
+  - name: dept_id
+    type: INTEGER
+    properties:
+      description: "所属部门ID(当前部门)"
+  - name: job_title
+    type: VARCHAR
+    properties:
+      description: "职位名称, 如: 软件工程师/产品经理"
+  - name: job_level
+    type: VARCHAR
+    properties:
+      description: "职级: 初级/中级/高级/专家/总监/副总裁"
+  - name: employment_type
+    type: VARCHAR
+    properties:
+      description: "用工类型: 全职/兼职/实习/外包"
+  - name: status
+    type: VARCHAR
+    properties:
+      description: "在职状态: 在职/离职"
+  - name: base_salary
+    type: DOUBLE
+    properties:
+      description: "当前月基本工资(元, 税前)"
+  - name: manager_id
+    type: INTEGER
+    properties:
+      description: "直属上级员工ID"
+  - name: work_city
+    type: VARCHAR
+    properties:
+      description: "工作城市: 北京/上海/深圳/杭州/成都/远程"
+  - name: email
+    type: VARCHAR
+    properties:
+      description: "企业邮箱"
+  - name: phone
+    type: VARCHAR
+    properties:
+      description: "手机号"
+  - name: education
+    type: VARCHAR
+    properties:
+      description: "最高学历: 大专/本科/硕士/博士"
+  - name: termination_date
+    type: DATE
+    properties:
+      description: "离职日期, 在职员工为空"
+  - name: termination_reason
+    type: VARCHAR
+    properties:
+      description: "离职原因: 个人原因/薪酬原因/职业发展等"
+  - name: is_voluntary
+    type: BOOLEAN
+    properties:
+      description: "是否主动离职: true主动/false被动(辞退等)"
+  - name: age
+    type: INTEGER
+    is_calculated: true
+    expression: "CAST(date_part('year', current_date) AS INTEGER) - CAST(date_part('year', birth_date) AS INTEGER)"
+    properties:
+      description: "年龄(岁), 由出生日期计算"
+  - name: tenure_years
+    type: DOUBLE
+    is_calculated: true
+    expression: "round((current_date - hire_date) / 365.25, 1)"
+    properties:
+      description: "司龄(年), 由入职日期计算"

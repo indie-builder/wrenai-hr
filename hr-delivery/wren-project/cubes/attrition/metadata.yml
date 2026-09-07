@@ -1,0 +1,37 @@
+name: attrition
+base_object: v_attrition_detail
+properties:
+  description: "离职分析 cube: 离职人数/主动被动/面谈满意度, 按部门与原因维度"
+measures:
+  - name: leaver_count
+    expression: COUNT(*)
+    type: BIGINT
+  - name: voluntary_leavers
+    expression: SUM(CASE WHEN is_voluntary THEN 1 ELSE 0 END)
+    type: BIGINT
+  - name: avg_exit_satisfaction
+    expression: AVG(exit_satisfaction)
+    type: DOUBLE
+dimensions:
+  - name: dept_name
+    expression: dept_name
+    type: VARCHAR
+  - name: termination_reason
+    expression: termination_reason
+    type: VARCHAR
+  - name: real_reason_category
+    expression: real_reason_category
+    type: VARCHAR
+  - name: gender
+    expression: gender
+    type: VARCHAR
+  - name: job_level
+    expression: job_level
+    type: VARCHAR
+  - name: is_voluntary
+    expression: is_voluntary
+    type: BOOLEAN
+time_dimensions:
+  - name: termination_date
+    expression: termination_date
+    type: DATE

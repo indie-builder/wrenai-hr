@@ -1,0 +1,56 @@
+name: salary_payments
+table_reference:
+  catalog: ""
+  schema: public
+  table: salary_payments
+primary_key: pay_id
+properties:
+  description: "月度薪资发放事实表: 2023-01起每月每人一条, 含税前/扣款/实发"
+columns:
+  - name: pay_id
+    type: INTEGER
+    not_null: true
+    properties:
+      description: "发放记录ID(主键)"
+  - name: emp_id
+    type: INTEGER
+    properties:
+      description: "员工ID"
+  - name: pay_period
+    type: VARCHAR
+    properties:
+      description: "薪资月份, 格式 YYYY-MM"
+  - name: base_pay
+    type: DOUBLE
+    properties:
+      description: "基本工资(税前)"
+  - name: overtime_pay
+    type: DOUBLE
+    properties:
+      description: "加班费"
+  - name: bonus
+    type: DOUBLE
+    properties:
+      description: "奖金: 含年终奖(1月发放)与项目奖"
+  - name: social_insurance
+    type: DOUBLE
+    properties:
+      description: "社保公积金个人扣款"
+  - name: income_tax
+    type: DOUBLE
+    properties:
+      description: "个人所得税"
+  - name: net_pay
+    type: DOUBLE
+    properties:
+      description: "实发工资(税后到手)"
+  - name: pay_date
+    type: DATE
+    properties:
+      description: "发放日期(次月10日)"
+  - name: gross_pay
+    type: DOUBLE
+    is_calculated: true
+    expression: "base_pay + overtime_pay + bonus"
+    properties:
+      description: "应发合计(税前) = 基本工资+加班费+奖金, 人力成本口径"

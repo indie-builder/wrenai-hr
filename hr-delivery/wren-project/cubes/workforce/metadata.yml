@@ -1,0 +1,40 @@
+name: workforce
+base_object: v_active_employees
+properties:
+  description: "人员编制 cube: 在职人数/平均工资, 支持按部门/职级/城市等维度"
+measures:
+  - name: headcount
+    expression: COUNT(*)
+    type: BIGINT
+  - name: avg_base_salary
+    expression: AVG(base_salary)
+    type: DOUBLE
+  - name: total_base_salary
+    expression: SUM(base_salary)
+    type: DOUBLE
+dimensions:
+  - name: dept_name
+    expression: dept_name
+    type: VARCHAR
+  - name: job_level
+    expression: job_level
+    type: VARCHAR
+  - name: job_title
+    expression: job_title
+    type: VARCHAR
+  - name: employment_type
+    expression: employment_type
+    type: VARCHAR
+  - name: work_city
+    expression: work_city
+    type: VARCHAR
+  - name: gender
+    expression: gender
+    type: VARCHAR
+  - name: education
+    expression: education
+    type: VARCHAR
+time_dimensions:
+  - name: hire_date
+    expression: hire_date
+    type: DATE

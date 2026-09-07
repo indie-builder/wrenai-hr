@@ -1,0 +1,38 @@
+name: performance_goals
+table_reference:
+  catalog: ""
+  schema: public
+  table: performance_goals
+primary_key: goal_id
+properties:
+  description: "绩效目标: 员工半年度 KPI/OKR 及完成率"
+columns:
+  - name: goal_id
+    type: INTEGER
+    not_null: true
+    properties:
+      description: "目标ID(主键)"
+  - name: emp_id
+    type: INTEGER
+    properties:
+      description: "员工ID"
+  - name: review_period
+    type: VARCHAR
+    properties:
+      description: "考核周期, 格式如 2025H1"
+  - name: goal_type
+    type: VARCHAR
+    properties:
+      description: "目标类型: KPI/OKR"
+  - name: goal_desc
+    type: VARCHAR
+    properties:
+      description: "目标描述"
+  - name: weight
+    type: INTEGER
+    properties:
+      description: "权重(%)"
+  - name: completion_pct
+    type: DOUBLE
+    properties:
+      description: "完成率(%)"

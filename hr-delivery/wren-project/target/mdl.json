@@ -1,0 +1,2529 @@
+{
+  "catalog": "wren",
+  "schema": "public",
+  "models": [
+    {
+      "name": "attendance_records",
+      "tableReference": {
+        "catalog": "",
+        "schema": "public",
+        "table": "attendance_records"
+      },
+      "primaryKey": "att_id",
+      "properties": {
+        "description": "每日考勤事实表: 2025-01起每个工作日每人一条"
+      },
+      "columns": [
+        {
+          "name": "att_id",
+          "type": "INTEGER",
+          "notNull": true,
+          "properties": {
+            "description": "考勤记录ID(主键)"
+          }
+        },
+        {
+          "name": "emp_id",
+          "type": "INTEGER",
+          "properties": {
+            "description": "员工ID"
+          }
+        },
+        {
+          "name": "att_date",
+          "type": "DATE",
+          "properties": {
+            "description": "考勤日期"
+          }
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "考勤状态: 正常/迟到/早退/旷工/请假/远程办公"
+          }
+        },
+        {
+          "name": "work_hours",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "当日工作小时数"
+          }
+        },
+        {
+          "name": "overtime_hours",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "当日加班小时数"
+          }
+        }
+      ]
+    },
+    {
+      "name": "awards_penalties",
+      "tableReference": {
+        "catalog": "",
+        "schema": "public",
+        "table": "awards_penalties"
+      },
+      "primaryKey": "record_id",
+      "properties": {
+        "description": "奖惩记录: 员工奖励与处罚"
+      },
+      "columns": [
+        {
+          "name": "record_id",
+          "type": "INTEGER",
+          "notNull": true,
+          "properties": {
+            "description": "记录ID(主键)"
+          }
+        },
+        {
+          "name": "emp_id",
+          "type": "INTEGER",
+          "properties": {
+            "description": "员工ID"
+          }
+        },
+        {
+          "name": "record_date",
+          "type": "DATE",
+          "properties": {
+            "description": "记录日期"
+          }
+        },
+        {
+          "name": "record_type",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "类型: 奖励/处罚"
+          }
+        },
+        {
+          "name": "category",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "类别: 奖金/通报表扬/优秀员工/警告/记过/罚款"
+          }
+        },
+        {
+          "name": "amount",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "金额(元), 通报类为空"
+          }
+        },
+        {
+          "name": "reason",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "事由"
+          }
+        },
+        {
+          "name": "approver_id",
+          "type": "INTEGER",
+          "properties": {
+            "description": "审批人员工ID"
+          }
+        }
+      ]
+    },
+    {
+      "name": "candidates",
+      "tableReference": {
+        "catalog": "",
+        "schema": "public",
+        "table": "candidates"
+      },
+      "primaryKey": "cand_id",
+      "properties": {
+        "description": "候选人表: 应聘各岗位的候选人及其招聘漏斗进展"
+      },
+      "columns": [
+        {
+          "name": "cand_id",
+          "type": "INTEGER",
+          "notNull": true,
+          "properties": {
+            "description": "候选人ID(主键)"
+          }
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "候选人姓名"
+          }
+        },
+        {
+          "name": "gender",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "候选人性别"
+          }
+        },
+        {
+          "name": "opening_id",
+          "type": "INTEGER",
+          "properties": {
+            "description": "应聘岗位ID"
+          }
+        },
+        {
+          "name": "source",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "候选人来源: 内推/招聘网站/猎头/校园招聘"
+          }
+        },
+        {
+          "name": "stage",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "当前阶段: 简历筛选/面试中/已发offer/已入职/已淘汰/拒绝offer"
+          }
+        },
+        {
+          "name": "applied_at",
+          "type": "DATE",
+          "properties": {
+            "description": "投递日期"
+          }
+        },
+        {
+          "name": "expected_salary",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "期望月薪"
+          }
+        },
+        {
+          "name": "hired_emp_id",
+          "type": "INTEGER",
+          "properties": {
+            "description": "入职后关联的员工ID, 未入职为空"
+          }
+        }
+      ]
+    },
+    {
+      "name": "contracts",
+      "tableReference": {
+        "catalog": "",
+        "schema": "public",
+        "table": "contracts"
+      },
+      "primaryKey": "contract_id",
+      "properties": {
+        "description": "劳动合同: 员工合同签订/续签/解除记录"
+      },
+      "columns": [
+        {
+          "name": "contract_id",
+          "type": "INTEGER",
+          "notNull": true,
+          "properties": {
+            "description": "合同ID(主键)"
+          }
+        },
+        {
+          "name": "emp_id",
+          "type": "INTEGER",
+          "properties": {
+            "description": "员工ID"
+          }
+        },
+        {
+          "name": "contract_no",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "合同编号"
+          }
+        },
+        {
+          "name": "contract_type",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "合同类型: 固定期限/无固定期限/实习协议/劳务协议"
+          }
+        },
+        {
+          "name": "start_date",
+          "type": "DATE",
+          "properties": {
+            "description": "合同开始日期"
+          }
+        },
+        {
+          "name": "end_date",
+          "type": "DATE",
+          "properties": {
+            "description": "合同结束日期, 无固定期限为空"
+          }
+        },
+        {
+          "name": "renewals",
+          "type": "INTEGER",
+          "properties": {
+            "description": "已续签次数"
+          }
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "合同状态: 履行中/已到期/已解除"
+          }
+        },
+        {
+          "name": "signed_date",
+          "type": "DATE",
+          "properties": {
+            "description": "签订日期"
+          }
+        },
+        {
+          "name": "is_expiring_soon",
+          "type": "BOOLEAN",
+          "isCalculated": true,
+          "expression": "CASE WHEN status = '履行中' AND end_date IS NOT NULL AND end_date <= current_date + INTERVAL '90 days' THEN true ELSE false END",
+          "properties": {
+            "description": "是否90天内到期(履行中)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "departments",
+      "tableReference": {
+        "catalog": "",
+        "schema": "public",
+        "table": "departments"
+      },
+      "primaryKey": "dept_id",
+      "properties": {
+        "description": "部门维度表: 公司组织架构中的各部门 (9个一级部门)"
+      },
+      "columns": [
+        {
+          "name": "dept_id",
+          "type": "INTEGER",
+          "notNull": true,
+          "properties": {
+            "description": "部门ID(主键)"
+          }
+        },
+        {
+          "name": "dept_name",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "部门名称, 如: 技术部/产品部/人事部"
+          }
+        },
+        {
+          "name": "parent_id",
+          "type": "INTEGER",
+          "properties": {
+            "description": "上级部门ID, 顶级部门为空"
+          }
+        },
+        {
+          "name": "location",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "部门主要办公地: 北京/上海/成都"
+          }
+        },
+        {
+          "name": "established_date",
+          "type": "DATE",
+          "properties": {
+            "description": "部门成立日期"
+          }
+        }
+      ]
+    },
+    {
+      "name": "employees",
+      "tableReference": {
+        "catalog": "",
+        "schema": "public",
+        "table": "employees"
+      },
+      "primaryKey": "emp_id",
+      "properties": {
+        "description": "员工主表: 全量在职与离职员工档案 (截至2026-08-31)"
+      },
+      "columns": [
+        {
+          "name": "emp_id",
+          "type": "INTEGER",
+          "notNull": true,
+          "properties": {
+            "description": "员工ID(主键)"
+          }
+        },
+        {
+          "name": "emp_no",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "员工工号, 格式 EMP0001"
+          }
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "员工姓名"
+          }
+        },
+        {
+          "name": "gender",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "性别: 男/女"
+          }
+        },
+        {
+          "name": "birth_date",
+          "type": "DATE",
+          "properties": {
+            "description": "出生日期"
+          }
+        },
+        {
+          "name": "hire_date",
+          "type": "DATE",
+          "properties": {
+            "description": "入职日期"
+          }
+        },
+        {
+          "name": "dept_id",
+          "type": "INTEGER",
+          "properties": {
+            "description": "所属部门ID(当前部门)"
+          }
+        },
+        {
+          "name": "job_title",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "职位名称, 如: 软件工程师/产品经理"
+          }
+        },
+        {
+          "name": "job_level",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "职级: 初级/中级/高级/专家/总监/副总裁"
+          }
+        },
+        {
+          "name": "employment_type",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "用工类型: 全职/兼职/实习/外包"
+          }
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "在职状态: 在职/离职"
+          }
+        },
+        {
+          "name": "base_salary",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "当前月基本工资(元, 税前)"
+          }
+        },
+        {
+          "name": "manager_id",
+          "type": "INTEGER",
+          "properties": {
+            "description": "直属上级员工ID"
+          }
+        },
+        {
+          "name": "work_city",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "工作城市: 北京/上海/深圳/杭州/成都/远程"
+          }
+        },
+        {
+          "name": "email",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "企业邮箱"
+          }
+        },
+        {
+          "name": "phone",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "手机号"
+          }
+        },
+        {
+          "name": "education",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "最高学历: 大专/本科/硕士/博士"
+          }
+        },
+        {
+          "name": "termination_date",
+          "type": "DATE",
+          "properties": {
+            "description": "离职日期, 在职员工为空"
+          }
+        },
+        {
+          "name": "termination_reason",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "离职原因: 个人原因/薪酬原因/职业发展等"
+          }
+        },
+        {
+          "name": "is_voluntary",
+          "type": "BOOLEAN",
+          "properties": {
+            "description": "是否主动离职: true主动/false被动(辞退等)"
+          }
+        },
+        {
+          "name": "age",
+          "type": "INTEGER",
+          "isCalculated": true,
+          "expression": "CAST(date_part('year', current_date) AS INTEGER) - CAST(date_part('year', birth_date) AS INTEGER)",
+          "properties": {
+            "description": "年龄(岁), 由出生日期计算"
+          }
+        },
+        {
+          "name": "tenure_years",
+          "type": "DOUBLE",
+          "isCalculated": true,
+          "expression": "round((current_date - hire_date) / 365.25, 1)",
+          "properties": {
+            "description": "司龄(年), 由入职日期计算"
+          }
+        }
+      ]
+    },
+    {
+      "name": "engagement_surveys",
+      "tableReference": {
+        "catalog": "",
+        "schema": "public",
+        "table": "engagement_surveys"
+      },
+      "primaryKey": "survey_id",
+      "properties": {
+        "description": "敬业度调研: 年度全员调研(1-5分)"
+      },
+      "columns": [
+        {
+          "name": "survey_id",
+          "type": "INTEGER",
+          "notNull": true,
+          "properties": {
+            "description": "调研记录ID(主键)"
+          }
+        },
+        {
+          "name": "emp_id",
+          "type": "INTEGER",
+          "properties": {
+            "description": "员工ID"
+          }
+        },
+        {
+          "name": "survey_year",
+          "type": "INTEGER",
+          "properties": {
+            "description": "调研年度"
+          }
+        },
+        {
+          "name": "engagement_score",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "敬业度总分(1-5)"
+          }
+        },
+        {
+          "name": "recognition",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "认可与回报维度(1-5)"
+          }
+        },
+        {
+          "name": "growth",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "成长与发展维度(1-5)"
+          }
+        },
+        {
+          "name": "pay_satisfaction",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "薪酬满意度维度(1-5)"
+          }
+        },
+        {
+          "name": "manager_trust",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "管理者信任维度(1-5)"
+          }
+        },
+        {
+          "name": "work_life_balance",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "工作生活平衡维度(1-5)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "exit_interviews",
+      "tableReference": {
+        "catalog": "",
+        "schema": "public",
+        "table": "exit_interviews"
+      },
+      "primaryKey": "exit_id",
+      "properties": {
+        "description": "离职面谈: 离职员工真实原因调研"
+      },
+      "columns": [
+        {
+          "name": "exit_id",
+          "type": "INTEGER",
+          "notNull": true,
+          "properties": {
+            "description": "面谈记录ID(主键)"
+          }
+        },
+        {
+          "name": "emp_id",
+          "type": "INTEGER",
+          "properties": {
+            "description": "离职员工ID"
+          }
+        },
+        {
+          "name": "interview_date",
+          "type": "DATE",
+          "properties": {
+            "description": "面谈日期(离职前一周内)"
+          }
+        },
+        {
+          "name": "real_reason_category",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "真实原因归类: 薪酬福利/职业发展/管理问题/工作文化/家庭个人/健康"
+          }
+        },
+        {
+          "name": "satisfaction",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "公司满意度(1-5)"
+          }
+        },
+        {
+          "name": "would_recommend",
+          "type": "BOOLEAN",
+          "properties": {
+            "description": "是否愿意推荐他人入职"
+          }
+        },
+        {
+          "name": "comment",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "面谈备注"
+          }
+        }
+      ]
+    },
+    {
+      "name": "headcount_plan",
+      "tableReference": {
+        "catalog": "",
+        "schema": "public",
+        "table": "headcount_plan"
+      },
+      "primaryKey": "plan_id",
+      "properties": {
+        "description": "年度部门编制规划: 计划编制人数与人力成本预算"
+      },
+      "columns": [
+        {
+          "name": "plan_id",
+          "type": "INTEGER",
+          "notNull": true,
+          "properties": {
+            "description": "编制计划ID(主键)"
+          }
+        },
+        {
+          "name": "plan_year",
+          "type": "INTEGER",
+          "properties": {
+            "description": "规划年度"
+          }
+        },
+        {
+          "name": "dept_id",
+          "type": "INTEGER",
+          "properties": {
+            "description": "部门ID"
+          }
+        },
+        {
+          "name": "planned_headcount",
+          "type": "INTEGER",
+          "properties": {
+            "description": "计划编制人数(年末)"
+          }
+        },
+        {
+          "name": "budget_labor_cost",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "年度人力成本预算(元, 税前应发口径)"
+          }
+        },
+        {
+          "name": "approved_at",
+          "type": "DATE",
+          "properties": {
+            "description": "预算批准日期(上年11-12月)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "insurance_payments",
+      "tableReference": {
+        "catalog": "",
+        "schema": "public",
+        "table": "insurance_payments"
+      },
+      "primaryKey": "ins_id",
+      "properties": {
+        "description": "社保公积金企业缴纳月度记录(与薪资同期, 缴费基数=当月基本工资)"
+      },
+      "columns": [
+        {
+          "name": "ins_id",
+          "type": "INTEGER",
+          "notNull": true,
+          "properties": {
+            "description": "缴纳记录ID(主键)"
+          }
+        },
+        {
+          "name": "emp_id",
+          "type": "INTEGER",
+          "properties": {
+            "description": "员工ID"
+          }
+        },
+        {
+          "name": "pay_period",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "缴纳月份, 格式 YYYY-MM"
+          }
+        },
+        {
+          "name": "pension",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "养老保险企业缴纳(元)"
+          }
+        },
+        {
+          "name": "medical",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "医疗保险企业缴纳(元)"
+          }
+        },
+        {
+          "name": "unemployment",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "失业保险企业缴纳(元)"
+          }
+        },
+        {
+          "name": "injury",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "工伤保险企业缴纳(元)"
+          }
+        },
+        {
+          "name": "maternity",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "生育保险企业缴纳(元)"
+          }
+        },
+        {
+          "name": "housing_fund",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "住房公积金企业缴纳(元)"
+          }
+        },
+        {
+          "name": "company_total",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "企业缴纳合计(元)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "interviews",
+      "tableReference": {
+        "catalog": "",
+        "schema": "public",
+        "table": "interviews"
+      },
+      "primaryKey": "interview_id",
+      "properties": {
+        "description": "面试记录表: 候选人各轮面试结果"
+      },
+      "columns": [
+        {
+          "name": "interview_id",
+          "type": "INTEGER",
+          "notNull": true,
+          "properties": {
+            "description": "面试记录ID(主键)"
+          }
+        },
+        {
+          "name": "cand_id",
+          "type": "INTEGER",
+          "properties": {
+            "description": "候选人ID"
+          }
+        },
+        {
+          "name": "round",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "面试轮次: 一面/二面/三面/HR面"
+          }
+        },
+        {
+          "name": "interviewer_id",
+          "type": "INTEGER",
+          "properties": {
+            "description": "面试官员工ID"
+          }
+        },
+        {
+          "name": "interview_date",
+          "type": "DATE",
+          "properties": {
+            "description": "面试日期"
+          }
+        },
+        {
+          "name": "score",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "面试评分(0-100)"
+          }
+        },
+        {
+          "name": "result",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "面试结果: 通过/未通过/待定"
+          }
+        }
+      ]
+    },
+    {
+      "name": "job_openings",
+      "tableReference": {
+        "catalog": "",
+        "schema": "public",
+        "table": "job_openings"
+      },
+      "primaryKey": "opening_id",
+      "properties": {
+        "description": "招聘岗位表: 各部门的用人需求(headcount)"
+      },
+      "columns": [
+        {
+          "name": "opening_id",
+          "type": "INTEGER",
+          "notNull": true,
+          "properties": {
+            "description": "岗位ID(主键)"
+          }
+        },
+        {
+          "name": "dept_id",
+          "type": "INTEGER",
+          "properties": {
+            "description": "用人部门ID"
+          }
+        },
+        {
+          "name": "job_title",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "招聘岗位名称"
+          }
+        },
+        {
+          "name": "job_level",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "招聘职级"
+          }
+        },
+        {
+          "name": "headcount",
+          "type": "INTEGER",
+          "properties": {
+            "description": "计划招聘人数"
+          }
+        },
+        {
+          "name": "salary_min",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "岗位薪资下限(月)"
+          }
+        },
+        {
+          "name": "salary_max",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "岗位薪资上限(月)"
+          }
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "岗位状态: 招聘中/已关闭/暂停"
+          }
+        },
+        {
+          "name": "opened_at",
+          "type": "DATE",
+          "properties": {
+            "description": "岗位开放日期"
+          }
+        },
+        {
+          "name": "closed_at",
+          "type": "DATE",
+          "properties": {
+            "description": "岗位关闭日期"
+          }
+        },
+        {
+          "name": "hired_count",
+          "type": "INTEGER",
+          "properties": {
+            "description": "该岗位实际入职人数"
+          }
+        }
+      ]
+    },
+    {
+      "name": "leave_balances",
+      "tableReference": {
+        "catalog": "",
+        "schema": "public",
+        "table": "leave_balances"
+      },
+      "primaryKey": "balance_id",
+      "properties": {
+        "description": "假期余额季度快照: 年假与调休"
+      },
+      "columns": [
+        {
+          "name": "balance_id",
+          "type": "INTEGER",
+          "notNull": true,
+          "properties": {
+            "description": "余额记录ID(主键)"
+          }
+        },
+        {
+          "name": "emp_id",
+          "type": "INTEGER",
+          "properties": {
+            "description": "员工ID"
+          }
+        },
+        {
+          "name": "balance_type",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "假期类型: 年假/调休"
+          }
+        },
+        {
+          "name": "as_of_quarter",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "快照季度, 格式如 2025Q3"
+          }
+        },
+        {
+          "name": "entitled",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "本期总额度(天)"
+          }
+        },
+        {
+          "name": "used",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "已使用(天, 截至季度末)"
+          }
+        },
+        {
+          "name": "remaining",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "剩余(天)"
+          }
+        },
+        {
+          "name": "expired",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "本期已失效(天, 年度清零)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "leave_requests",
+      "tableReference": {
+        "catalog": "",
+        "schema": "public",
+        "table": "leave_requests"
+      },
+      "primaryKey": "leave_id",
+      "properties": {
+        "description": "请假申请单: 员工提交的各类假期申请"
+      },
+      "columns": [
+        {
+          "name": "leave_id",
+          "type": "INTEGER",
+          "notNull": true,
+          "properties": {
+            "description": "请假单ID(主键)"
+          }
+        },
+        {
+          "name": "emp_id",
+          "type": "INTEGER",
+          "properties": {
+            "description": "请假员工ID"
+          }
+        },
+        {
+          "name": "leave_type",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "假期类型: 年假/事假/病假/婚假/产假/陪产假/调休"
+          }
+        },
+        {
+          "name": "start_date",
+          "type": "DATE",
+          "properties": {
+            "description": "假期开始日期"
+          }
+        },
+        {
+          "name": "end_date",
+          "type": "DATE",
+          "properties": {
+            "description": "假期结束日期"
+          }
+        },
+        {
+          "name": "days",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "请假天数(支持0.5)"
+          }
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "审批状态: 已批准/待审批/已拒绝"
+          }
+        },
+        {
+          "name": "approver_id",
+          "type": "INTEGER",
+          "properties": {
+            "description": "审批人员工ID"
+          }
+        },
+        {
+          "name": "applied_at",
+          "type": "TIMESTAMP",
+          "properties": {
+            "description": "申请提交时间"
+          }
+        }
+      ]
+    },
+    {
+      "name": "offers",
+      "tableReference": {
+        "catalog": "",
+        "schema": "public",
+        "table": "offers"
+      },
+      "primaryKey": "offer_id",
+      "properties": {
+        "description": "Offer发放记录"
+      },
+      "columns": [
+        {
+          "name": "offer_id",
+          "type": "INTEGER",
+          "notNull": true,
+          "properties": {
+            "description": "Offer ID(主键)"
+          }
+        },
+        {
+          "name": "cand_id",
+          "type": "INTEGER",
+          "properties": {
+            "description": "候选人ID"
+          }
+        },
+        {
+          "name": "offer_date",
+          "type": "DATE",
+          "properties": {
+            "description": "发放日期"
+          }
+        },
+        {
+          "name": "offer_salary",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "Offer 月薪(元)"
+          }
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "状态: 待回复/已接受/已拒绝"
+          }
+        },
+        {
+          "name": "response_date",
+          "type": "DATE",
+          "properties": {
+            "description": "回复日期"
+          }
+        },
+        {
+          "name": "reject_reason",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "拒绝原因: 薪酬不匹配/已接其他offer/家庭原因/其他"
+          }
+        }
+      ]
+    },
+    {
+      "name": "overtime_requests",
+      "tableReference": {
+        "catalog": "",
+        "schema": "public",
+        "table": "overtime_requests"
+      },
+      "primaryKey": "ot_id",
+      "properties": {
+        "description": "加班申请与审批"
+      },
+      "columns": [
+        {
+          "name": "ot_id",
+          "type": "INTEGER",
+          "notNull": true,
+          "properties": {
+            "description": "加班单ID(主键)"
+          }
+        },
+        {
+          "name": "emp_id",
+          "type": "INTEGER",
+          "properties": {
+            "description": "员工ID"
+          }
+        },
+        {
+          "name": "ot_date",
+          "type": "DATE",
+          "properties": {
+            "description": "加班日期"
+          }
+        },
+        {
+          "name": "planned_hours",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "申请加班时长(小时)"
+          }
+        },
+        {
+          "name": "actual_hours",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "实际加班时长(小时), 未完成为空"
+          }
+        },
+        {
+          "name": "reason",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "加班事由"
+          }
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "审批状态: 已批准/已拒绝/待审批"
+          }
+        },
+        {
+          "name": "compensation",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "补偿方式: 调休/加班费/无"
+          }
+        },
+        {
+          "name": "applied_at",
+          "type": "DATE",
+          "properties": {
+            "description": "申请日期(加班前)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "performance_goals",
+      "tableReference": {
+        "catalog": "",
+        "schema": "public",
+        "table": "performance_goals"
+      },
+      "primaryKey": "goal_id",
+      "properties": {
+        "description": "绩效目标: 员工半年度 KPI/OKR 及完成率"
+      },
+      "columns": [
+        {
+          "name": "goal_id",
+          "type": "INTEGER",
+          "notNull": true,
+          "properties": {
+            "description": "目标ID(主键)"
+          }
+        },
+        {
+          "name": "emp_id",
+          "type": "INTEGER",
+          "properties": {
+            "description": "员工ID"
+          }
+        },
+        {
+          "name": "review_period",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "考核周期, 格式如 2025H1"
+          }
+        },
+        {
+          "name": "goal_type",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "目标类型: KPI/OKR"
+          }
+        },
+        {
+          "name": "goal_desc",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "目标描述"
+          }
+        },
+        {
+          "name": "weight",
+          "type": "INTEGER",
+          "properties": {
+            "description": "权重(%)"
+          }
+        },
+        {
+          "name": "completion_pct",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "完成率(%)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "performance_reviews",
+      "tableReference": {
+        "catalog": "",
+        "schema": "public",
+        "table": "performance_reviews"
+      },
+      "primaryKey": "review_id",
+      "properties": {
+        "description": "绩效考核事实表: 每半年一次(2023H1起), 等级S/A/B/C/D"
+      },
+      "columns": [
+        {
+          "name": "review_id",
+          "type": "INTEGER",
+          "notNull": true,
+          "properties": {
+            "description": "考核记录ID(主键)"
+          }
+        },
+        {
+          "name": "emp_id",
+          "type": "INTEGER",
+          "properties": {
+            "description": "被考核员工ID"
+          }
+        },
+        {
+          "name": "review_period",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "考核周期, 格式如 2025H1/2025H2"
+          }
+        },
+        {
+          "name": "score",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "绩效得分(0-100)"
+          }
+        },
+        {
+          "name": "grade",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "绩效等级: S/A/B/C/D"
+          }
+        },
+        {
+          "name": "reviewer_id",
+          "type": "INTEGER",
+          "properties": {
+            "description": "考核人(直属上级)员工ID"
+          }
+        },
+        {
+          "name": "comment",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "考核评语"
+          }
+        }
+      ]
+    },
+    {
+      "name": "promotions",
+      "tableReference": {
+        "catalog": "",
+        "schema": "public",
+        "table": "promotions"
+      },
+      "primaryKey": "promo_id",
+      "properties": {
+        "description": "晋升记录: 员工职级/职位晋升及调薪"
+      },
+      "columns": [
+        {
+          "name": "promo_id",
+          "type": "INTEGER",
+          "notNull": true,
+          "properties": {
+            "description": "晋升记录ID(主键)"
+          }
+        },
+        {
+          "name": "emp_id",
+          "type": "INTEGER",
+          "properties": {
+            "description": "晋升员工ID"
+          }
+        },
+        {
+          "name": "promo_date",
+          "type": "DATE",
+          "properties": {
+            "description": "晋升生效日期"
+          }
+        },
+        {
+          "name": "from_level",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "晋升前职级"
+          }
+        },
+        {
+          "name": "to_level",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "晋升后职级"
+          }
+        },
+        {
+          "name": "from_title",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "晋升前职位"
+          }
+        },
+        {
+          "name": "to_title",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "晋升后职位"
+          }
+        },
+        {
+          "name": "salary_before",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "晋升前月基本工资(元)"
+          }
+        },
+        {
+          "name": "salary_after",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "晋升后月基本工资(元)"
+          }
+        },
+        {
+          "name": "reason",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "晋升调薪幅度(%)"
+          },
+          "isCalculated": true,
+          "expression": "round((salary_after - salary_before) * 100.0 / salary_before, 2)"
+        }
+      ]
+    },
+    {
+      "name": "recruitment_costs",
+      "tableReference": {
+        "catalog": "",
+        "schema": "public",
+        "table": "recruitment_costs"
+      },
+      "primaryKey": "cost_id",
+      "properties": {
+        "description": "招聘渠道月度费用"
+      },
+      "columns": [
+        {
+          "name": "cost_id",
+          "type": "INTEGER",
+          "notNull": true,
+          "properties": {
+            "description": "费用记录ID(主键)"
+          }
+        },
+        {
+          "name": "channel",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "渠道: 招聘网站/猎头/内推奖励/校园招聘"
+          }
+        },
+        {
+          "name": "cost_month",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "费用月份, 格式 YYYY-MM"
+          }
+        },
+        {
+          "name": "amount",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "费用金额(元)"
+          }
+        },
+        {
+          "name": "notes",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "备注"
+          }
+        }
+      ]
+    },
+    {
+      "name": "salary_changes",
+      "tableReference": {
+        "catalog": "",
+        "schema": "public",
+        "table": "salary_changes"
+      },
+      "primaryKey": "change_id",
+      "properties": {
+        "description": "调薪记录: 员工月基本工资调整历史"
+      },
+      "columns": [
+        {
+          "name": "change_id",
+          "type": "INTEGER",
+          "notNull": true,
+          "properties": {
+            "description": "调薪记录ID(主键)"
+          }
+        },
+        {
+          "name": "emp_id",
+          "type": "INTEGER",
+          "properties": {
+            "description": "调薪员工ID"
+          }
+        },
+        {
+          "name": "effective_date",
+          "type": "DATE",
+          "properties": {
+            "description": "生效日期"
+          }
+        },
+        {
+          "name": "salary_before",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "调薪前月基本工资(元)"
+          }
+        },
+        {
+          "name": "salary_after",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "调薪后月基本工资(元)"
+          }
+        },
+        {
+          "name": "change_pct",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "调薪幅度(百分比)"
+          }
+        },
+        {
+          "name": "change_type",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "调薪类型: 年度调薪/晋升调薪/特批调薪/转正调薪"
+          }
+        }
+      ]
+    },
+    {
+      "name": "salary_payments",
+      "tableReference": {
+        "catalog": "",
+        "schema": "public",
+        "table": "salary_payments"
+      },
+      "primaryKey": "pay_id",
+      "properties": {
+        "description": "月度薪资发放事实表: 2023-01起每月每人一条, 含税前/扣款/实发"
+      },
+      "columns": [
+        {
+          "name": "pay_id",
+          "type": "INTEGER",
+          "notNull": true,
+          "properties": {
+            "description": "发放记录ID(主键)"
+          }
+        },
+        {
+          "name": "emp_id",
+          "type": "INTEGER",
+          "properties": {
+            "description": "员工ID"
+          }
+        },
+        {
+          "name": "pay_period",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "薪资月份, 格式 YYYY-MM"
+          }
+        },
+        {
+          "name": "base_pay",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "基本工资(税前)"
+          }
+        },
+        {
+          "name": "overtime_pay",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "加班费"
+          }
+        },
+        {
+          "name": "bonus",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "奖金: 含年终奖(1月发放)与项目奖"
+          }
+        },
+        {
+          "name": "social_insurance",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "社保公积金个人扣款"
+          }
+        },
+        {
+          "name": "income_tax",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "个人所得税"
+          }
+        },
+        {
+          "name": "net_pay",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "实发工资(税后到手)"
+          }
+        },
+        {
+          "name": "pay_date",
+          "type": "DATE",
+          "properties": {
+            "description": "发放日期(次月10日)"
+          }
+        },
+        {
+          "name": "gross_pay",
+          "type": "DOUBLE",
+          "isCalculated": true,
+          "expression": "base_pay + overtime_pay + bonus",
+          "properties": {
+            "description": "应发合计(税前) = 基本工资+加班费+奖金, 人力成本口径"
+          }
+        }
+      ]
+    },
+    {
+      "name": "talent_pool",
+      "tableReference": {
+        "catalog": "",
+        "schema": "public",
+        "table": "talent_pool"
+      },
+      "primaryKey": "pool_id",
+      "properties": {
+        "description": "人才池: 高潜人才与关键岗位继任者"
+      },
+      "columns": [
+        {
+          "name": "pool_id",
+          "type": "INTEGER",
+          "notNull": true,
+          "properties": {
+            "description": "记录ID(主键)"
+          }
+        },
+        {
+          "name": "emp_id",
+          "type": "INTEGER",
+          "properties": {
+            "description": "员工ID"
+          }
+        },
+        {
+          "name": "pool_type",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "类型: 高潜人才/继任者"
+          }
+        },
+        {
+          "name": "target_position",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "继任目标岗位, 继任者必填"
+          }
+        },
+        {
+          "name": "potential_rating",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "潜力评级: 高潜/潜力之星"
+          }
+        },
+        {
+          "name": "nominated_date",
+          "type": "DATE",
+          "properties": {
+            "description": "提名日期"
+          }
+        },
+        {
+          "name": "nominated_by",
+          "type": "INTEGER",
+          "properties": {
+            "description": "提名人员工ID"
+          }
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "状态: 在池/已晋升/已移出"
+          }
+        }
+      ]
+    },
+    {
+      "name": "training_records",
+      "tableReference": {
+        "catalog": "",
+        "schema": "public",
+        "table": "training_records"
+      },
+      "primaryKey": "training_id",
+      "properties": {
+        "description": "培训记录表: 员工参加的培训课程"
+      },
+      "columns": [
+        {
+          "name": "training_id",
+          "type": "INTEGER",
+          "notNull": true,
+          "properties": {
+            "description": "培训记录ID(主键)"
+          }
+        },
+        {
+          "name": "emp_id",
+          "type": "INTEGER",
+          "properties": {
+            "description": "参训员工ID"
+          }
+        },
+        {
+          "name": "course_name",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "课程名称, 如: 新员工入职培训/管理力提升"
+          }
+        },
+        {
+          "name": "training_date",
+          "type": "DATE",
+          "properties": {
+            "description": "培训日期"
+          }
+        },
+        {
+          "name": "hours",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "课程时长(小时)"
+          }
+        },
+        {
+          "name": "completed",
+          "type": "BOOLEAN",
+          "properties": {
+            "description": "是否完成: true/false"
+          }
+        },
+        {
+          "name": "score",
+          "type": "DOUBLE",
+          "properties": {
+            "description": "结业得分(0-100)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "transfers",
+      "tableReference": {
+        "catalog": "",
+        "schema": "public",
+        "table": "transfers"
+      },
+      "primaryKey": "transfer_id",
+      "properties": {
+        "description": "人事调动记录: 跨部门调动"
+      },
+      "columns": [
+        {
+          "name": "transfer_id",
+          "type": "INTEGER",
+          "notNull": true,
+          "properties": {
+            "description": "调动记录ID(主键)"
+          }
+        },
+        {
+          "name": "emp_id",
+          "type": "INTEGER",
+          "properties": {
+            "description": "调动员工ID"
+          }
+        },
+        {
+          "name": "from_dept_id",
+          "type": "INTEGER",
+          "properties": {
+            "description": "原部门ID"
+          }
+        },
+        {
+          "name": "to_dept_id",
+          "type": "INTEGER",
+          "properties": {
+            "description": "新部门ID"
+          }
+        },
+        {
+          "name": "transfer_date",
+          "type": "DATE",
+          "properties": {
+            "description": "调动生效日期"
+          }
+        },
+        {
+          "name": "reason",
+          "type": "VARCHAR",
+          "properties": {
+            "description": "调动原因: 组织调整/个人发展/晋升"
+          }
+        }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "name": "employees_department",
+      "models": [
+        "employees",
+        "departments"
+      ],
+      "joinType": "many_to_one",
+      "condition": "employees.dept_id = departments.dept_id"
+    },
+    {
+      "name": "employees_manager",
+      "models": [
+        "employees",
+        "employees"
+      ],
+      "joinType": "many_to_one",
+      "condition": "employees.manager_id = employees.emp_id"
+    },
+    {
+      "name": "salary_payments_employee",
+      "models": [
+        "salary_payments",
+        "employees"
+      ],
+      "joinType": "many_to_one",
+      "condition": "salary_payments.emp_id = employees.emp_id"
+    },
+    {
+      "name": "attendance_employee",
+      "models": [
+        "attendance_records",
+        "employees"
+      ],
+      "joinType": "many_to_one",
+      "condition": "attendance_records.emp_id = employees.emp_id"
+    },
+    {
+      "name": "leave_requests_employee",
+      "models": [
+        "leave_requests",
+        "employees"
+      ],
+      "joinType": "many_to_one",
+      "condition": "leave_requests.emp_id = employees.emp_id"
+    },
+    {
+      "name": "leave_requests_approver",
+      "models": [
+        "leave_requests",
+        "employees"
+      ],
+      "joinType": "many_to_one",
+      "condition": "leave_requests.approver_id = employees.emp_id"
+    },
+    {
+      "name": "job_openings_department",
+      "models": [
+        "job_openings",
+        "departments"
+      ],
+      "joinType": "many_to_one",
+      "condition": "job_openings.dept_id = departments.dept_id"
+    },
+    {
+      "name": "candidates_opening",
+      "models": [
+        "candidates",
+        "job_openings"
+      ],
+      "joinType": "many_to_one",
+      "condition": "candidates.opening_id = job_openings.opening_id"
+    },
+    {
+      "name": "candidates_hired_employee",
+      "models": [
+        "candidates",
+        "employees"
+      ],
+      "joinType": "many_to_one",
+      "condition": "candidates.hired_emp_id = employees.emp_id"
+    },
+    {
+      "name": "interviews_candidate",
+      "models": [
+        "interviews",
+        "candidates"
+      ],
+      "joinType": "many_to_one",
+      "condition": "interviews.cand_id = candidates.cand_id"
+    },
+    {
+      "name": "interviews_interviewer",
+      "models": [
+        "interviews",
+        "employees"
+      ],
+      "joinType": "many_to_one",
+      "condition": "interviews.interviewer_id = employees.emp_id"
+    },
+    {
+      "name": "performance_reviews_employee",
+      "models": [
+        "performance_reviews",
+        "employees"
+      ],
+      "joinType": "many_to_one",
+      "condition": "performance_reviews.emp_id = employees.emp_id"
+    },
+    {
+      "name": "performance_reviews_reviewer",
+      "models": [
+        "performance_reviews",
+        "employees"
+      ],
+      "joinType": "many_to_one",
+      "condition": "performance_reviews.reviewer_id = employees.emp_id"
+    },
+    {
+      "name": "training_records_employee",
+      "models": [
+        "training_records",
+        "employees"
+      ],
+      "joinType": "many_to_one",
+      "condition": "training_records.emp_id = employees.emp_id"
+    },
+    {
+      "name": "transfers_employee",
+      "models": [
+        "transfers",
+        "employees"
+      ],
+      "joinType": "many_to_one",
+      "condition": "transfers.emp_id = employees.emp_id"
+    },
+    {
+      "name": "transfers_from_department",
+      "models": [
+        "transfers",
+        "departments"
+      ],
+      "joinType": "many_to_one",
+      "condition": "transfers.from_dept_id = departments.dept_id"
+    },
+    {
+      "name": "transfers_to_department",
+      "models": [
+        "transfers",
+        "departments"
+      ],
+      "joinType": "many_to_one",
+      "condition": "transfers.to_dept_id = departments.dept_id"
+    },
+    {
+      "name": "headcount_plan_department",
+      "models": [
+        "headcount_plan",
+        "departments"
+      ],
+      "joinType": "many_to_one",
+      "condition": "headcount_plan.dept_id = departments.dept_id"
+    },
+    {
+      "name": "promotions_employee",
+      "models": [
+        "promotions",
+        "employees"
+      ],
+      "joinType": "many_to_one",
+      "condition": "promotions.emp_id = employees.emp_id"
+    },
+    {
+      "name": "contracts_employee",
+      "models": [
+        "contracts",
+        "employees"
+      ],
+      "joinType": "many_to_one",
+      "condition": "contracts.emp_id = employees.emp_id"
+    },
+    {
+      "name": "salary_changes_employee",
+      "models": [
+        "salary_changes",
+        "employees"
+      ],
+      "joinType": "many_to_one",
+      "condition": "salary_changes.emp_id = employees.emp_id"
+    },
+    {
+      "name": "insurance_payments_employee",
+      "models": [
+        "insurance_payments",
+        "employees"
+      ],
+      "joinType": "many_to_one",
+      "condition": "insurance_payments.emp_id = employees.emp_id"
+    },
+    {
+      "name": "awards_penalties_employee",
+      "models": [
+        "awards_penalties",
+        "employees"
+      ],
+      "joinType": "many_to_one",
+      "condition": "awards_penalties.emp_id = employees.emp_id"
+    },
+    {
+      "name": "awards_penalties_approver",
+      "models": [
+        "awards_penalties",
+        "employees"
+      ],
+      "joinType": "many_to_one",
+      "condition": "awards_penalties.approver_id = employees.emp_id"
+    },
+    {
+      "name": "overtime_requests_employee",
+      "models": [
+        "overtime_requests",
+        "employees"
+      ],
+      "joinType": "many_to_one",
+      "condition": "overtime_requests.emp_id = employees.emp_id"
+    },
+    {
+      "name": "leave_balances_employee",
+      "models": [
+        "leave_balances",
+        "employees"
+      ],
+      "joinType": "many_to_one",
+      "condition": "leave_balances.emp_id = employees.emp_id"
+    },
+    {
+      "name": "offers_candidate",
+      "models": [
+        "offers",
+        "candidates"
+      ],
+      "joinType": "many_to_one",
+      "condition": "offers.cand_id = candidates.cand_id"
+    },
+    {
+      "name": "performance_goals_employee",
+      "models": [
+        "performance_goals",
+        "employees"
+      ],
+      "joinType": "many_to_one",
+      "condition": "performance_goals.emp_id = employees.emp_id"
+    },
+    {
+      "name": "talent_pool_employee",
+      "models": [
+        "talent_pool",
+        "employees"
+      ],
+      "joinType": "many_to_one",
+      "condition": "talent_pool.emp_id = employees.emp_id"
+    },
+    {
+      "name": "talent_pool_nominator",
+      "models": [
+        "talent_pool",
+        "employees"
+      ],
+      "joinType": "many_to_one",
+      "condition": "talent_pool.nominated_by = employees.emp_id"
+    },
+    {
+      "name": "engagement_surveys_employee",
+      "models": [
+        "engagement_surveys",
+        "employees"
+      ],
+      "joinType": "many_to_one",
+      "condition": "engagement_surveys.emp_id = employees.emp_id"
+    },
+    {
+      "name": "exit_interviews_employee",
+      "models": [
+        "exit_interviews",
+        "employees"
+      ],
+      "joinType": "many_to_one",
+      "condition": "exit_interviews.emp_id = employees.emp_id"
+    }
+  ],
+  "views": [
+    {
+      "name": "v_active_employees",
+      "properties": {
+        "description": "在职员工宽表: 员工档案 + 部门名称, 仅 status=在职 (人员分析用)"
+      },
+      "statement": "SELECT e.emp_id, e.emp_no, e.name, e.gender, e.birth_date, e.hire_date, e.dept_id, d.dept_name, d.location AS dept_location, e.job_title, e.job_level, e.employment_type, e.status, e.base_salary, e.work_city, e.education, CAST(date_part('year', current_date) AS INTEGER) - CAST(date_part('year', e.birth_date) AS INTEGER) AS age, round((current_date - e.hire_date) / 365.25, 1) AS tenure_years FROM employees e JOIN departments d ON e.dept_id = d.dept_id WHERE e.status = '在职'"
+    },
+    {
+      "name": "v_attendance_daily",
+      "properties": {
+        "description": "每日考勤宽表: 考勤 + 员工 + 部门 (出勤/加班分析用)"
+      },
+      "statement": "SELECT a.att_id, a.emp_id, e.name AS emp_name, e.dept_id, d.dept_name, e.job_title, e.job_level, e.employment_type, a.att_date, a.status, a.work_hours, a.overtime_hours FROM attendance_records a JOIN employees e ON a.emp_id = e.emp_id JOIN departments d ON e.dept_id = d.dept_id"
+    },
+    {
+      "name": "v_attrition_detail",
+      "properties": {
+        "description": "离职明细宽表: 离职员工 + 部门 + 离职面谈真实原因 (流失分析用)"
+      },
+      "statement": "SELECT e.emp_id, e.name AS emp_name, e.gender, d.dept_name, e.job_level, e.job_title, e.work_city, e.hire_date, e.termination_date, e.termination_reason, e.is_voluntary, x.real_reason_category, x.satisfaction AS exit_satisfaction, x.would_recommend FROM employees e JOIN departments d ON e.dept_id = d.dept_id LEFT JOIN exit_interviews x ON x.emp_id = e.emp_id WHERE e.status = '离职'"
+    },
+    {
+      "name": "v_headcount_vs_plan",
+      "properties": {
+        "description": "编制达成宽表: 部门年度计划编制 vs 年末实际在职人数"
+      },
+      "statement": "SELECT p.plan_year, make_date(p.plan_year, 12, 31) AS plan_year_end, d.dept_name, p.planned_headcount, p.budget_labor_cost, coalesce(a.actual_headcount, 0) AS actual_headcount FROM headcount_plan p JOIN departments d ON d.dept_id = p.dept_id LEFT JOIN ( SELECT y.yr_end, e.dept_id, count(*) AS actual_headcount FROM ( SELECT DATE '2023-12-31' AS yr_end UNION ALL SELECT DATE '2024-12-31' UNION ALL SELECT DATE '2025-12-31' UNION ALL SELECT DATE '2026-12-31' ) y JOIN employees e ON e.hire_date <= y.yr_end AND (e.termination_date IS NULL OR e.termination_date > y.yr_end) GROUP BY y.yr_end, e.dept_id ) a ON a.yr_end = make_date(p.plan_year, 12, 31) AND a.dept_id = p.dept_id"
+    },
+    {
+      "name": "v_monthly_salary",
+      "properties": {
+        "description": "月度薪资宽表: 薪资发放 + 员工 + 部门 (人力成本=base_pay+overtime_pay+bonus 在查询时计算)"
+      },
+      "statement": "SELECT s.pay_id, s.emp_id, e.name AS emp_name, e.dept_id, d.dept_name, e.job_title, e.job_level, e.employment_type, s.pay_period, s.base_pay, s.overtime_pay, s.bonus, s.social_insurance, s.income_tax, s.net_pay, s.pay_date FROM salary_payments s JOIN employees e ON s.emp_id = e.emp_id JOIN departments d ON e.dept_id = d.dept_id"
+    },
+    {
+      "name": "v_workforce_monthly",
+      "properties": {
+        "description": "人力成本月度明细宽表: 薪资行 + 社保企业缴纳 (人效/总成本分析用, 聚合在查询时完成)"
+      },
+      "statement": "SELECT s.pay_id, s.pay_period, s.pay_date, e.emp_id, e.emp_no, e.name AS emp_name, d.dept_name, e.job_level, e.employment_type, s.base_pay, s.overtime_pay, s.bonus, i.company_total AS insurance_company FROM salary_payments s JOIN insurance_payments i ON i.emp_id = s.emp_id AND i.pay_period = s.pay_period JOIN employees e ON e.emp_id = s.emp_id JOIN departments d ON d.dept_id = e.dept_id"
+    }
+  ],
+  "cubes": [
+    {
+      "name": "attrition",
+      "baseObject": "v_attrition_detail",
+      "properties": {
+        "description": "离职分析 cube: 离职人数/主动被动/面谈满意度, 按部门与原因维度"
+      },
+      "measures": [
+        {
+          "name": "leaver_count",
+          "expression": "COUNT(*)",
+          "type": "BIGINT"
+        },
+        {
+          "name": "voluntary_leavers",
+          "expression": "SUM(CASE WHEN is_voluntary THEN 1 ELSE 0 END)",
+          "type": "BIGINT"
+        },
+        {
+          "name": "avg_exit_satisfaction",
+          "expression": "AVG(exit_satisfaction)",
+          "type": "DOUBLE"
+        }
+      ],
+      "dimensions": [
+        {
+          "name": "dept_name",
+          "expression": "dept_name",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "termination_reason",
+          "expression": "termination_reason",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "real_reason_category",
+          "expression": "real_reason_category",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "gender",
+          "expression": "gender",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "job_level",
+          "expression": "job_level",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "is_voluntary",
+          "expression": "is_voluntary",
+          "type": "BOOLEAN"
+        }
+      ],
+      "timeDimensions": [
+        {
+          "name": "termination_date",
+          "expression": "termination_date",
+          "type": "DATE"
+        }
+      ]
+    },
+    {
+      "name": "headcount_plan_cube",
+      "baseObject": "v_headcount_vs_plan",
+      "properties": {
+        "description": "编制达成 cube: 计划编制 vs 年末实际在职"
+      },
+      "measures": [
+        {
+          "name": "planned_total",
+          "expression": "SUM(planned_headcount)",
+          "type": "BIGINT"
+        },
+        {
+          "name": "actual_total",
+          "expression": "SUM(actual_headcount)",
+          "type": "BIGINT"
+        },
+        {
+          "name": "dept_count",
+          "expression": "COUNT(*)",
+          "type": "BIGINT"
+        }
+      ],
+      "dimensions": [
+        {
+          "name": "dept_name",
+          "expression": "dept_name",
+          "type": "VARCHAR"
+        }
+      ],
+      "timeDimensions": [
+        {
+          "name": "plan_year_end",
+          "expression": "plan_year_end",
+          "type": "DATE"
+        }
+      ]
+    },
+    {
+      "name": "labor_cost",
+      "baseObject": "v_monthly_salary",
+      "properties": {
+        "description": "人力成本 cube: 月度应发/实发合计与发薪人数, 按部门/职级维度"
+      },
+      "measures": [
+        {
+          "name": "gross_cost",
+          "expression": "SUM(base_pay + overtime_pay + bonus)",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "net_pay_total",
+          "expression": "SUM(net_pay)",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "base_pay_total",
+          "expression": "SUM(base_pay)",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "bonus_total",
+          "expression": "SUM(bonus)",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "payee_count",
+          "expression": "COUNT(*)",
+          "type": "BIGINT"
+        }
+      ],
+      "dimensions": [
+        {
+          "name": "dept_name",
+          "expression": "dept_name",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "job_level",
+          "expression": "job_level",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "employment_type",
+          "expression": "employment_type",
+          "type": "VARCHAR"
+        }
+      ],
+      "timeDimensions": [
+        {
+          "name": "pay_date",
+          "expression": "pay_date",
+          "type": "DATE"
+        }
+      ]
+    },
+    {
+      "name": "recruitment",
+      "baseObject": "candidates",
+      "properties": {
+        "description": "招聘漏斗 cube: 候选人数与入职转化, 按来源/阶段维度"
+      },
+      "measures": [
+        {
+          "name": "candidate_count",
+          "expression": "COUNT(*)",
+          "type": "BIGINT"
+        },
+        {
+          "name": "hired_count",
+          "expression": "SUM(CASE WHEN stage = '已入职' THEN 1 ELSE 0 END)",
+          "type": "BIGINT"
+        }
+      ],
+      "dimensions": [
+        {
+          "name": "source",
+          "expression": "source",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "stage",
+          "expression": "stage",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "gender",
+          "expression": "gender",
+          "type": "VARCHAR"
+        }
+      ],
+      "timeDimensions": [
+        {
+          "name": "applied_at",
+          "expression": "applied_at",
+          "type": "DATE"
+        }
+      ]
+    },
+    {
+      "name": "total_cost",
+      "baseObject": "v_workforce_monthly",
+      "properties": {
+        "description": "人力总成本 cube: 基本工资/加班/奖金/社保企业缴纳分项聚合, 总成本在查询时相加"
+      },
+      "measures": [
+        {
+          "name": "payee_count",
+          "expression": "COUNT(*)",
+          "type": "BIGINT"
+        },
+        {
+          "name": "base_total",
+          "expression": "SUM(base_pay)",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "overtime_total",
+          "expression": "SUM(overtime_pay)",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "bonus_total",
+          "expression": "SUM(bonus)",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "insurance_total",
+          "expression": "SUM(insurance_company)",
+          "type": "DOUBLE"
+        }
+      ],
+      "dimensions": [
+        {
+          "name": "dept_name",
+          "expression": "dept_name",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "job_level",
+          "expression": "job_level",
+          "type": "VARCHAR"
+        }
+      ],
+      "timeDimensions": [
+        {
+          "name": "pay_date",
+          "expression": "pay_date",
+          "type": "DATE"
+        }
+      ]
+    },
+    {
+      "name": "workforce",
+      "baseObject": "v_active_employees",
+      "properties": {
+        "description": "人员编制 cube: 在职人数/平均工资, 支持按部门/职级/城市等维度"
+      },
+      "measures": [
+        {
+          "name": "headcount",
+          "expression": "COUNT(*)",
+          "type": "BIGINT"
+        },
+        {
+          "name": "avg_base_salary",
+          "expression": "AVG(base_salary)",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "total_base_salary",
+          "expression": "SUM(base_salary)",
+          "type": "DOUBLE"
+        }
+      ],
+      "dimensions": [
+        {
+          "name": "dept_name",
+          "expression": "dept_name",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "job_level",
+          "expression": "job_level",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "job_title",
+          "expression": "job_title",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "employment_type",
+          "expression": "employment_type",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "work_city",
+          "expression": "work_city",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "gender",
+          "expression": "gender",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "education",
+          "expression": "education",
+          "type": "VARCHAR"
+        }
+      ],
+      "timeDimensions": [
+        {
+          "name": "hire_date",
+          "expression": "hire_date",
+          "type": "DATE"
+        }
+      ]
+    }
+  ],
+  "dataSource": "postgres",
+  "layoutVersion": 3
+}

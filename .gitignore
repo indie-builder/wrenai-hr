@@ -1,0 +1,16 @@
+# Local environments and credentials
+.venv/
+.env
+.env.*
+!.env.example
+
+# Python and OS caches
+__pycache__/
+*.py[cod]
+.DS_Store
+
+# Rebuildable local semantic-search indexes
+**/.wren/memory/
+
+# Unmodified upstream reference clone; install Wren separately
+/vendor/

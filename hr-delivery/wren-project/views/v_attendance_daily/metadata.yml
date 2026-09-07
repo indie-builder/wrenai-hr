@@ -1,0 +1,10 @@
+name: v_attendance_daily
+properties:
+  description: "每日考勤宽表: 考勤 + 员工 + 部门 (出勤/加班分析用)"
+statement: >-
+  SELECT a.att_id, a.emp_id, e.name AS emp_name, e.dept_id, d.dept_name,
+  e.job_title, e.job_level, e.employment_type,
+  a.att_date, a.status, a.work_hours, a.overtime_hours
+  FROM attendance_records a
+  JOIN employees e ON a.emp_id = e.emp_id
+  JOIN departments d ON e.dept_id = d.dept_id

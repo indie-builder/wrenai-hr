@@ -1,0 +1,42 @@
+name: leave_balances
+table_reference:
+  catalog: ""
+  schema: public
+  table: leave_balances
+primary_key: balance_id
+properties:
+  description: "假期余额季度快照: 年假与调休"
+columns:
+  - name: balance_id
+    type: INTEGER
+    not_null: true
+    properties:
+      description: "余额记录ID(主键)"
+  - name: emp_id
+    type: INTEGER
+    properties:
+      description: "员工ID"
+  - name: balance_type
+    type: VARCHAR
+    properties:
+      description: "假期类型: 年假/调休"
+  - name: as_of_quarter
+    type: VARCHAR
+    properties:
+      description: "快照季度, 格式如 2025Q3"
+  - name: entitled
+    type: DOUBLE
+    properties:
+      description: "本期总额度(天)"
+  - name: used
+    type: DOUBLE
+    properties:
+      description: "已使用(天, 截至季度末)"
+  - name: remaining
+    type: DOUBLE
+    properties:
+      description: "剩余(天)"
+  - name: expired
+    type: DOUBLE
+    properties:
+      description: "本期已失效(天, 年度清零)"

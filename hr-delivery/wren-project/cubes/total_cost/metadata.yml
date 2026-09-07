@@ -1,0 +1,31 @@
+name: total_cost
+base_object: v_workforce_monthly
+properties:
+  description: "人力总成本 cube: 基本工资/加班/奖金/社保企业缴纳分项聚合, 总成本在查询时相加"
+measures:
+  - name: payee_count
+    expression: COUNT(*)
+    type: BIGINT
+  - name: base_total
+    expression: SUM(base_pay)
+    type: DOUBLE
+  - name: overtime_total
+    expression: SUM(overtime_pay)
+    type: DOUBLE
+  - name: bonus_total
+    expression: SUM(bonus)
+    type: DOUBLE
+  - name: insurance_total
+    expression: SUM(insurance_company)
+    type: DOUBLE
+dimensions:
+  - name: dept_name
+    expression: dept_name
+    type: VARCHAR
+  - name: job_level
+    expression: job_level
+    type: VARCHAR
+time_dimensions:
+  - name: pay_date
+    expression: pay_date
+    type: DATE

@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>星辰科技 · HR 人力资本总览</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<style>
+  :root {
+    --bg: #0e1420; --panel: #161e2e; --panel2: #1b2437; --line: #26304a;
+    --text: #e8edf7; --muted: #8a97b0; --accent: #4f8cff; --green: #3ecf8e;
+    --orange: #ffb454; --red: #ff6b81; --purple: #a78bfa;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; padding: 24px 28px 40px; }
+  header { display: flex; align-items: baseline; gap: 16px; margin-bottom: 6px; }
+  h1 { font-size: 22px; letter-spacing: 1px; }
+  .sub { color: var(--muted); font-size: 13px; }
+  #status { font-size: 13px; color: var(--muted); margin: 10px 0 18px; }
+  #status.ok { color: var(--green); }
+  #status.err { color: var(--red); }
+  .kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin-bottom: 18px; }
+  .kpi { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; }
+  .kpi .label { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+  .kpi .value { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .kpi .value small { font-size: 13px; color: var(--muted); font-weight: 400; margin-left: 4px; }
+  .kpi .note { font-size: 11px; color: var(--muted); margin-top: 6px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px 8px; min-height: 300px; display: flex; flex-direction: column; }
+  .card h3 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  .card .desc { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+  .chart { flex: 1; min-height: 240px; }
+  footer { margin-top: 22px; color: var(--muted); font-size: 12px; line-height: 1.8; }
+  footer b { color: var(--text); font-weight: 600; }
+  .loading { display: grid; place-items: center; height: 100%; color: var(--muted); font-size: 13px; }
+  @media (max-width: 1100px) { .kpis { grid-template-columns: repeat(2, 1fr); } .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>星辰科技 · HR 人力资本总览</h1>
+  <span class="sub">数据快照截至 2026-08-31</span>
+</header>
+<div id="status">正在加载 Wren 语义引擎 (wren-core-wasm) 与快照数据…</div>
+
+<div class="kpis">
+  <div class="kpi"><div class="label">在职员工</div><div class="value" id="kpi-hc">–</div><div class="note">status = 在职</div></div>
+  <div class="kpi"><div class="label">2025 年离职率</div><div class="value" id="kpi-turnover">–</div><div class="note">期间离职 ÷ 期初在职（官方口径）</div></div>
+  <div class="kpi"><div class="label">2026H1 月均人力成本</div><div class="value" id="kpi-cost">–</div><div class="note">税前应发 = 基本工资+加班费+奖金</div></div>
+  <div class="kpi"><div class="label">2026 年新入职</div><div class="value" id="kpi-hire">–</div><div class="note">1–8 月累计入职人数</div></div>
+  <div class="kpi"><div class="label">2025 投递→入职转化率</div><div class="value" id="kpi-funnel">–</div><div class="note">招聘漏斗（candidates）</div></div>
+  <div class="kpi"><div class="label">2026H1 月均人力总成本</div><div class="value" id="kpi-totalcost">–</div><div class="note">应发 + 社保公积金企业缴纳</div></div>
+  <div class="kpi"><div class="label">2025 整体编制达成率</div><div class="value" id="kpi-plan">–</div><div class="note">年末实际 ÷ 计划编制（v_headcount_vs_plan）</div></div>
+  <div class="kpi"><div class="label">2025 Offer 接受率</div><div class="value" id="kpi-offer">–</div><div class="note">已接受 ÷ 已回复（offers）</div></div>
+  <div class="kpi"><div class="label">2025 员工敬业度</div><div class="value" id="kpi-eng">–</div><div class="note">年度调研均分（1-5）</div></div>
+</div>
+
+<div class="grid">
+  <div class="card"><h3>各部门在职人数</h3><div class="desc">employees ⋈ departments · 在职快照</div><div class="chart" id="c1"><div class="loading">加载中…</div></div></div>
+  <div class="card"><h3>月度人力成本趋势</h3><div class="desc">salary_payments · 2025-01 起应发合计（1 月含年终奖峰值）</div><div class="chart" id="c2"><div class="loading">加载中…</div></div></div>
+  <div class="card"><h3>各职级平均基本工资</h3><div class="desc">在职员工 · 税前月薪（元）</div><div class="chart" id="c3"><div class="loading">加载中…</div></div></div>
+  <div class="card"><h3>2025 年各部门离职率</h3><div class="desc">离职人数 ÷ 期初在职人数</div><div class="chart" id="c4"><div class="loading">加载中…</div></div></div>
+  <div class="card"><h3>2025 年假期结构（已批准）</h3><div class="desc">leave_requests · 按类型总天数</div><div class="chart" id="c5"><div class="loading">加载中…</div></div></div>
+  <div class="card"><h3>2026 年新入职来源 & 性别构成</h3><div class="desc">candidates 来源分布 / employees 性别占比</div><div class="chart" id="c6"><div class="loading">加载中…</div></div></div>
+  <div class="card"><h3>各部门编制 vs 年末实际（2025）</h3><div class="desc">headcount_plan ⋈ employees · 编制达成分析</div><div class="chart" id="c7"><div class="loading">加载中…</div></div></div>
+  <div class="card"><h3>人力总成本构成趋势</h3><div class="desc">基本工资/加班/奖金/社保企业缴纳 · v_workforce_monthly</div><div class="chart" id="c8"><div class="loading">加载中…</div></div></div>
+  <div class="card"><h3>Offer 拒绝原因分布</h3><div class="desc">offers · 全部已拒绝 offer</div><div class="chart" id="c9"><div class="loading">加载中…</div></div></div>
+  <div class="card"><h3>各渠道单人招聘成本（2025）</h3><div class="desc">recruitment_costs ÷ 对应来源入职人数</div><div class="chart" id="c10"><div class="loading">加载中…</div></div></div>
+  <div class="card"><h3>离职原因：档案 vs 面谈真实归因</h3><div class="desc">employees.termination_reason 对比 exit_interviews</div><div class="chart" id="c11"><div class="loading">加载中…</div></div></div>
+  <div class="card"><h3>各部门绩效目标加权完成率（2026H1）</h3><div class="desc">performance_goals 按 weight 加权</div><div class="chart" id="c12"><div class="loading">加载中…</div></div></div>
+</div>
+
+<footer>
+  <b>查询路径：</b>本页所有指标由 wren-core-wasm 在浏览器内加载本项目 MDL 语义层后执行 SQL 计算得出，
+  数据来自随应用打包的 PostgreSQL 快照（parquet，25 张表）。口径定义见项目 <b>knowledge/rules/general.md</b>（v2 含编制/调薪/Offer/敬业度等扩展口径）。
+</footer>
+
+<script>
+  window.addEventListener("error", (e) => {
+    const s = document.getElementById("status");
+    if (s) { s.textContent = "加载错误: " + (e.message || e.type); s.className = "err"; }
+  });
+</script>
+<script type="module">
+const $ = (id) => document.getElementById(id);
+const fmtW = (v) => (v / 10000).toLocaleString("zh-CN", { maximumFractionDigits: 0 }) + " 万";
+const setStatus = (msg, cls) => { const s = $("status"); s.textContent = msg; s.className = cls || ""; };
+
+const { WrenEngine } = await import("https://unpkg.com/@wrenai/wren-core-wasm@0.4.1/dist/index.js");
+const mdl = await (await fetch("./mdl.json")).json();
+
+const engine = await WrenEngine.init();
+// local 模式: 预注册快照 parquet (表名 = MDL 模型名), 再加载语义层
+const SNAPSHOT = ["departments", "employees", "salary_payments", "attendance_records",
+                  "leave_requests", "candidates", "interviews", "job_openings",
+                  "performance_reviews", "training_records", "transfers", "headcount_plan",
+                  "promotions", "contracts", "salary_changes", "insurance_payments",
+                  "awards_penalties", "overtime_requests", "leave_balances", "offers",
+                  "recruitment_costs", "performance_goals", "talent_pool",
+                  "engagement_surveys", "exit_interviews"];
+for (const name of SNAPSHOT) {
+  const buf = await (await fetch(`data/${name}.parquet`)).arrayBuffer();
+  await engine.registerParquet(name, buf);
+}
+await engine.loadMDL(mdl, { source: "./data/" });
+window.wrenEngine = engine; // 调试/演示: 控制台可直接 engine.query(sql)
+const q = (sql) => engine.query(sql);
+setStatus("✓ 语义引擎已就绪，正在执行语义层查询…", "ok");
+
+const rows = (res, key) => res.map((r) => r[key]);
+
+/* ---------- KPI ---------- */
+const [hc] = await q("SELECT count(*) AS v FROM employees WHERE status = '在职'");
+$("kpi-hc").textContent = hc.v.toLocaleString("zh-CN");
+
+const [to] = await q(`WITH leavers AS (SELECT count(*) AS n FROM employees
+    WHERE termination_date >= DATE '2025-01-01' AND termination_date < DATE '2026-01-01'),
+  hc0 AS (SELECT count(*) AS n FROM employees WHERE hire_date < DATE '2025-01-01'
+    AND (termination_date IS NULL OR termination_date >= DATE '2025-01-01'))
+  SELECT round(l.n * 100.0 / h.n, 2) AS v FROM leavers l, hc0 h`);
+$("kpi-turnover").innerHTML = `${to.v}<small>%</small>`;
+
+const [cost] = await q(`SELECT round(sum(base_pay + overtime_pay + bonus) / 6, 0) AS v
+  FROM salary_payments WHERE pay_period BETWEEN '2026-01' AND '2026-06'`);
+$("kpi-cost").innerHTML = `¥${fmtW(Number(cost.v))}`;
+
+const [hire] = await q(`SELECT count(*) AS v FROM employees
+  WHERE hire_date BETWEEN DATE '2026-01-01' AND DATE '2026-08-31'`);
+$("kpi-hire").textContent = hire.v.toLocaleString("zh-CN");
+
+const [fun] = await q(`SELECT round(count(*) FILTER (WHERE stage = '已入职') * 100.0 / count(*), 1) AS v
+  FROM candidates WHERE applied_at BETWEEN DATE '2025-01-01' AND DATE '2025-12-31'`);
+$("kpi-funnel").innerHTML = `${fun.v}<small>%</small>`;
+
+/* ---------- 图表公共样式 ---------- */
+const base = {
+  textStyle: { color: "#8a97b0", fontFamily: "inherit" },
+  tooltip: { backgroundColor: "#1b2437", borderColor: "#26304a", textStyle: { color: "#e8edf7" } },
+  grid: { left: 8, right: 18, top: 28, bottom: 8, containLabel: true },
+};
+const mk = (id, opt) => echarts.init($(id), null, { renderer: "canvas" }).setOption({ ...base, ...opt });
+const AXIS = {
+  xAxis: { type: "category", axisLine: { lineStyle: { color: "#26304a" } }, axisLabel: { color: "#8a97b0" } },
+  yAxis: { type: "value", splitLine: { lineStyle: { color: "#1c2536" } }, axisLabel: { color: "#8a97b0" } },
+};
+
+/* 1 各部门在职人数 */
+const dept = await q(`SELECT d.dept_name AS k, count(*) AS v FROM employees e
+  JOIN departments d ON e.dept_id = d.dept_id WHERE e.status = '在职'
+  GROUP BY d.dept_name ORDER BY v DESC`);
+mk("c1", { ...AXIS,
+  xAxis: { ...AXIS.xAxis, data: rows(dept, "k"), axisLabel: { color: "#8a97b0", interval: 0, rotate: 30 } },
+  series: [{ type: "bar", data: rows(dept, "v"), barMaxWidth: 26,
+    itemStyle: { borderRadius: [6, 6, 0, 0], color: "#4f8cff" } }] });
+
+/* 2 月度人力成本趋势 */
+const costM = await q(`SELECT pay_period AS k, sum(base_pay + overtime_pay + bonus) AS v
+  FROM salary_payments WHERE pay_period >= '2025-01' GROUP BY pay_period ORDER BY k`);
+mk("c2", { ...AXIS,
+  xAxis: { ...AXIS.xAxis, type: "category", data: rows(costM, "k") },
+  yAxis: { ...AXIS.yAxis, axisLabel: { color: "#8a97b0", formatter: (v) => v / 10000 + "万" } },
+  series: [{ type: "line", data: rows(costM, "v"), smooth: true, symbolSize: 5,
+    lineStyle: { color: "#3ecf8e", width: 2.5 }, itemStyle: { color: "#3ecf8e" },
+    areaStyle: { color: "rgba(62,207,142,.12)" } }] });
+
+/* 3 职级平均基本工资 */
+const lvl = await q(`SELECT job_level AS k, round(avg(base_salary), 0) AS v FROM employees
+  WHERE status = '在职' GROUP BY job_level
+  ORDER BY avg(base_salary) DESC`);
+mk("c3", { ...AXIS,
+  xAxis: { ...AXIS.xAxis, data: rows(lvl, "k"), axisLabel: { color: "#8a97b0", interval: 0 } },
+  series: [{ type: "bar", data: rows(lvl, "v"), barMaxWidth: 26,
+    itemStyle: { borderRadius: [6, 6, 0, 0], color: "#a78bfa" } }] });
+
+/* 4 各部门离职率 2025 */
+const attr = await q(`WITH l AS (SELECT e.dept_id, count(*) AS lv FROM employees e
+    WHERE e.termination_date >= DATE '2025-01-01' AND e.termination_date < DATE '2026-01-01' GROUP BY e.dept_id),
+  h AS (SELECT e.dept_id, count(*) AS hc FROM employees e WHERE e.hire_date < DATE '2025-01-01'
+    AND (e.termination_date IS NULL OR e.termination_date >= DATE '2025-01-01') GROUP BY e.dept_id)
+  SELECT d.dept_name AS k, round(coalesce(l.lv,0) * 100.0 / h.hc, 1) AS v
+  FROM h JOIN departments d ON d.dept_id = h.dept_id LEFT JOIN l ON l.dept_id = h.dept_id
+  ORDER BY v DESC`);
+mk("c4", { ...AXIS,
+  yAxis: { type: "category", data: rows(attr, "k"), axisLabel: { color: "#8a97b0" } },
+  xAxis: { type: "value", splitLine: { lineStyle: { color: "#1c2536" } }, axisLabel: { color: "#8a97b0", formatter: "{value}%" } },
+  series: [{ type: "bar", data: rows(attr, "v"), barMaxWidth: 16,
+    itemStyle: { borderRadius: [0, 6, 6, 0], color: "#ffb454" } }] });
+
+/* 5 假期结构 */
+const leave = await q(`SELECT leave_type AS k, sum(days) AS v FROM leave_requests
+  WHERE status = '已批准' AND start_date BETWEEN DATE '2025-01-01' AND DATE '2025-12-31'
+  GROUP BY leave_type ORDER BY v DESC`);
+mk("c5", {
+  series: [{ type: "pie", radius: ["42%", "70%"], center: ["50%", "52%"],
+    data: leave.map((r) => ({ name: r.k, value: r.v })),
+    label: { color: "#8a97b0", formatter: "{b} {c}天" },
+    itemStyle: { borderColor: "#161e2e", borderWidth: 2 } }] });
+
+/* 6 新入职来源 + 性别构成 (左右复用) */
+const src = await q(`SELECT c.source AS k, count(*) AS v FROM candidates c
+  JOIN employees e ON c.hired_emp_id = e.emp_id
+  WHERE e.hire_date BETWEEN DATE '2026-01-01' AND DATE '2026-08-31'
+  GROUP BY c.source ORDER BY v DESC`);
+const gen = await q(`SELECT gender AS k, count(*) AS v FROM employees
+  WHERE status = '在职' GROUP BY gender`);
+mk("c6", {
+  title: [{ text: "新入职来源", left: "25%", top: 4, textAlign: "center", textStyle: { color: "#8a97b0", fontSize: 12 } },
+          { text: "性别构成", left: "75%", top: 4, textAlign: "center", textStyle: { color: "#8a97b0", fontSize: 12 } }],
+  series: [
+    { type: "pie", radius: ["30%", "55%"], center: ["25%", "58%"],
+      data: src.map((r) => ({ name: r.k, value: r.v })),
+      label: { color: "#8a97b0", fontSize: 11, formatter: "{b}" },
+      itemStyle: { borderColor: "#161e2e", borderWidth: 2 } },
+    { type: "pie", radius: ["30%", "55%"], center: ["75%", "58%"],
+      data: gen.map((r, i) => ({ name: r.k, value: r.v,
+        itemStyle: { color: ["#4f8cff", "#ff6b81"][i] } })),
+      label: { color: "#8a97b0", fontSize: 11, formatter: "{b} {d}%" },
+      itemStyle: { borderColor: "#161e2e", borderWidth: 2 } }] });
+
+
+/* ---------- v2 扩展 KPI ---------- */
+const [tc] = await q(`WITH g AS (SELECT sum(base_pay + overtime_pay + bonus) AS v FROM v_workforce_monthly WHERE pay_period BETWEEN '2026-01' AND '2026-06'),
+  i AS (SELECT sum(insurance_company) AS v FROM v_workforce_monthly WHERE pay_period BETWEEN '2026-01' AND '2026-06')
+  SELECT round((g.v + i.v) / 6 / 10000, 1) AS v FROM g, i`);
+$("kpi-totalcost").innerHTML = `¥${tc.v}<small>万</small>`;
+
+const [plan] = await q(`SELECT round(sum(actual_headcount) * 100.0 / sum(planned_headcount), 1) AS v
+  FROM v_headcount_vs_plan WHERE plan_year = 2025`);
+$("kpi-plan").innerHTML = `${plan.v}<small>%</small>`;
+
+const [off] = await q(`SELECT round(count(*) FILTER (WHERE status = '已接受') * 100.0
+  / NULLIF(count(*) FILTER (WHERE status IN ('已接受','已拒绝')), 0), 1) AS v
+  FROM offers WHERE offer_date BETWEEN DATE '2025-01-01' AND DATE '2025-12-31'`);
+$("kpi-offer").innerHTML = `${off.v}<small>%</small>`;
+
+const [eng] = await q(`SELECT round(avg(engagement_score), 2) AS v FROM engagement_surveys WHERE survey_year = 2025`);
+$("kpi-eng").textContent = `${eng.v} / 5`;
+
+/* 7 编制 vs 年末实际 (2025) */
+const hp = await q(`SELECT dept_name AS k, planned_headcount AS p, actual_headcount AS a
+  FROM v_headcount_vs_plan WHERE plan_year = 2025`);
+mk("c7", { ...AXIS,
+  xAxis: { ...AXIS.xAxis, data: rows(hp, "k"), axisLabel: { color: "#8a97b0", interval: 0, rotate: 30 } },
+  series: [
+    { name: "计划编制", type: "bar", data: rows(hp, "p"), barMaxWidth: 14,
+      itemStyle: { borderRadius: [4, 4, 0, 0], color: "#3a4a6b" } },
+    { name: "年末实际", type: "bar", data: rows(hp, "a"), barMaxWidth: 14,
+      itemStyle: { borderRadius: [4, 4, 0, 0], color: "#4f8cff" } }] });
+
+/* 8 人力总成本构成趋势 */
+const costC = await q(`SELECT pay_period AS k, sum(base_pay) AS b, sum(overtime_pay) AS o,
+  sum(bonus) AS bo, sum(insurance_company) AS ins
+  FROM v_workforce_monthly WHERE pay_period >= '2025-01' GROUP BY pay_period`);
+mk("c8", { ...AXIS,
+  xAxis: { ...AXIS.xAxis, data: rows(costC, "k") },
+  yAxis: { ...AXIS.yAxis, axisLabel: { color: "#8a97b0", formatter: (v) => v / 10000 + "万" } },
+  series: [
+    { name: "基本工资", type: "line", stack: "cost", data: rows(costC, "b"), symbolSize: 0, lineStyle: { width: 0 },
+      areaStyle: { color: "#4f8cff" } },
+    { name: "加班费", type: "line", stack: "cost", data: rows(costC, "o"), symbolSize: 0, lineStyle: { width: 0 },
+      areaStyle: { color: "#3ecf8e" } },
+    { name: "奖金", type: "line", stack: "cost", data: rows(costC, "bo"), symbolSize: 0, lineStyle: { width: 0 },
+      areaStyle: { color: "#ffb454" } },
+    { name: "社保(企业)", type: "line", stack: "cost", data: rows(costC, "ins"), symbolSize: 0, lineStyle: { width: 0 },
+      areaStyle: { color: "#a78bfa" } }] });
+
+/* 9 Offer 拒绝原因 */
+const rej = await q(`SELECT reject_reason AS k, count(*) AS v FROM offers WHERE status = '已拒绝' GROUP BY reject_reason`);
+mk("c9", {
+  series: [{ type: "pie", radius: ["42%", "70%"], center: ["50%", "52%"],
+    data: rej.map((r) => ({ name: r.k, value: r.v })),
+    label: { color: "#8a97b0", formatter: "{b} {c}单" },
+    itemStyle: { borderColor: "#161e2e", borderWidth: 2 } }] });
+
+/* 10 渠道单人招聘成本 (2025) */
+const chCost = await q(`SELECT channel AS k, sum(amount) AS v FROM recruitment_costs
+  WHERE cost_month LIKE '2025%' GROUP BY channel`);
+const chHire = await q(`SELECT c.source AS k, count(*) AS v FROM candidates c
+  JOIN employees e ON c.hired_emp_id = e.emp_id
+  WHERE e.hire_date BETWEEN DATE '2025-01-01' AND DATE '2025-12-31' GROUP BY c.source`);
+const CH2SRC = { "招聘网站": "招聘网站", "猎头": "猎头", "内推奖励": "内推", "校园招聘": "校园招聘" };
+const hireMap = Object.fromEntries(rows(chHire, "k").map((k, i) => [k, chHire[i].v]));
+const costPerHire = chCost.map((r) => ({
+  k: r.k, v: r.v / (hireMap[CH2SRC[r.k]] || Infinity), n: hireMap[CH2SRC[r.k]] || 0 }))
+  .filter((r) => isFinite(r.v)).sort((a, b) => b.v - a.v);
+mk("c10", { ...AXIS,
+  yAxis: { type: "category", data: rows(costPerHire, "k"), axisLabel: { color: "#8a97b0" } },
+  xAxis: { type: "value", splitLine: { lineStyle: { color: "#1c2536" } }, axisLabel: { color: "#8a97b0", formatter: "¥{value}" } },
+  series: [{ type: "bar", data: costPerHire.map((r) => ({ value: Math.round(r.v),
+    label: { show: true, position: "right", color: "#8a97b0", fontSize: 11, formatter: `入职${r.n}人` } })),
+    barMaxWidth: 16, itemStyle: { borderRadius: [0, 6, 6, 0], color: "#ff6b81" } }] });
+
+/* 11 离职原因: 档案 vs 面谈真实归因 */
+const arc = await q(`SELECT termination_reason AS k, count(*) AS v FROM employees
+  WHERE status = '离职' GROUP BY termination_reason ORDER BY v DESC LIMIT 6`);
+const real = await q(`SELECT real_reason_category AS k, count(*) AS v FROM exit_interviews GROUP BY real_reason_category ORDER BY v DESC LIMIT 6`);
+mk("c11", {
+  title: [{ text: "档案离职原因", left: "25%", top: 4, textAlign: "center", textStyle: { color: "#8a97b0", fontSize: 12 } },
+          { text: "面谈真实归因", left: "75%", top: 4, textAlign: "center", textStyle: { color: "#8a97b0", fontSize: 12 } }],
+  series: [
+    { type: "pie", radius: ["30%", "55%"], center: ["25%", "58%"],
+      data: arc.map((r) => ({ name: r.k, value: r.v })),
+      label: { color: "#8a97b0", fontSize: 10, formatter: "{b}" },
+      itemStyle: { borderColor: "#161e2e", borderWidth: 2 } },
+    { type: "pie", radius: ["30%", "55%"], center: ["75%", "58%"],
+      data: real.map((r) => ({ name: r.k, value: r.v })),
+      label: { color: "#8a97b0", fontSize: 10, formatter: "{b}" },
+      itemStyle: { borderColor: "#161e2e", borderWidth: 2 } }] });
+
+/* 12 各部门绩效目标加权完成率 (2026H1) */
+const goal = await q(`SELECT d.dept_name AS k, sum(g.completion_pct * g.weight) / sum(g.weight) AS v
+  FROM performance_goals g JOIN employees e ON g.emp_id = e.emp_id JOIN departments d ON d.dept_id = e.dept_id
+  WHERE g.review_period = '2026H1' GROUP BY d.dept_name ORDER BY v DESC`);
+mk("c12", { ...AXIS,
+  xAxis: { ...AXIS.xAxis, data: rows(goal, "k"), axisLabel: { color: "#8a97b0", interval: 0, rotate: 30 } },
+  yAxis: { ...AXIS.yAxis, min: 40, axisLabel: { color: "#8a97b0", formatter: "{value}%" } },
+  series: [{ type: "bar", data: goal.map((r) => Math.round(r.v * 10) / 10), barMaxWidth: 24,
+    itemStyle: { borderRadius: [6, 6, 0, 0], color: "#3ecf8e" } }] });
+
+setStatus("✓ 完成：全部指标由 wren-core-wasm 语义层在浏览器内计算（v2：25 表 / 12 图）", "ok");
+</script>
+</body>
+</html>

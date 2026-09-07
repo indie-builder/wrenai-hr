@@ -1,0 +1,42 @@
+name: talent_pool
+table_reference:
+  catalog: ""
+  schema: public
+  table: talent_pool
+primary_key: pool_id
+properties:
+  description: "人才池: 高潜人才与关键岗位继任者"
+columns:
+  - name: pool_id
+    type: INTEGER
+    not_null: true
+    properties:
+      description: "记录ID(主键)"
+  - name: emp_id
+    type: INTEGER
+    properties:
+      description: "员工ID"
+  - name: pool_type
+    type: VARCHAR
+    properties:
+      description: "类型: 高潜人才/继任者"
+  - name: target_position
+    type: VARCHAR
+    properties:
+      description: "继任目标岗位, 继任者必填"
+  - name: potential_rating
+    type: VARCHAR
+    properties:
+      description: "潜力评级: 高潜/潜力之星"
+  - name: nominated_date
+    type: DATE
+    properties:
+      description: "提名日期"
+  - name: nominated_by
+    type: INTEGER
+    properties:
+      description: "提名人员工ID"
+  - name: status
+    type: VARCHAR
+    properties:
+      description: "状态: 在池/已晋升/已移出"

@@ -1,0 +1,38 @@
+name: salary_changes
+table_reference:
+  catalog: ""
+  schema: public
+  table: salary_changes
+primary_key: change_id
+properties:
+  description: "调薪记录: 员工月基本工资调整历史"
+columns:
+  - name: change_id
+    type: INTEGER
+    not_null: true
+    properties:
+      description: "调薪记录ID(主键)"
+  - name: emp_id
+    type: INTEGER
+    properties:
+      description: "调薪员工ID"
+  - name: effective_date
+    type: DATE
+    properties:
+      description: "生效日期"
+  - name: salary_before
+    type: DOUBLE
+    properties:
+      description: "调薪前月基本工资(元)"
+  - name: salary_after
+    type: DOUBLE
+    properties:
+      description: "调薪后月基本工资(元)"
+  - name: change_pct
+    type: DOUBLE
+    properties:
+      description: "调薪幅度(百分比)"
+  - name: change_type
+    type: VARCHAR
+    properties:
+      description: "调薪类型: 年度调薪/晋升调薪/特批调薪/转正调薪"

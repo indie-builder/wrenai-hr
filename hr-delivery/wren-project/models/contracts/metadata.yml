@@ -1,0 +1,52 @@
+name: contracts
+table_reference:
+  catalog: ""
+  schema: public
+  table: contracts
+primary_key: contract_id
+properties:
+  description: "劳动合同: 员工合同签订/续签/解除记录"
+columns:
+  - name: contract_id
+    type: INTEGER
+    not_null: true
+    properties:
+      description: "合同ID(主键)"
+  - name: emp_id
+    type: INTEGER
+    properties:
+      description: "员工ID"
+  - name: contract_no
+    type: VARCHAR
+    properties:
+      description: "合同编号"
+  - name: contract_type
+    type: VARCHAR
+    properties:
+      description: "合同类型: 固定期限/无固定期限/实习协议/劳务协议"
+  - name: start_date
+    type: DATE
+    properties:
+      description: "合同开始日期"
+  - name: end_date
+    type: DATE
+    properties:
+      description: "合同结束日期, 无固定期限为空"
+  - name: renewals
+    type: INTEGER
+    properties:
+      description: "已续签次数"
+  - name: status
+    type: VARCHAR
+    properties:
+      description: "合同状态: 履行中/已到期/已解除"
+  - name: signed_date
+    type: DATE
+    properties:
+      description: "签订日期"
+  - name: is_expiring_soon
+    type: BOOLEAN
+    is_calculated: true
+    expression: "CASE WHEN status = '履行中' AND end_date IS NOT NULL AND end_date <= current_date + INTERVAL '90 days' THEN true ELSE false END"
+    properties:
+      description: "是否90天内到期(履行中)"

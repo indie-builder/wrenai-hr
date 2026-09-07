@@ -1,0 +1,11 @@
+name: v_monthly_salary
+properties:
+  description: "月度薪资宽表: 薪资发放 + 员工 + 部门 (人力成本=base_pay+overtime_pay+bonus 在查询时计算)"
+statement: >-
+  SELECT s.pay_id, s.emp_id, e.name AS emp_name, e.dept_id, d.dept_name,
+  e.job_title, e.job_level, e.employment_type,
+  s.pay_period, s.base_pay, s.overtime_pay, s.bonus,
+  s.social_insurance, s.income_tax, s.net_pay, s.pay_date
+  FROM salary_payments s
+  JOIN employees e ON s.emp_id = e.emp_id
+  JOIN departments d ON e.dept_id = d.dept_id

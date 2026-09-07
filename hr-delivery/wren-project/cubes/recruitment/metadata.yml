@@ -1,0 +1,25 @@
+name: recruitment
+base_object: candidates
+properties:
+  description: "招聘漏斗 cube: 候选人数与入职转化, 按来源/阶段维度"
+measures:
+  - name: candidate_count
+    expression: COUNT(*)
+    type: BIGINT
+  - name: hired_count
+    expression: SUM(CASE WHEN stage = '已入职' THEN 1 ELSE 0 END)
+    type: BIGINT
+dimensions:
+  - name: source
+    expression: source
+    type: VARCHAR
+  - name: stage
+    expression: stage
+    type: VARCHAR
+  - name: gender
+    expression: gender
+    type: VARCHAR
+time_dimensions:
+  - name: applied_at
+    expression: applied_at
+    type: DATE

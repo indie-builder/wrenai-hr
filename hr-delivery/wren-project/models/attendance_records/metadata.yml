@@ -1,0 +1,34 @@
+name: attendance_records
+table_reference:
+  catalog: ""
+  schema: public
+  table: attendance_records
+primary_key: att_id
+properties:
+  description: "每日考勤事实表: 2025-01起每个工作日每人一条"
+columns:
+  - name: att_id
+    type: INTEGER
+    not_null: true
+    properties:
+      description: "考勤记录ID(主键)"
+  - name: emp_id
+    type: INTEGER
+    properties:
+      description: "员工ID"
+  - name: att_date
+    type: DATE
+    properties:
+      description: "考勤日期"
+  - name: status
+    type: VARCHAR
+    properties:
+      description: "考勤状态: 正常/迟到/早退/旷工/请假/远程办公"
+  - name: work_hours
+    type: DOUBLE
+    properties:
+      description: "当日工作小时数"
+  - name: overtime_hours
+    type: DOUBLE
+    properties:
+      description: "当日加班小时数"

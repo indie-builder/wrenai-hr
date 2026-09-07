@@ -1,0 +1,38 @@
+name: exit_interviews
+table_reference:
+  catalog: ""
+  schema: public
+  table: exit_interviews
+primary_key: exit_id
+properties:
+  description: "离职面谈: 离职员工真实原因调研"
+columns:
+  - name: exit_id
+    type: INTEGER
+    not_null: true
+    properties:
+      description: "面谈记录ID(主键)"
+  - name: emp_id
+    type: INTEGER
+    properties:
+      description: "离职员工ID"
+  - name: interview_date
+    type: DATE
+    properties:
+      description: "面谈日期(离职前一周内)"
+  - name: real_reason_category
+    type: VARCHAR
+    properties:
+      description: "真实原因归类: 薪酬福利/职业发展/管理问题/工作文化/家庭个人/健康"
+  - name: satisfaction
+    type: DOUBLE
+    properties:
+      description: "公司满意度(1-5)"
+  - name: would_recommend
+    type: BOOLEAN
+    properties:
+      description: "是否愿意推荐他人入职"
+  - name: comment
+    type: VARCHAR
+    properties:
+      description: "面谈备注"

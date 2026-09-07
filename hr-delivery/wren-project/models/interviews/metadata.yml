@@ -1,0 +1,38 @@
+name: interviews
+table_reference:
+  catalog: ""
+  schema: public
+  table: interviews
+primary_key: interview_id
+properties:
+  description: "面试记录表: 候选人各轮面试结果"
+columns:
+  - name: interview_id
+    type: INTEGER
+    not_null: true
+    properties:
+      description: "面试记录ID(主键)"
+  - name: cand_id
+    type: INTEGER
+    properties:
+      description: "候选人ID"
+  - name: round
+    type: VARCHAR
+    properties:
+      description: "面试轮次: 一面/二面/三面/HR面"
+  - name: interviewer_id
+    type: INTEGER
+    properties:
+      description: "面试官员工ID"
+  - name: interview_date
+    type: DATE
+    properties:
+      description: "面试日期"
+  - name: score
+    type: DOUBLE
+    properties:
+      description: "面试评分(0-100)"
+  - name: result
+    type: VARCHAR
+    properties:
+      description: "面试结果: 通过/未通过/待定"

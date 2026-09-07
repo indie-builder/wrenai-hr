@@ -1,0 +1,42 @@
+name: awards_penalties
+table_reference:
+  catalog: ""
+  schema: public
+  table: awards_penalties
+primary_key: record_id
+properties:
+  description: "奖惩记录: 员工奖励与处罚"
+columns:
+  - name: record_id
+    type: INTEGER
+    not_null: true
+    properties:
+      description: "记录ID(主键)"
+  - name: emp_id
+    type: INTEGER
+    properties:
+      description: "员工ID"
+  - name: record_date
+    type: DATE
+    properties:
+      description: "记录日期"
+  - name: record_type
+    type: VARCHAR
+    properties:
+      description: "类型: 奖励/处罚"
+  - name: category
+    type: VARCHAR
+    properties:
+      description: "类别: 奖金/通报表扬/优秀员工/警告/记过/罚款"
+  - name: amount
+    type: DOUBLE
+    properties:
+      description: "金额(元), 通报类为空"
+  - name: reason
+    type: VARCHAR
+    properties:
+      description: "事由"
+  - name: approver_id
+    type: INTEGER
+    properties:
+      description: "审批人员工ID"

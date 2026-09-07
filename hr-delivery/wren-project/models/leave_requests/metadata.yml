@@ -1,0 +1,46 @@
+name: leave_requests
+table_reference:
+  catalog: ""
+  schema: public
+  table: leave_requests
+primary_key: leave_id
+properties:
+  description: "请假申请单: 员工提交的各类假期申请"
+columns:
+  - name: leave_id
+    type: INTEGER
+    not_null: true
+    properties:
+      description: "请假单ID(主键)"
+  - name: emp_id
+    type: INTEGER
+    properties:
+      description: "请假员工ID"
+  - name: leave_type
+    type: VARCHAR
+    properties:
+      description: "假期类型: 年假/事假/病假/婚假/产假/陪产假/调休"
+  - name: start_date
+    type: DATE
+    properties:
+      description: "假期开始日期"
+  - name: end_date
+    type: DATE
+    properties:
+      description: "假期结束日期"
+  - name: days
+    type: DOUBLE
+    properties:
+      description: "请假天数(支持0.5)"
+  - name: status
+    type: VARCHAR
+    properties:
+      description: "审批状态: 已批准/待审批/已拒绝"
+  - name: approver_id
+    type: INTEGER
+    properties:
+      description: "审批人员工ID"
+  - name: applied_at
+    type: TIMESTAMP
+    properties:
+      description: "申请提交时间"

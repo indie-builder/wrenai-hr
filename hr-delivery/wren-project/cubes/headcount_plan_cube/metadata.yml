@@ -1,0 +1,22 @@
+name: headcount_plan_cube
+base_object: v_headcount_vs_plan
+properties:
+  description: "编制达成 cube: 计划编制 vs 年末实际在职"
+measures:
+  - name: planned_total
+    expression: SUM(planned_headcount)
+    type: BIGINT
+  - name: actual_total
+    expression: SUM(actual_headcount)
+    type: BIGINT
+  - name: dept_count
+    expression: COUNT(*)
+    type: BIGINT
+dimensions:
+  - name: dept_name
+    expression: dept_name
+    type: VARCHAR
+time_dimensions:
+  - name: plan_year_end
+    expression: plan_year_end
+    type: DATE

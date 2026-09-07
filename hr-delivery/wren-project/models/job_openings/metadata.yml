@@ -1,0 +1,54 @@
+name: job_openings
+table_reference:
+  catalog: ""
+  schema: public
+  table: job_openings
+primary_key: opening_id
+properties:
+  description: "招聘岗位表: 各部门的用人需求(headcount)"
+columns:
+  - name: opening_id
+    type: INTEGER
+    not_null: true
+    properties:
+      description: "岗位ID(主键)"
+  - name: dept_id
+    type: INTEGER
+    properties:
+      description: "用人部门ID"
+  - name: job_title
+    type: VARCHAR
+    properties:
+      description: "招聘岗位名称"
+  - name: job_level
+    type: VARCHAR
+    properties:
+      description: "招聘职级"
+  - name: headcount
+    type: INTEGER
+    properties:
+      description: "计划招聘人数"
+  - name: salary_min
+    type: DOUBLE
+    properties:
+      description: "岗位薪资下限(月)"
+  - name: salary_max
+    type: DOUBLE
+    properties:
+      description: "岗位薪资上限(月)"
+  - name: status
+    type: VARCHAR
+    properties:
+      description: "岗位状态: 招聘中/已关闭/暂停"
+  - name: opened_at
+    type: DATE
+    properties:
+      description: "岗位开放日期"
+  - name: closed_at
+    type: DATE
+    properties:
+      description: "岗位关闭日期"
+  - name: hired_count
+    type: INTEGER
+    properties:
+      description: "该岗位实际入职人数"

@@ -1,0 +1,50 @@
+name: insurance_payments
+table_reference:
+  catalog: ""
+  schema: public
+  table: insurance_payments
+primary_key: ins_id
+properties:
+  description: "社保公积金企业缴纳月度记录(与薪资同期, 缴费基数=当月基本工资)"
+columns:
+  - name: ins_id
+    type: INTEGER
+    not_null: true
+    properties:
+      description: "缴纳记录ID(主键)"
+  - name: emp_id
+    type: INTEGER
+    properties:
+      description: "员工ID"
+  - name: pay_period
+    type: VARCHAR
+    properties:
+      description: "缴纳月份, 格式 YYYY-MM"
+  - name: pension
+    type: DOUBLE
+    properties:
+      description: "养老保险企业缴纳(元)"
+  - name: medical
+    type: DOUBLE
+    properties:
+      description: "医疗保险企业缴纳(元)"
+  - name: unemployment
+    type: DOUBLE
+    properties:
+      description: "失业保险企业缴纳(元)"
+  - name: injury
+    type: DOUBLE
+    properties:
+      description: "工伤保险企业缴纳(元)"
+  - name: maternity
+    type: DOUBLE
+    properties:
+      description: "生育保险企业缴纳(元)"
+  - name: housing_fund
+    type: DOUBLE
+    properties:
+      description: "住房公积金企业缴纳(元)"
+  - name: company_total
+    type: DOUBLE
+    properties:
+      description: "企业缴纳合计(元)"

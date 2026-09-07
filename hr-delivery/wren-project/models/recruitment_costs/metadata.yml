@@ -1,0 +1,30 @@
+name: recruitment_costs
+table_reference:
+  catalog: ""
+  schema: public
+  table: recruitment_costs
+primary_key: cost_id
+properties:
+  description: "招聘渠道月度费用"
+columns:
+  - name: cost_id
+    type: INTEGER
+    not_null: true
+    properties:
+      description: "费用记录ID(主键)"
+  - name: channel
+    type: VARCHAR
+    properties:
+      description: "渠道: 招聘网站/猎头/内推奖励/校园招聘"
+  - name: cost_month
+    type: VARCHAR
+    properties:
+      description: "费用月份, 格式 YYYY-MM"
+  - name: amount
+    type: DOUBLE
+    properties:
+      description: "费用金额(元)"
+  - name: notes
+    type: VARCHAR
+    properties:
+      description: "备注"

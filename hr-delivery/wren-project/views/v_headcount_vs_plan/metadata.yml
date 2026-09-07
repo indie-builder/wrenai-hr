@@ -1,0 +1,20 @@
+name: v_headcount_vs_plan
+properties:
+  description: "编制达成宽表: 部门年度计划编制 vs 年末实际在职人数"
+statement: >-
+  SELECT p.plan_year, make_date(p.plan_year, 12, 31) AS plan_year_end, d.dept_name, p.planned_headcount, p.budget_labor_cost,
+  coalesce(a.actual_headcount, 0) AS actual_headcount
+  FROM headcount_plan p
+  JOIN departments d ON d.dept_id = p.dept_id
+  LEFT JOIN (
+  SELECT y.yr_end, e.dept_id, count(*) AS actual_headcount
+  FROM (
+  SELECT DATE '2023-12-31' AS yr_end
+  UNION ALL SELECT DATE '2024-12-31'
+  UNION ALL SELECT DATE '2025-12-31'
+  UNION ALL SELECT DATE '2026-12-31'
+  ) y
+  JOIN employees e ON e.hire_date <= y.yr_end
+  AND (e.termination_date IS NULL OR e.termination_date > y.yr_end)
+  GROUP BY y.yr_end, e.dept_id
+  ) a ON a.yr_end = make_date(p.plan_year, 12, 31) AND a.dept_id = p.dept_id

@@ -1,0 +1,12 @@
+name: v_active_employees
+properties:
+  description: "在职员工宽表: 员工档案 + 部门名称, 仅 status=在职 (人员分析用)"
+statement: >-
+  SELECT e.emp_id, e.emp_no, e.name, e.gender, e.birth_date, e.hire_date,
+  e.dept_id, d.dept_name, d.location AS dept_location, e.job_title, e.job_level,
+  e.employment_type, e.status, e.base_salary, e.work_city, e.education,
+  CAST(date_part('year', current_date) AS INTEGER) - CAST(date_part('year', e.birth_date) AS INTEGER) AS age,
+  round((current_date - e.hire_date) / 365.25, 1) AS tenure_years
+  FROM employees e
+  JOIN departments d ON e.dept_id = d.dept_id
+  WHERE e.status = '在职'

@@ -1,0 +1,11 @@
+name: v_workforce_monthly
+properties:
+  description: "人力成本月度明细宽表: 薪资行 + 社保企业缴纳 (人效/总成本分析用, 聚合在查询时完成)"
+statement: >-
+  SELECT s.pay_id, s.pay_period, s.pay_date, e.emp_id, e.emp_no, e.name AS emp_name,
+  d.dept_name, e.job_level, e.employment_type,
+  s.base_pay, s.overtime_pay, s.bonus, i.company_total AS insurance_company
+  FROM salary_payments s
+  JOIN insurance_payments i ON i.emp_id = s.emp_id AND i.pay_period = s.pay_period
+  JOIN employees e ON e.emp_id = s.emp_id
+  JOIN departments d ON d.dept_id = e.dept_id

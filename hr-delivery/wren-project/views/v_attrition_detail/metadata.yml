@@ -1,0 +1,11 @@
+name: v_attrition_detail
+properties:
+  description: "离职明细宽表: 离职员工 + 部门 + 离职面谈真实原因 (流失分析用)"
+statement: >-
+  SELECT e.emp_id, e.name AS emp_name, e.gender, d.dept_name, e.job_level, e.job_title,
+  e.work_city, e.hire_date, e.termination_date, e.termination_reason, e.is_voluntary,
+  x.real_reason_category, x.satisfaction AS exit_satisfaction, x.would_recommend
+  FROM employees e
+  JOIN departments d ON e.dept_id = d.dept_id
+  LEFT JOIN exit_interviews x ON x.emp_id = e.emp_id
+  WHERE e.status = '离职'

@@ -1,0 +1,34 @@
+name: labor_cost
+base_object: v_monthly_salary
+properties:
+  description: "人力成本 cube: 月度应发/实发合计与发薪人数, 按部门/职级维度"
+measures:
+  - name: gross_cost
+    expression: SUM(base_pay + overtime_pay + bonus)
+    type: DOUBLE
+  - name: net_pay_total
+    expression: SUM(net_pay)
+    type: DOUBLE
+  - name: base_pay_total
+    expression: SUM(base_pay)
+    type: DOUBLE
+  - name: bonus_total
+    expression: SUM(bonus)
+    type: DOUBLE
+  - name: payee_count
+    expression: COUNT(*)
+    type: BIGINT
+dimensions:
+  - name: dept_name
+    expression: dept_name
+    type: VARCHAR
+  - name: job_level
+    expression: job_level
+    type: VARCHAR
+  - name: employment_type
+    expression: employment_type
+    type: VARCHAR
+time_dimensions:
+  - name: pay_date
+    expression: pay_date
+    type: DATE

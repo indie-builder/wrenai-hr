@@ -1,0 +1,38 @@
+name: training_records
+table_reference:
+  catalog: ""
+  schema: public
+  table: training_records
+primary_key: training_id
+properties:
+  description: "培训记录表: 员工参加的培训课程"
+columns:
+  - name: training_id
+    type: INTEGER
+    not_null: true
+    properties:
+      description: "培训记录ID(主键)"
+  - name: emp_id
+    type: INTEGER
+    properties:
+      description: "参训员工ID"
+  - name: course_name
+    type: VARCHAR
+    properties:
+      description: "课程名称, 如: 新员工入职培训/管理力提升"
+  - name: training_date
+    type: DATE
+    properties:
+      description: "培训日期"
+  - name: hours
+    type: DOUBLE
+    properties:
+      description: "课程时长(小时)"
+  - name: completed
+    type: BOOLEAN
+    properties:
+      description: "是否完成: true/false"
+  - name: score
+    type: DOUBLE
+    properties:
+      description: "结业得分(0-100)"

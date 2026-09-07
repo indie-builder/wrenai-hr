@@ -1,0 +1,55 @@
+name: promotions
+table_reference:
+  catalog: ""
+  schema: public
+  table: promotions
+primary_key: promo_id
+properties:
+  description: "晋升记录: 员工职级/职位晋升及调薪"
+columns:
+  - name: promo_id
+    type: INTEGER
+    not_null: true
+    properties:
+      description: "晋升记录ID(主键)"
+  - name: emp_id
+    type: INTEGER
+    properties:
+      description: "晋升员工ID"
+  - name: promo_date
+    type: DATE
+    properties:
+      description: "晋升生效日期"
+  - name: from_level
+    type: VARCHAR
+    properties:
+      description: "晋升前职级"
+  - name: to_level
+    type: VARCHAR
+    properties:
+      description: "晋升后职级"
+  - name: from_title
+    type: VARCHAR
+    properties:
+      description: "晋升前职位"
+  - name: to_title
+    type: VARCHAR
+    properties:
+      description: "晋升后职位"
+  - name: salary_before
+    type: DOUBLE
+    properties:
+      description: "晋升前月基本工资(元)"
+  - name: salary_after
+    type: DOUBLE
+    properties:
+      description: "晋升后月基本工资(元)"
+  - name: reason
+    type: VARCHAR
+    properties:
+      description: "晋升原因: 年度晋升/破格晋升/继任就任"
+    type: DOUBLE
+    is_calculated: true
+    expression: "round((salary_after - salary_before) * 100.0 / salary_before, 2)"
+    properties:
+      description: "晋升调薪幅度(%)"

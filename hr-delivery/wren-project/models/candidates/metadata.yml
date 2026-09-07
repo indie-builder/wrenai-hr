@@ -1,0 +1,46 @@
+name: candidates
+table_reference:
+  catalog: ""
+  schema: public
+  table: candidates
+primary_key: cand_id
+properties:
+  description: "候选人表: 应聘各岗位的候选人及其招聘漏斗进展"
+columns:
+  - name: cand_id
+    type: INTEGER
+    not_null: true
+    properties:
+      description: "候选人ID(主键)"
+  - name: name
+    type: VARCHAR
+    properties:
+      description: "候选人姓名"
+  - name: gender
+    type: VARCHAR
+    properties:
+      description: "候选人性别"
+  - name: opening_id
+    type: INTEGER
+    properties:
+      description: "应聘岗位ID"
+  - name: source
+    type: VARCHAR
+    properties:
+      description: "候选人来源: 内推/招聘网站/猎头/校园招聘"
+  - name: stage
+    type: VARCHAR
+    properties:
+      description: "当前阶段: 简历筛选/面试中/已发offer/已入职/已淘汰/拒绝offer"
+  - name: applied_at
+    type: DATE
+    properties:
+      description: "投递日期"
+  - name: expected_salary
+    type: DOUBLE
+    properties:
+      description: "期望月薪"
+  - name: hired_emp_id
+    type: INTEGER
+    properties:
+      description: "入职后关联的员工ID, 未入职为空"

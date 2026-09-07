@@ -1,0 +1,38 @@
+name: offers
+table_reference:
+  catalog: ""
+  schema: public
+  table: offers
+primary_key: offer_id
+properties:
+  description: "Offer发放记录"
+columns:
+  - name: offer_id
+    type: INTEGER
+    not_null: true
+    properties:
+      description: "Offer ID(主键)"
+  - name: cand_id
+    type: INTEGER
+    properties:
+      description: "候选人ID"
+  - name: offer_date
+    type: DATE
+    properties:
+      description: "发放日期"
+  - name: offer_salary
+    type: DOUBLE
+    properties:
+      description: "Offer 月薪(元)"
+  - name: status
+    type: VARCHAR
+    properties:
+      description: "状态: 待回复/已接受/已拒绝"
+  - name: response_date
+    type: DATE
+    properties:
+      description: "回复日期"
+  - name: reject_reason
+    type: VARCHAR
+    properties:
+      description: "拒绝原因: 薪酬不匹配/已接其他offer/家庭原因/其他"

@@ -1,0 +1,46 @@
+name: engagement_surveys
+table_reference:
+  catalog: ""
+  schema: public
+  table: engagement_surveys
+primary_key: survey_id
+properties:
+  description: "敬业度调研: 年度全员调研(1-5分)"
+columns:
+  - name: survey_id
+    type: INTEGER
+    not_null: true
+    properties:
+      description: "调研记录ID(主键)"
+  - name: emp_id
+    type: INTEGER
+    properties:
+      description: "员工ID"
+  - name: survey_year
+    type: INTEGER
+    properties:
+      description: "调研年度"
+  - name: engagement_score
+    type: DOUBLE
+    properties:
+      description: "敬业度总分(1-5)"
+  - name: recognition
+    type: DOUBLE
+    properties:
+      description: "认可与回报维度(1-5)"
+  - name: growth
+    type: DOUBLE
+    properties:
+      description: "成长与发展维度(1-5)"
+  - name: pay_satisfaction
+    type: DOUBLE
+    properties:
+      description: "薪酬满意度维度(1-5)"
+  - name: manager_trust
+    type: DOUBLE
+    properties:
+      description: "管理者信任维度(1-5)"
+  - name: work_life_balance
+    type: DOUBLE
+    properties:
+      description: "工作生活平衡维度(1-5)"
