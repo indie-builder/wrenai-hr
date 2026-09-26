@@ -39,9 +39,9 @@ def _cell(v):
 
 
 def write_csv(out_dir, name, header, rows):
-    """按 header 顺序写出字典行; None→空串, True/False→t/f"""
+    """按 header 顺序写出字典行; None→空串, True/False→t/f; LF 行尾与仓库快照一致"""
     with open(os.path.join(out_dir, name), "w", newline="", encoding="utf-8") as f:
-        w = csv.writer(f)
+        w = csv.writer(f, lineterminator="\n")
         w.writerow(header)
         for r in rows:
-            w.writerow([_cell(r.get(k)) for k in header])
+            w.writerow([_cell(r[k]) for k in header])
