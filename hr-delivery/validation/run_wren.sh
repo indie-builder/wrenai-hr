@@ -1,11 +1,26 @@
 #!/usr/bin/env bash
-# 端到端验证: Wren 语义层路径
+# 端到端验证: Wren 语义层路径 (v1 遗留脚本, 当前统一验证入口为 validation/v2/run_all.py)
 # SQL 由 agent 基于 MDL 上下文编写 (模型名/视图/计算列/业务口径), 经 wren dry-plan 校验后执行
 set -uo pipefail
-cd "$(dirname "$0")"
-W=/Users/xbjt/Documents/myself/wrenai-hr/.venv/bin/wren
-cd ../wren-project
-export $(grep -v '^#' .env | xargs)
+cd "$(dirname "$0")/../.."
+ROOT="$PWD"
+W="${WREN_BIN:-$ROOT/.venv/bin/wren}"
+cd "$ROOT/hr-delivery/wren-project"
+if [ ! -x "$W" ]; then
+  echo "错误: 未找到 wren CLI: $W" >&2
+  echo "请在仓库根目录执行: python3 -m venv .venv && .venv/bin/python -m pip install 'wrenai[memory]==0.13.4' (见 hr-delivery/README.md)" >&2
+  exit 1
+fi
+if [ ! -f .env ]; then
+  echo "错误: 缺少 hr-delivery/wren-project/.env (可为空文件)" >&2
+  exit 1
+fi
+set -a
+# 临时关闭 -u: .env 值可能引用外部变量, 不应因此崩溃
+set +u
+. ./.env
+set -u
+set +a
 mkdir -p ../validation/wren_output
 
 run() {  # $1=编号  $2=SQL

@@ -1,9 +1,26 @@
 #!/usr/bin/env bash
 # 把验证过的 NL→SQL 对写入 wren 语义记忆 (knowledge/sql/), 沉淀为可复用资产
+# (v1 遗留脚本; 批量写入会修改语义记忆, 运行前确认)
 set -uo pipefail
-cd "$(dirname "$0")/../wren-project"
-W=/Users/xbjt/Documents/myself/wrenai-hr/.venv/bin/wren
-export $(grep -v '^#' .env | xargs)
+cd "$(dirname "$0")/../.."
+ROOT="$PWD"
+W="${WREN_BIN:-$ROOT/.venv/bin/wren}"
+cd "$ROOT/hr-delivery/wren-project"
+if [ ! -x "$W" ]; then
+  echo "错误: 未找到 wren CLI: $W" >&2
+  echo "请在仓库根目录执行: python3 -m venv .venv && .venv/bin/python -m pip install 'wrenai[memory]==0.13.4' (见 hr-delivery/README.md)" >&2
+  exit 1
+fi
+if [ ! -f .env ]; then
+  echo "错误: 缺少 hr-delivery/wren-project/.env (可为空文件)" >&2
+  exit 1
+fi
+set -a
+# 临时关闭 -u: .env 值可能引用外部变量, 不应因此崩溃
+set +u
+. ./.env
+set -u
+set +a
 
 store() { $W memory store --nl "$1" --sql "$2" -q 2>&1 | tail -1; }
 
