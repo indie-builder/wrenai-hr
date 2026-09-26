@@ -47,7 +47,7 @@
   .kpi .value small { font-size: 13px; color: var(--muted); font-weight: 400; margin-left: 4px; }
   .kpi .note { font-size: 11px; color: var(--muted); margin-top: 6px; }
   .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
-  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px 8px; min-height: 300px; display: flex; flex-direction: column; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px 8px; min-height: 300px; min-width: 0; display: flex; flex-direction: column; }
   .card h3 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
   .card .desc { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
   .chart { flex: 1; min-height: 240px; }
@@ -155,7 +155,16 @@ const base = {
   tooltip: { backgroundColor: "#1b2437", borderColor: "#26304a", textStyle: { color: "#e8edf7" } },
   grid: { left: 8, right: 18, top: 28, bottom: 8, containLabel: true },
 };
-const mk = (id, opt) => echarts.init($(id), null, { renderer: "canvas" }).setOption({ ...base, ...opt });
+const charts = [];
+const mk = (id, opt) => {
+  const c = echarts.init($(id), null, { renderer: "canvas" });
+  c.setOption({ ...base, ...opt });
+  charts.push(c);
+  return c;
+};
+// 画布尺寸在 init 时固定, 窗口缩放后不重排会留下大片空白或溢出卡片
+// (不用 rAF 节流: 后台标签页 rAF 被浏览器门控, 会导致缩放后不重排)
+window.addEventListener("resize", () => charts.forEach((c) => c.resize()));
 const AXIS = {
   xAxis: { type: "category", axisLine: { lineStyle: { color: "#26304a" } }, axisLabel: { color: "#8a97b0" } },
   yAxis: { type: "value", splitLine: { lineStyle: { color: "#1c2536" } }, axisLabel: { color: "#8a97b0" } },
