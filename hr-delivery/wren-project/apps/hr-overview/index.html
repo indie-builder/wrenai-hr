@@ -132,6 +132,7 @@ const q = (sql) => engine.query(sql);
 setStatus("✓ 语义引擎已就绪，正在执行语义层查询…", "ok");
 
 const rows = (res, key) => res.map((r) => r[key]);
+const setKpi = (id, value, unit = "") => { $(id).innerHTML = `${value}<small>${unit}</small>`; };
 
 /* ---------- KPI ---------- */
 const [hc] = await q("SELECT count(*) AS v FROM employees WHERE status = '在职'");
@@ -142,11 +143,11 @@ const [to] = await q(`WITH leavers AS (SELECT count(*) AS n FROM employees
   hc0 AS (SELECT count(*) AS n FROM employees WHERE hire_date < DATE '2025-01-01'
     AND (termination_date IS NULL OR termination_date >= DATE '2025-01-01'))
   SELECT round(l.n * 100.0 / h.n, 2) AS v FROM leavers l, hc0 h`);
-$("kpi-turnover").innerHTML = `${to.v}<small>%</small>`;
+setKpi("kpi-turnover", to.v, "%");
 
 const [cost] = await q(`SELECT round(sum(base_pay + overtime_pay + bonus) / 6, 0) AS v
   FROM salary_payments WHERE pay_period BETWEEN '2026-01' AND '2026-06'`);
-$("kpi-cost").innerHTML = `¥${fmtW(Number(cost.v))}<small> 万</small>`;
+setKpi("kpi-cost", `¥${fmtW(Number(cost.v))}`, " 万");
 
 const [hire] = await q(`SELECT count(*) AS v FROM employees
   WHERE hire_date BETWEEN DATE '2026-01-01' AND DATE '2026-08-31'`);
@@ -154,9 +155,10 @@ $("kpi-hire").textContent = hire.v.toLocaleString("zh-CN");
 
 const [fun] = await q(`SELECT round(count(*) FILTER (WHERE stage = '已入职') * 100.0 / count(*), 1) AS v
   FROM candidates WHERE applied_at BETWEEN DATE '2025-01-01' AND DATE '2025-12-31'`);
-$("kpi-funnel").innerHTML = `${fun.v}<small>%</small>`;
+setKpi("kpi-funnel", fun.v, "%");
 
-/* ---------- 图表公共样式 ---------- */
+/* ---------- 图表公共样式与图表工厂 ---------- */
+const MUTED = "#8a97b0", PANEL = "#161e2e", SPLIT = "#1c2536";
 const base = {
   textStyle: { color: "#8a97b0", fontFamily: "inherit" },
   tooltip: { backgroundColor: "#1b2437", borderColor: "#26304a", textStyle: { color: "#e8edf7" } },
@@ -173,25 +175,59 @@ const mk = (id, opt) => {
 // (不用 rAF 节流: 后台标签页 rAF 被浏览器门控, 会导致缩放后不重排)
 window.addEventListener("resize", () => charts.forEach((c) => c.resize()));
 const AXIS = {
-  xAxis: { type: "category", axisLine: { lineStyle: { color: "#26304a" } }, axisLabel: { color: "#8a97b0" } },
-  yAxis: { type: "value", splitLine: { lineStyle: { color: "#1c2536" } }, axisLabel: { color: "#8a97b0" } },
+  xAxis: { type: "category", axisLine: { lineStyle: { color: "#26304a" } }, axisLabel: { color: MUTED } },
+  yAxis: { type: "value", splitLine: { lineStyle: { color: SPLIT } }, axisLabel: { color: MUTED } },
 };
+const WAN = (v) => (v / 10000).toLocaleString("zh-CN") + "万";
+const CAT = (x, extra = {}) => ({ ...x, axisLabel: { color: MUTED, ...extra } });
+
+// 纵向柱状图 (支持多系列); series: [{name?, data, color, max?, br?}], label/y 覆盖公共轴
+const vBar = (id, cats, series, { label = {}, y = AXIS.yAxis } = {}) => mk(id, {
+  ...AXIS,
+  xAxis: { ...AXIS.xAxis, data: cats, axisLabel: { color: MUTED, ...label } },
+  yAxis: y === AXIS.yAxis ? y : { ...AXIS.yAxis, ...y },
+  series: series.map((s) => ({ name: s.name, type: "bar", data: s.data, barMaxWidth: s.max || 26,
+    itemStyle: { borderRadius: s.br || [6, 6, 0, 0], color: s.color } })),
+});
+// 横向条形图 (类目在 y 轴)
+const hBar = (id, cats, values, color, fmt) => mk(id, {
+  ...AXIS,
+  yAxis: { type: "category", data: cats, axisLabel: { color: MUTED } },
+  xAxis: { type: "value", splitLine: { lineStyle: { color: SPLIT } },
+    axisLabel: { color: MUTED, formatter: fmt } },
+  series: [{ type: "bar", data: values, barMaxWidth: 16,
+    itemStyle: { borderRadius: [0, 6, 6, 0], color } }],
+});
+// 环形饼图
+const pie = (id, data, fmt) => mk(id, {
+  series: [{ type: "pie", radius: ["42%", "70%"], center: ["50%", "52%"], data,
+    label: { color: MUTED, formatter: fmt },
+    itemStyle: { borderColor: PANEL, borderWidth: 2 } }],
+});
+// 左右双环形饼图
+const dualPie = (id, lTitle, rTitle, series, { fs = 11, fmts = ["{b}", "{b}"] } = {}) => mk(id, {
+  title: [{ text: lTitle, left: "25%", top: 4, textAlign: "center", textStyle: { color: MUTED, fontSize: 12 } },
+          { text: rTitle, left: "75%", top: 4, textAlign: "center", textStyle: { color: MUTED, fontSize: 12 } }],
+  series: series.map((s, i) => ({ ...s, type: "pie", radius: ["30%", "55%"],
+    center: [i ? "75%" : "25%", "58%"],
+    label: { color: MUTED, fontSize: fs, formatter: fmts[i] },
+    itemStyle: { borderColor: PANEL, borderWidth: 2 } })),
+});
+const pieData = (res) => res.map((r) => ({ name: r.k, value: r.v }));
 
 /* 1 各部门在职人数 */
 const dept = await q(`SELECT d.dept_name AS k, count(*) AS v FROM employees e
   JOIN departments d ON e.dept_id = d.dept_id WHERE e.status = '在职'
   GROUP BY d.dept_name ORDER BY v DESC`);
-mk("c1", { ...AXIS,
-  xAxis: { ...AXIS.xAxis, data: rows(dept, "k"), axisLabel: { color: "#8a97b0", interval: 0, rotate: 30 } },
-  series: [{ type: "bar", data: rows(dept, "v"), barMaxWidth: 26,
-    itemStyle: { borderRadius: [6, 6, 0, 0], color: "#4f8cff" } }] });
+vBar("c1", rows(dept, "k"), [{ data: rows(dept, "v"), color: "#4f8cff" }],
+     { label: { interval: 0, rotate: 30 } });
 
 /* 2 月度人力成本趋势 */
 const costM = await q(`SELECT pay_period AS k, sum(base_pay + overtime_pay + bonus) AS v
   FROM salary_payments WHERE pay_period >= '2025-01' GROUP BY pay_period ORDER BY k`);
 mk("c2", { ...AXIS,
-  xAxis: { ...AXIS.xAxis, type: "category", data: rows(costM, "k") },
-  yAxis: { ...AXIS.yAxis, axisLabel: { color: "#8a97b0", formatter: (v) => (v / 10000).toLocaleString("zh-CN") + "万" } },
+  xAxis: { ...CAT(AXIS.xAxis), data: rows(costM, "k") },
+  yAxis: { ...AXIS.yAxis, axisLabel: { color: MUTED, formatter: WAN } },
   series: [{ type: "line", data: rows(costM, "v"), smooth: true, symbolSize: 5,
     lineStyle: { color: "#3ecf8e", width: 2.5 }, itemStyle: { color: "#3ecf8e" },
     areaStyle: { color: "rgba(62,207,142,.12)" } }] });
@@ -200,10 +236,7 @@ mk("c2", { ...AXIS,
 const lvl = await q(`SELECT job_level AS k, round(avg(base_salary), 0) AS v FROM employees
   WHERE status = '在职' GROUP BY job_level
   ORDER BY avg(base_salary) DESC`);
-mk("c3", { ...AXIS,
-  xAxis: { ...AXIS.xAxis, data: rows(lvl, "k"), axisLabel: { color: "#8a97b0", interval: 0 } },
-  series: [{ type: "bar", data: rows(lvl, "v"), barMaxWidth: 26,
-    itemStyle: { borderRadius: [6, 6, 0, 0], color: "#a78bfa" } }] });
+vBar("c3", rows(lvl, "k"), [{ data: rows(lvl, "v"), color: "#a78bfa" }], { label: { interval: 0 } });
 
 /* 4 各部门离职率 2025 */
 const attr = await q(`WITH l AS (SELECT e.dept_id, count(*) AS lv FROM employees e
@@ -213,21 +246,13 @@ const attr = await q(`WITH l AS (SELECT e.dept_id, count(*) AS lv FROM employees
   SELECT d.dept_name AS k, round(coalesce(l.lv,0) * 100.0 / h.hc, 1) AS v
   FROM h JOIN departments d ON d.dept_id = h.dept_id LEFT JOIN l ON l.dept_id = h.dept_id
   ORDER BY v DESC`);
-mk("c4", { ...AXIS,
-  yAxis: { type: "category", data: rows(attr, "k"), axisLabel: { color: "#8a97b0" } },
-  xAxis: { type: "value", splitLine: { lineStyle: { color: "#1c2536" } }, axisLabel: { color: "#8a97b0", formatter: "{value}%" } },
-  series: [{ type: "bar", data: rows(attr, "v"), barMaxWidth: 16,
-    itemStyle: { borderRadius: [0, 6, 6, 0], color: "#ffb454" } }] });
+hBar("c4", rows(attr, "k"), rows(attr, "v"), "#ffb454", "{value}%");
 
 /* 5 假期结构 */
 const leave = await q(`SELECT leave_type AS k, sum(days) AS v FROM leave_requests
   WHERE status = '已批准' AND start_date BETWEEN DATE '2025-01-01' AND DATE '2025-12-31'
   GROUP BY leave_type ORDER BY v DESC`);
-mk("c5", {
-  series: [{ type: "pie", radius: ["42%", "70%"], center: ["50%", "52%"],
-    data: leave.map((r) => ({ name: r.k, value: r.v })),
-    label: { color: "#8a97b0", formatter: "{b} {c}天" },
-    itemStyle: { borderColor: "#161e2e", borderWidth: 2 } }] });
+pie("c5", pieData(leave), "{b} {c}天");
 
 /* 6 新入职来源 + 性别构成 (左右复用) */
 const src = await q(`SELECT c.source AS k, count(*) AS v FROM candidates c
@@ -236,35 +261,25 @@ const src = await q(`SELECT c.source AS k, count(*) AS v FROM candidates c
   GROUP BY c.source ORDER BY v DESC`);
 const gen = await q(`SELECT gender AS k, count(*) AS v FROM employees
   WHERE status = '在职' GROUP BY gender`);
-mk("c6", {
-  title: [{ text: "新入职来源", left: "25%", top: 4, textAlign: "center", textStyle: { color: "#8a97b0", fontSize: 12 } },
-          { text: "性别构成", left: "75%", top: 4, textAlign: "center", textStyle: { color: "#8a97b0", fontSize: 12 } }],
-  series: [
-    { type: "pie", radius: ["30%", "55%"], center: ["25%", "58%"],
-      data: src.map((r) => ({ name: r.k, value: r.v })),
-      label: { color: "#8a97b0", fontSize: 11, formatter: "{b}" },
-      itemStyle: { borderColor: "#161e2e", borderWidth: 2 } },
-    { type: "pie", radius: ["30%", "55%"], center: ["75%", "58%"],
-      data: gen.map((r, i) => ({ name: r.k, value: r.v,
-        itemStyle: { color: ["#4f8cff", "#ff6b81"][i] } })),
-      label: { color: "#8a97b0", fontSize: 11, formatter: "{b} {d}%" },
-      itemStyle: { borderColor: "#161e2e", borderWidth: 2 } }] });
-
+dualPie("c6", "新入职来源", "性别构成", [
+  { data: pieData(src) },
+  { data: gen.map((r, i) => ({ name: r.k, value: r.v, itemStyle: { color: ["#4f8cff", "#ff6b81"][i] } })) },
+], { fmts: ["{b}", "{b} {d}%"] });
 
 /* ---------- v2 扩展 KPI ---------- */
 const [tc] = await q(`WITH g AS (SELECT sum(base_pay + overtime_pay + bonus) AS v FROM v_workforce_monthly WHERE pay_period BETWEEN '2026-01' AND '2026-06'),
   i AS (SELECT sum(insurance_company) AS v FROM v_workforce_monthly WHERE pay_period BETWEEN '2026-01' AND '2026-06')
   SELECT round((g.v + i.v) / 6 / 10000, 1) AS v FROM g, i`);
-$("kpi-totalcost").innerHTML = `¥${Number(tc.v).toLocaleString("zh-CN", { maximumFractionDigits: 1 })}<small> 万</small>`;
+setKpi("kpi-totalcost", `¥${Number(tc.v).toLocaleString("zh-CN", { maximumFractionDigits: 1 })}`, " 万");
 
 const [plan] = await q(`SELECT round(sum(actual_headcount) * 100.0 / sum(planned_headcount), 1) AS v
   FROM v_headcount_vs_plan WHERE plan_year = 2025`);
-$("kpi-plan").innerHTML = `${plan.v}<small>%</small>`;
+setKpi("kpi-plan", plan.v, "%");
 
 const [off] = await q(`SELECT round(count(*) FILTER (WHERE status = '已接受') * 100.0
   / NULLIF(count(*) FILTER (WHERE status IN ('已接受','已拒绝')), 0), 1) AS v
   FROM offers WHERE offer_date BETWEEN DATE '2025-01-01' AND DATE '2025-12-31'`);
-$("kpi-offer").innerHTML = `${off.v}<small>%</small>`;
+setKpi("kpi-offer", off.v, "%");
 
 const [eng] = await q(`SELECT round(avg(engagement_score), 2) AS v FROM engagement_surveys WHERE survey_year = 2025`);
 $("kpi-eng").textContent = `${eng.v} / 5`;
@@ -272,38 +287,26 @@ $("kpi-eng").textContent = `${eng.v} / 5`;
 /* 7 编制 vs 年末实际 (2025) */
 const hp = await q(`SELECT dept_name AS k, planned_headcount AS p, actual_headcount AS a
   FROM v_headcount_vs_plan WHERE plan_year = 2025`);
-mk("c7", { ...AXIS,
-  xAxis: { ...AXIS.xAxis, data: rows(hp, "k"), axisLabel: { color: "#8a97b0", interval: 0, rotate: 30 } },
-  series: [
-    { name: "计划编制", type: "bar", data: rows(hp, "p"), barMaxWidth: 14,
-      itemStyle: { borderRadius: [4, 4, 0, 0], color: "#3a4a6b" } },
-    { name: "年末实际", type: "bar", data: rows(hp, "a"), barMaxWidth: 14,
-      itemStyle: { borderRadius: [4, 4, 0, 0], color: "#4f8cff" } }] });
+vBar("c7", rows(hp, "k"), [
+  { name: "计划编制", data: rows(hp, "p"), max: 14, br: [4, 4, 0, 0], color: "#3a4a6b" },
+  { name: "年末实际", data: rows(hp, "a"), max: 14, br: [4, 4, 0, 0], color: "#4f8cff" },
+], { label: { interval: 0, rotate: 30 } });
 
 /* 8 人力总成本构成趋势 */
 const costC = await q(`SELECT pay_period AS k, sum(base_pay) AS b, sum(overtime_pay) AS o,
   sum(bonus) AS bo, sum(insurance_company) AS ins
   FROM v_workforce_monthly WHERE pay_period >= '2025-01' GROUP BY pay_period`);
 mk("c8", { ...AXIS,
-  xAxis: { ...AXIS.xAxis, data: rows(costC, "k") },
-  yAxis: { ...AXIS.yAxis, axisLabel: { color: "#8a97b0", formatter: (v) => (v / 10000).toLocaleString("zh-CN") + "万" } },
-  series: [
-    { name: "基本工资", type: "line", stack: "cost", data: rows(costC, "b"), symbolSize: 0, lineStyle: { width: 0 },
-      areaStyle: { color: "#4f8cff" } },
-    { name: "加班费", type: "line", stack: "cost", data: rows(costC, "o"), symbolSize: 0, lineStyle: { width: 0 },
-      areaStyle: { color: "#3ecf8e" } },
-    { name: "奖金", type: "line", stack: "cost", data: rows(costC, "bo"), symbolSize: 0, lineStyle: { width: 0 },
-      areaStyle: { color: "#ffb454" } },
-    { name: "社保(企业)", type: "line", stack: "cost", data: rows(costC, "ins"), symbolSize: 0, lineStyle: { width: 0 },
-      areaStyle: { color: "#a78bfa" } }] });
+  xAxis: { ...CAT(AXIS.xAxis), data: rows(costC, "k") },
+  yAxis: { ...AXIS.yAxis, axisLabel: { color: MUTED, formatter: WAN } },
+  series: [["基本工资", "b", "#4f8cff"], ["加班费", "o", "#3ecf8e"],
+           ["奖金", "bo", "#ffb454"], ["社保(企业)", "ins", "#a78bfa"]]
+    .map(([name, key, color]) => ({ name, type: "line", stack: "cost", data: rows(costC, key),
+      symbolSize: 0, lineStyle: { width: 0 }, areaStyle: { color } })) });
 
 /* 9 Offer 拒绝原因 */
 const rej = await q(`SELECT reject_reason AS k, count(*) AS v FROM offers WHERE status = '已拒绝' GROUP BY reject_reason`);
-mk("c9", {
-  series: [{ type: "pie", radius: ["42%", "70%"], center: ["50%", "52%"],
-    data: rej.map((r) => ({ name: r.k, value: r.v })),
-    label: { color: "#8a97b0", formatter: "{b} {c}单" },
-    itemStyle: { borderColor: "#161e2e", borderWidth: 2 } }] });
+pie("c9", pieData(rej), "{b} {c}单");
 
 /* 10 渠道单人招聘成本 (2025) */
 const chCost = await q(`SELECT channel AS k, sum(amount) AS v FROM recruitment_costs
@@ -316,39 +319,26 @@ const hireMap = Object.fromEntries(rows(chHire, "k").map((k, i) => [k, chHire[i]
 const costPerHire = chCost.map((r) => ({
   k: r.k, v: r.v / (hireMap[CH2SRC[r.k]] || Infinity), n: hireMap[CH2SRC[r.k]] || 0 }))
   .filter((r) => isFinite(r.v)).sort((a, b) => b.v - a.v);
-mk("c10", { ...AXIS,
-  yAxis: { type: "category", data: rows(costPerHire, "k"), axisLabel: { color: "#8a97b0" } },
-  xAxis: { type: "value", splitLine: { lineStyle: { color: "#1c2536" } }, axisLabel: { color: "#8a97b0", formatter: "¥{value}" } },
-  series: [{ type: "bar", data: costPerHire.map((r) => ({ value: Math.round(r.v),
-    label: { show: true, position: "right", color: "#8a97b0", fontSize: 11, formatter: `入职${r.n}人` } })),
-    barMaxWidth: 16, itemStyle: { borderRadius: [0, 6, 6, 0], color: "#ff6b81" } }] });
+hBar("c10", rows(costPerHire, "k"),
+     costPerHire.map((r) => ({ value: Math.round(r.v),
+       label: { show: true, position: "right", color: MUTED, fontSize: 11, formatter: `入职${r.n}人` } })),
+     "#ff6b81", "¥{value}");
 
 /* 11 离职原因: 档案 vs 面谈真实归因 */
 const arc = await q(`SELECT termination_reason AS k, count(*) AS v FROM employees
   WHERE status = '离职' GROUP BY termination_reason ORDER BY v DESC LIMIT 6`);
 const real = await q(`SELECT real_reason_category AS k, count(*) AS v FROM exit_interviews GROUP BY real_reason_category ORDER BY v DESC LIMIT 6`);
-mk("c11", {
-  title: [{ text: "档案离职原因", left: "25%", top: 4, textAlign: "center", textStyle: { color: "#8a97b0", fontSize: 12 } },
-          { text: "面谈真实归因", left: "75%", top: 4, textAlign: "center", textStyle: { color: "#8a97b0", fontSize: 12 } }],
-  series: [
-    { type: "pie", radius: ["30%", "55%"], center: ["25%", "58%"],
-      data: arc.map((r) => ({ name: r.k, value: r.v })),
-      label: { color: "#8a97b0", fontSize: 10, formatter: "{b}" },
-      itemStyle: { borderColor: "#161e2e", borderWidth: 2 } },
-    { type: "pie", radius: ["30%", "55%"], center: ["75%", "58%"],
-      data: real.map((r) => ({ name: r.k, value: r.v })),
-      label: { color: "#8a97b0", fontSize: 10, formatter: "{b}" },
-      itemStyle: { borderColor: "#161e2e", borderWidth: 2 } }] });
+dualPie("c11", "档案离职原因", "面谈真实归因",
+        [{ data: pieData(arc) }, { data: pieData(real) }], { fs: 10 });
 
 /* 12 各部门绩效目标加权完成率 (2026H1) */
 const goal = await q(`SELECT d.dept_name AS k, sum(g.completion_pct * g.weight) / sum(g.weight) AS v
   FROM performance_goals g JOIN employees e ON g.emp_id = e.emp_id JOIN departments d ON d.dept_id = e.dept_id
   WHERE g.review_period = '2026H1' GROUP BY d.dept_name ORDER BY v DESC`);
-mk("c12", { ...AXIS,
-  xAxis: { ...AXIS.xAxis, data: rows(goal, "k"), axisLabel: { color: "#8a97b0", interval: 0, rotate: 30 } },
-  yAxis: { ...AXIS.yAxis, min: 40, axisLabel: { color: "#8a97b0", formatter: "{value}%" } },
-  series: [{ type: "bar", data: goal.map((r) => Math.round(r.v * 10) / 10), barMaxWidth: 24,
-    itemStyle: { borderRadius: [6, 6, 0, 0], color: "#3ecf8e" } }] });
+vBar("c12", rows(goal, "k"),
+     [{ data: goal.map((r) => Math.round(r.v * 10) / 10), max: 24, color: "#3ecf8e" }],
+     { label: { interval: 0, rotate: 30 },
+       y: { min: 40, axisLabel: { color: MUTED, formatter: "{value}%" } } });
 
 // canvas 图对辅助技术不可见: 以卡片标题为图表演义提供可访问名称
 document.querySelectorAll(".card").forEach((card) => {
