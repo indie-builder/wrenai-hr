@@ -101,7 +101,10 @@ const $ = (id) => document.getElementById(id);
 const fmtW = (v) => (v / 10000).toLocaleString("zh-CN", { maximumFractionDigits: 0 });
 const setStatus = (msg, cls) => { const s = $("status"); s.textContent = msg; s.className = cls || ""; };
 // head 阶段发生的 CDN 失败此时才能上屏; 直接终止, 避免渲染出缺图表的半成品页面
-if (window.__loadErrMsg) throw new Error(window.__loadErrMsg);
+if (window.__loadErrMsg) {
+  document.querySelectorAll(".loading").forEach((el) => (el.textContent = "未加载（见顶部错误）"));
+  throw new Error(window.__loadErrMsg);
+}
 
 const { WrenEngine } = await import("https://unpkg.com/@wrenai/wren-core-wasm@0.4.1/dist/index.js");
 const mdl = await (await fetch("./mdl.json")).json();
@@ -184,7 +187,7 @@ const costM = await q(`SELECT pay_period AS k, sum(base_pay + overtime_pay + bon
   FROM salary_payments WHERE pay_period >= '2025-01' GROUP BY pay_period ORDER BY k`);
 mk("c2", { ...AXIS,
   xAxis: { ...AXIS.xAxis, type: "category", data: rows(costM, "k") },
-  yAxis: { ...AXIS.yAxis, axisLabel: { color: "#8a97b0", formatter: (v) => v / 10000 + "万" } },
+  yAxis: { ...AXIS.yAxis, axisLabel: { color: "#8a97b0", formatter: (v) => (v / 10000).toLocaleString("zh-CN") + "万" } },
   series: [{ type: "line", data: rows(costM, "v"), smooth: true, symbolSize: 5,
     lineStyle: { color: "#3ecf8e", width: 2.5 }, itemStyle: { color: "#3ecf8e" },
     areaStyle: { color: "rgba(62,207,142,.12)" } }] });
@@ -279,7 +282,7 @@ const costC = await q(`SELECT pay_period AS k, sum(base_pay) AS b, sum(overtime_
   FROM v_workforce_monthly WHERE pay_period >= '2025-01' GROUP BY pay_period`);
 mk("c8", { ...AXIS,
   xAxis: { ...AXIS.xAxis, data: rows(costC, "k") },
-  yAxis: { ...AXIS.yAxis, axisLabel: { color: "#8a97b0", formatter: (v) => v / 10000 + "万" } },
+  yAxis: { ...AXIS.yAxis, axisLabel: { color: "#8a97b0", formatter: (v) => (v / 10000).toLocaleString("zh-CN") + "万" } },
   series: [
     { name: "基本工资", type: "line", stack: "cost", data: rows(costC, "b"), symbolSize: 0, lineStyle: { width: 0 },
       areaStyle: { color: "#4f8cff" } },
@@ -342,6 +345,13 @@ mk("c12", { ...AXIS,
   yAxis: { ...AXIS.yAxis, min: 40, axisLabel: { color: "#8a97b0", formatter: "{value}%" } },
   series: [{ type: "bar", data: goal.map((r) => Math.round(r.v * 10) / 10), barMaxWidth: 24,
     itemStyle: { borderRadius: [6, 6, 0, 0], color: "#3ecf8e" } }] });
+
+// canvas 图对辅助技术不可见: 以卡片标题为图表演义提供可访问名称
+document.querySelectorAll(".card").forEach((card) => {
+  const h = card.querySelector("h3");
+  const chartEl = card.querySelector(".chart");
+  if (h && chartEl) { chartEl.setAttribute("role", "img"); chartEl.setAttribute("aria-label", h.textContent); }
+});
 
 setStatus("✓ 完成：全部指标由 wren-core-wasm 语义层在浏览器内计算（v2：25 表 / 12 图）", "ok");
 </script>
