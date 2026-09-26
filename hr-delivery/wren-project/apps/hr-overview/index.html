@@ -4,7 +4,28 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>星辰科技 · HR 人力资本总览</title>
-<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<script>
+  // 必须先于下方 CDN <script> 注册: head 阻塞脚本失败时, 其后的处理器尚未存在;
+  // 资源加载错误不冒泡, 只有 capture 阶段能拿到失败元素, 否则只能显示掩码的 "Script error."
+  (() => {
+    const show = (msg) => {
+      window.__loadErrMsg ??= msg; // 首个错误优先, 不被后续噪声覆盖
+      const s = document.getElementById("status");
+      if (s && s.className !== "err") { s.textContent = "加载错误: " + msg; s.className = "err"; }
+    };
+    window.__showLoadError = show;
+    window.addEventListener("error", (e) => {
+      const t = e.target;
+      if (t && t !== window && (t.src || t.href)) {
+        show("资源加载失败: " + (t.src || t.href).split("/").pop() + "（本页依赖 cdn.jsdelivr.net / unpkg.com，请检查网络后刷新）");
+      } else {
+        show(e.message || e.type);
+      }
+    }, true);
+    window.addEventListener("unhandledrejection", (e) => show((e.reason && e.reason.message) || String(e.reason)));
+  })();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js" crossorigin="anonymous"></script>
 <style>
   :root {
     --bg: #0e1420; --panel: #161e2e; --panel2: #1b2437; --line: #26304a;
@@ -75,16 +96,12 @@
   数据来自随应用打包的 PostgreSQL 快照（parquet，25 张表）。口径定义见项目 <b>knowledge/rules/general.md</b>（v2 含编制/调薪/Offer/敬业度等扩展口径）。
 </footer>
 
-<script>
-  window.addEventListener("error", (e) => {
-    const s = document.getElementById("status");
-    if (s) { s.textContent = "加载错误: " + (e.message || e.type); s.className = "err"; }
-  });
-</script>
 <script type="module">
 const $ = (id) => document.getElementById(id);
-const fmtW = (v) => (v / 10000).toLocaleString("zh-CN", { maximumFractionDigits: 0 }) + " 万";
+const fmtW = (v) => (v / 10000).toLocaleString("zh-CN", { maximumFractionDigits: 0 });
 const setStatus = (msg, cls) => { const s = $("status"); s.textContent = msg; s.className = cls || ""; };
+// head 阶段发生的 CDN 失败此时才能上屏; 直接终止, 避免渲染出缺图表的半成品页面
+if (window.__loadErrMsg) throw new Error(window.__loadErrMsg);
 
 const { WrenEngine } = await import("https://unpkg.com/@wrenai/wren-core-wasm@0.4.1/dist/index.js");
 const mdl = await (await fetch("./mdl.json")).json();
@@ -122,7 +139,7 @@ $("kpi-turnover").innerHTML = `${to.v}<small>%</small>`;
 
 const [cost] = await q(`SELECT round(sum(base_pay + overtime_pay + bonus) / 6, 0) AS v
   FROM salary_payments WHERE pay_period BETWEEN '2026-01' AND '2026-06'`);
-$("kpi-cost").innerHTML = `¥${fmtW(Number(cost.v))}`;
+$("kpi-cost").innerHTML = `¥${fmtW(Number(cost.v))}<small> 万</small>`;
 
 const [hire] = await q(`SELECT count(*) AS v FROM employees
   WHERE hire_date BETWEEN DATE '2026-01-01' AND DATE '2026-08-31'`);
@@ -222,7 +239,7 @@ mk("c6", {
 const [tc] = await q(`WITH g AS (SELECT sum(base_pay + overtime_pay + bonus) AS v FROM v_workforce_monthly WHERE pay_period BETWEEN '2026-01' AND '2026-06'),
   i AS (SELECT sum(insurance_company) AS v FROM v_workforce_monthly WHERE pay_period BETWEEN '2026-01' AND '2026-06')
   SELECT round((g.v + i.v) / 6 / 10000, 1) AS v FROM g, i`);
-$("kpi-totalcost").innerHTML = `¥${tc.v}<small>万</small>`;
+$("kpi-totalcost").innerHTML = `¥${Number(tc.v).toLocaleString("zh-CN", { maximumFractionDigits: 1 })}<small> 万</small>`;
 
 const [plan] = await q(`SELECT round(sum(actual_headcount) * 100.0 / sum(planned_headcount), 1) AS v
   FROM v_headcount_vs_plan WHERE plan_year = 2025`);
