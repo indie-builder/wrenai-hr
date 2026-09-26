@@ -304,8 +304,8 @@ source .venv/bin/activate
 +--------+-------------------------------------------------------------------------------------------+
 | 16     | 运行现有 HR 参考项目                                                                      |
 | 参考   |                                                                                           |
-|        | [终端] 当前机器：                                                                         |
-|        | cd /Users/xbjt/Documents/myself/wrenai-hr                                                 |
+|        | [终端] 在 wrenai-hr 仓库根目录：                                                          |
+|        | cd <wrenai-hr 克隆路径>                                                                   |
 |        | python3 hr-delivery/validation/v2/run_all.py                                              |
 |        |                                                                                           |
 |        | 本次会话已实际验证：41/41 PASS，P0 口径题 11/11 PASS。                                    |
@@ -314,11 +314,11 @@ source .venv/bin/activate
 |        |                                                                                           |
 |        | 当前仪表盘地址：http://127.0.0.1:8317                                                     |
 |        | 如果预览服务未运行，可在另一个终端执行：                                                  |
-|        | cd /Users/xbjt/Documents/myself/wrenai-hr                                                 |
+|        | cd <wrenai-hr 克隆路径>                                                                   |
 |        | python3 -m http.server 8317 --bind 127.0.0.1 \                                            |
 |        | --directory hr-delivery/wren-project/apps/hr-overview                                     |
 |        |                                                                                           |
-|        | 已有服务占用 8317 时不重复启动。换机器时替换项目绝对路径。                                |
+|        | 已有服务占用 8317 时不重复启动。                                                          |
 +--------+-------------------------------------------------------------------------------------------+
 ```
 
