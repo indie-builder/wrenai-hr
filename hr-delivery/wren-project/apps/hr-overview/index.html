@@ -12,6 +12,12 @@
       window.__loadErrMsg ??= msg; // 首个错误优先, 不被后续噪声覆盖
       const s = document.getElementById("status");
       if (s && s.className !== "err") { s.textContent = "加载错误: " + msg; s.className = "err"; }
+      // 失败后图表卡片不应停留「加载中…」; head 阶段错误触发时 body 尚未解析, 由 module 启动回放兜底
+      if (document.body) {
+        document.querySelectorAll(".loading").forEach((el) => {
+          if (el.textContent === "加载中…") el.textContent = "未加载（见顶部错误）";
+        });
+      }
     };
     window.__showLoadError = show;
     window.addEventListener("error", (e) => {
@@ -101,10 +107,8 @@ const $ = (id) => document.getElementById(id);
 const fmtW = (v) => (v / 10000).toLocaleString("zh-CN", { maximumFractionDigits: 0 });
 const setStatus = (msg, cls) => { const s = $("status"); s.textContent = msg; s.className = cls || ""; };
 // head 阶段发生的 CDN 失败此时才能上屏; 直接终止, 避免渲染出缺图表的半成品页面
-if (window.__loadErrMsg) {
-  document.querySelectorAll(".loading").forEach((el) => (el.textContent = "未加载（见顶部错误）"));
-  throw new Error(window.__loadErrMsg);
-}
+// (throw 触发的 error 事件会回进 show(), 由其翻转卡片占位)
+if (window.__loadErrMsg) throw new Error(window.__loadErrMsg);
 
 const { WrenEngine } = await import("https://unpkg.com/@wrenai/wren-core-wasm@0.4.1/dist/index.js");
 const mdl = await (await fetch("./mdl.json")).json();
