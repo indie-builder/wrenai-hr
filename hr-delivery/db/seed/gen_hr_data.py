@@ -16,7 +16,6 @@ OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "out")
 os.makedirs(OUT, exist_ok=True)
 
 REF = dt.date(2026, 9, 1)          # 数据截至 2026-08-31
-PAY_START = dt.date(2023, 1, 1)    # 薪资/绩效数据起点
 MONTHS = [(2023 + i // 12, i % 12 + 1) for i in range(44)]   # 2023-01 .. 2026-08
 
 # ---------------- 基础字典 ----------------
@@ -44,13 +43,13 @@ LEVEL_SALARY = {  # (下限k, 上限k) 月基本工资
     "初级": (9, 14), "中级": (15, 22), "高级": (23, 32),
     "专家": (33, 48), "总监": (45, 65), "副总裁": (70, 90),
 }
+GENDER_W = [("男", 55), ("女", 45)]
+SOURCE_W = [("内推", 25), ("招聘网站", 45), ("猎头", 12), ("校园招聘", 18)]
 CITY_MULT = {"北京": 1.05, "上海": 1.00, "深圳": 0.95, "杭州": 0.90, "成都": 0.75, "远程": 0.85}
 CITIES = ["北京", "上海", "深圳", "杭州", "成都", "远程"]
 SURNAME = "王李张刘陈杨黄赵吴周徐孙马朱胡郭何林罗高郑梁谢宋唐许韩冯邓曹彭曾肖田董潘袁蔡蒋余杜叶程魏苏吕"
 MALE_GIVEN = ["伟", "强", "磊", "军", "洋", "勇", "杰", "涛", "斌", "波", "辉", "刚", "健", "明", "俊", "帆", "宇", "浩", "凯", "晨", "子轩", "浩然", "俊杰", "志强", "建国", "建华", "晓东", "文博", "天宇", "思远"]
 FEMALE_GIVEN = ["芳", "娟", "敏", "静", "丽", "娜", "艳", "琳", "雪", "慧", "颖", "婷", "玉", "莹", "雪莲", "雨欣", "梦琪", "欣怡", "晓燕", "海燕", "佳怡", "思琪", "晓雯", "雅静", "诗涵"]
-EDU = ["大专", "本科", "硕士", "博士"]
-LEAVE_TYPES = ["年假", "事假", "病假", "调休", "婚假", "产假", "陪产假"]
 TERMINATE_REASONS_V = ["个人原因", "职业发展", "薪酬原因", "家庭原因", "健康原因", "深造学习"]
 TERMINATE_REASONS_I = ["业绩不达标", "组织调整", "合同到期"]
 TRAINING_COURSES = ["新员工入职培训", "信息安全与合规培训", "管理力提升工作坊", "跨部门沟通协作",
@@ -89,10 +88,10 @@ for i, (dn, loc, _) in enumerate(DEPTS, 1):
 
 # ---------------- 2. 员工 ----------------
 employees = []          # dict
-_seen_names, _used_emp_ids = set(), set()
+_seen_names = set()
 def add_emp(hire_date, dept, title, level, city=None, etype=None, gender=None, age=None, salary=None, edu=None):
     eid = len(employees) + 1
-    gender = gender or weighted([("男", 55), ("女", 45)])
+    gender = gender or weighted(GENDER_W)
     if age is None:
         if level in ("总监", "副总裁"):
             age = random.randint(33, 48)
@@ -166,7 +165,7 @@ def add_opening(opened, dept=None, title=None, level=None):
     return job_openings[-1]
 
 for (yy, mm) in MONTHS:
-    for _ in range(random.choices([0, 1, 2, 3], weights=[35, 35, 22, 8])[0]):
+    for _ in range(weighted([(0, 35), (1, 35), (2, 22), (3, 8)])):
         add_opening(month_rand_workday(yy, mm))
 
 # ---------------- 4. 月度入职 (金三银四/金九银十, 候选人闭环) ----------------
@@ -200,11 +199,11 @@ for (yy, mm) in hires_plan:
     emp["manager_id"] = random.choice(DIRECTORS[o["_dept"]])["emp_id"]
     o["hired_count"] += 1
     # 对应候选人(已入职)
-    gender = weighted([("男", 55), ("女", 45)])
+    gender = weighted(GENDER_W)
     candidates.append({
         "cand_id": len(candidates) + 1, "name": pick_name(_cand_names, gender), "gender": gender,
         "opening_id": o["opening_id"],
-        "source": weighted([("内推", 25), ("招聘网站", 45), ("猎头", 12), ("校园招聘", 18)]),
+        "source": weighted(SOURCE_W),
         "stage": "已入职",
         "applied_at": hire_date - dt.timedelta(days=random.randint(20, 45)),
         "expected_salary": round(random.uniform(float(lo), float(hi)) / 100) * 100,
@@ -222,7 +221,7 @@ for o in job_openings:
         o["status"] = "已关闭"
         o["closed_at"] = min(o["opened_at"] + dt.timedelta(days=random.randint(30, 150)), REF - dt.timedelta(days=1))
     for _ in range(random.randint(2, 6)):
-        gender = weighted([("男", 55), ("女", 45)])
+        gender = weighted(GENDER_W)
         applied = o["opened_at"] + dt.timedelta(days=random.randint(0, 25))
         if applied >= REF:
             continue
@@ -232,7 +231,7 @@ for o in job_openings:
         candidates.append({
             "cand_id": len(candidates) + 1, "name": pick_name(_cand_names, gender), "gender": gender,
             "opening_id": o["opening_id"],
-            "source": weighted([("内推", 25), ("招聘网站", 45), ("猎头", 12), ("校园招聘", 18)]),
+            "source": weighted(SOURCE_W),
             "stage": stage, "applied_at": applied,
             "expected_salary": round(random.uniform(float(o["salary_min"]), float(o["salary_max"])) / 100) * 100,
             "hired_emp_id": None,
@@ -357,7 +356,7 @@ for e in employees:
     start_y = max(2023, e["hire_date"].year)
     end_y = e["termination_date"].year if e["termination_date"] else 2026
     for yy in range(start_y, end_y + 1):
-        for _ in range(random.choices([0, 1, 2, 3, 4], weights=[22, 30, 26, 14, 8])[0]):
+        for _ in range(weighted([(0, 22), (1, 30), (2, 26), (3, 14), (4, 8)])):
             age = yy - e["birth_date"].year
             lt = weighted([("年假", 38), ("病假", 18), ("事假", 12), ("调休", 18),
                            ("婚假", 3), ("产假", 7 if e["gender"] == "女" and 24 <= age <= 38 else 0),
@@ -426,7 +425,7 @@ trid = 0
 for e in employees:
     if random.random() > 0.08:
         continue
-    for _ in range(random.choices([1, 2], weights=[80, 20])[0]):
+    for _ in range(weighted([(1, 80), (2, 20)])):
         d = rand_workday(max(e["hire_date"] + dt.timedelta(days=180), dt.date(2023, 1, 1)),
                          (e["termination_date"] or REF) - dt.timedelta(days=1))
         if d >= REF:
