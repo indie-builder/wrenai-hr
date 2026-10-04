@@ -91,12 +91,12 @@ columns:
   - name: age
     type: INTEGER
     is_calculated: true
-    expression: "CAST(date_part('year', current_date) AS INTEGER) - CAST(date_part('year', birth_date) AS INTEGER)"
+    expression: "CAST(date_part('year', DATE '2026-08-31') AS INTEGER) - CAST(date_part('year', birth_date) AS INTEGER)"
     properties:
-      description: "年龄(岁), 由出生日期计算"
+      description: "年龄(岁), 按2026-08-31所在年份减出生年份, 非周岁"
   - name: tenure_years
     type: DOUBLE
     is_calculated: true
-    expression: "round((current_date - hire_date) / 365.25, 1)"
+    expression: "round((DATE '2026-08-31' - hire_date) / 365.25, 1)"
     properties:
-      description: "司龄(年), 由入职日期计算"
+      description: "司龄(年), (2026-08-31减入职日期)/365.25, 四舍五入一位小数"

@@ -2,9 +2,10 @@
 # -*- coding: utf-8 -*-
 """
 端到端验证题库 v2 (GOAL.md M3)
-- 每题两条独立路径: gt = 直连 PostgreSQL 物理表 (标准答案); wren = 基于 MDL/视图/口径经语义层执行
+- 每题两条独立路径: gt = 直连物理表 (标准答案, duckdb 只读挂载); wren = 基于 MDL/视图/口径经语义层执行
 - 别名两侧完全一致, 由 run_all.py 自动逐值比对
 - priority: P0 = 口径题(零口径错误要求) / P1 = 常规
+- ordered=True: 排名与趋势逐行比对；排名并列按名称升序，趋势按时间升序
 """
 
 QUESTIONS = [
@@ -13,11 +14,11 @@ dict(id="q01", domain="人员基础", priority="P1", question="目前公司在�
 gt="""SELECT count(*) AS 在职人数 FROM employees WHERE status = '在职'""",
 wren="""SELECT count(*) AS 在职人数 FROM employees WHERE status = '在职'"""),
 
-dict(id="q02", domain="人员基础", priority="P1", question="各部门在职人数分布（从高到低）？",
+dict(id="q02", ordered=True, domain="人员基础", priority="P1", question="各部门在职人数分布（从高到低）？",
 gt="""SELECT d.dept_name AS 部门, count(*) AS 在职人数
 FROM employees e JOIN departments d ON e.dept_id = d.dept_id
-WHERE e.status = '在职' GROUP BY d.dept_name""",
-wren="""SELECT dept_name AS 部门, count(*) AS 在职人数 FROM v_active_employees GROUP BY dept_name"""),
+WHERE e.status = '在职' GROUP BY d.dept_name ORDER BY 在职人数 DESC, 部门 ASC""",
+wren="""SELECT dept_name AS 部门, count(*) AS 在职人数 FROM v_active_employees GROUP BY dept_name ORDER BY 在职人数 DESC, 部门 ASC"""),
 
 dict(id="q03", domain="人员基础", priority="P0", question="2025年公司整体离职率（官方口径）？",
 gt="""WITH leavers AS (SELECT count(*) AS n FROM employees WHERE termination_date >= DATE '2025-01-01' AND termination_date < DATE '2026-01-01'),
@@ -27,21 +28,23 @@ wren="""WITH leavers AS (SELECT count(*) AS n FROM employees WHERE termination_d
 hc AS (SELECT count(*) AS n FROM employees WHERE hire_date < DATE '2025-01-01' AND (termination_date IS NULL OR termination_date >= DATE '2025-01-01'))
 SELECT l.n AS 离职人数, h.n AS 期初在职, round(l.n * 100.0 / h.n, 2) AS 离职率百分比 FROM leavers l, hc h"""),
 
-dict(id="q04", domain="人员基础", priority="P0", question="2025年各部门离职率排行？",
+dict(id="q04", ordered=True, domain="人员基础", priority="P0", question="2025年各部门离职率排行？",
 gt="""WITH leavers AS (SELECT dept_id, count(*) AS l FROM employees WHERE termination_date >= DATE '2025-01-01' AND termination_date < DATE '2026-01-01' GROUP BY dept_id),
 hc AS (SELECT dept_id, count(*) AS h FROM employees WHERE hire_date < DATE '2025-01-01' AND (termination_date IS NULL OR termination_date >= DATE '2025-01-01') GROUP BY dept_id)
 SELECT d.dept_name AS 部门, coalesce(l.l,0) AS 离职人数, h.h AS 期初在职, round(coalesce(l.l,0) * 100.0 / h.h, 2) AS 离职率百分比
-FROM hc h JOIN departments d ON d.dept_id = h.dept_id LEFT JOIN leavers l ON l.dept_id = h.dept_id""",
+FROM hc h JOIN departments d ON d.dept_id = h.dept_id LEFT JOIN leavers l ON l.dept_id = h.dept_id
+ORDER BY 离职率百分比 DESC, 部门 ASC""",
 wren="""WITH leavers AS (SELECT e.dept_id, count(*) AS l FROM employees e WHERE e.termination_date >= DATE '2025-01-01' AND e.termination_date < DATE '2026-01-01' GROUP BY e.dept_id),
 hc AS (SELECT e.dept_id, count(*) AS h FROM employees e WHERE e.hire_date < DATE '2025-01-01' AND (e.termination_date IS NULL OR e.termination_date >= DATE '2025-01-01') GROUP BY e.dept_id)
 SELECT d.dept_name AS 部门, coalesce(l.l, 0) AS 离职人数, h.h AS 期初在职, round(coalesce(l.l, 0) * 100.0 / h.h, 2) AS 离职率百分比
-FROM hc h JOIN departments d ON d.dept_id = h.dept_id LEFT JOIN leavers l ON l.dept_id = h.dept_id"""),
+FROM hc h JOIN departments d ON d.dept_id = h.dept_id LEFT JOIN leavers l ON l.dept_id = h.dept_id
+ORDER BY 离职率百分比 DESC, 部门 ASC"""),
 
-dict(id="q05", domain="人员基础", priority="P0", question="2026上半年月度人力成本趋势（应发合计）？",
+dict(id="q05", ordered=True, domain="人员基础", priority="P0", question="2026上半年月度人力成本趋势（应发合计）？",
 gt="""SELECT pay_period AS 月份, round(sum(base_pay + overtime_pay + bonus), 2) AS 人力成本应发, count(*) AS 发薪人次
-FROM salary_payments WHERE pay_period BETWEEN '2026-01' AND '2026-06' GROUP BY pay_period""",
+FROM salary_payments WHERE pay_period BETWEEN '2026-01' AND '2026-06' GROUP BY pay_period ORDER BY 月份 ASC""",
 wren="""SELECT pay_period AS 月份, round(sum(base_pay + overtime_pay + bonus), 2) AS 人力成本应发, count(*) AS 发薪人次
-FROM v_monthly_salary WHERE pay_period BETWEEN '2026-01' AND '2026-06' GROUP BY pay_period"""),
+FROM v_monthly_salary WHERE pay_period BETWEEN '2026-01' AND '2026-06' GROUP BY pay_period ORDER BY 月份 ASC"""),
 
 dict(id="q06", domain="人员基础", priority="P1", question="各职级在职员工平均基本工资？",
 gt="""SELECT job_level AS 职级, count(*) AS 人数, round(avg(base_salary), 0) AS 平均基本工资
@@ -81,25 +84,25 @@ round(avg(base_salary), 0) AS 平均基本工资 FROM employees WHERE status = '
 wren="""SELECT gender AS 性别, count(*) AS 人数, round(count(*) * 100.0 / sum(count(*)) OVER (), 2) AS 占比,
 round(avg(base_salary), 0) AS 平均基本工资 FROM employees WHERE status = '在职' GROUP BY gender"""),
 
-dict(id="q11", domain="人员基础", priority="P1", question="2026H1人均月加班前3部门？",
+dict(id="q11", ordered=True, domain="人员基础", priority="P1", question="2026H1人均月加班前3部门？",
 gt="""WITH ot AS (SELECT d.dept_name, sum(a.overtime_hours) AS total_ot, count(DISTINCT a.emp_id) AS headcount
 FROM attendance_records a JOIN employees e ON a.emp_id = e.emp_id JOIN departments d ON e.dept_id = d.dept_id
 WHERE a.att_date BETWEEN '2026-01-01' AND '2026-06-30' GROUP BY d.dept_name)
 SELECT dept_name AS 部门, round(total_ot, 0) AS 加班总时长, round(total_ot / (headcount * 6.0), 2) AS 人均月加班小时
-FROM ot ORDER BY 人均月加班小时 DESC LIMIT 3""",
+FROM ot ORDER BY 人均月加班小时 DESC, 部门 ASC LIMIT 3""",
 wren="""WITH ot AS (SELECT d.dept_name, sum(a.overtime_hours) AS total_ot, count(DISTINCT a.emp_id) AS headcount
 FROM attendance_records a JOIN employees e ON a.emp_id = e.emp_id JOIN departments d ON e.dept_id = d.dept_id
 WHERE a.att_date BETWEEN '2026-01-01' AND '2026-06-30' GROUP BY d.dept_name)
 SELECT dept_name AS 部门, round(total_ot, 0) AS 加班总时长, round(total_ot / (headcount * 6.0), 2) AS 人均月加班小时
-FROM ot ORDER BY 人均月加班小时 DESC LIMIT 3"""),
+FROM ot ORDER BY 人均月加班小时 DESC, 部门 ASC LIMIT 3"""),
 
-dict(id="q12", domain="人员基础", priority="P1", question="2026H1绩效C/D在职员工的部门分布Top5？",
+dict(id="q12", ordered=True, domain="人员基础", priority="P1", question="2026H1绩效C/D在职员工的部门分布Top5？",
 gt="""SELECT d.dept_name AS 部门, count(*) AS 低绩效人数 FROM performance_reviews pr
 JOIN employees e ON pr.emp_id = e.emp_id JOIN departments d ON e.dept_id = d.dept_id
-WHERE pr.review_period = '2026H1' AND pr.grade IN ('C','D') AND e.status = '在职' GROUP BY d.dept_name LIMIT 5""",
+WHERE pr.review_period = '2026H1' AND pr.grade IN ('C','D') AND e.status = '在职' GROUP BY d.dept_name ORDER BY 低绩效人数 DESC, 部门 ASC LIMIT 5""",
 wren="""SELECT d.dept_name AS 部门, count(*) AS 低绩效人数 FROM performance_reviews pr
 JOIN employees e ON pr.emp_id = e.emp_id JOIN departments d ON e.dept_id = d.dept_id
-WHERE pr.review_period = '2026H1' AND pr.grade IN ('C','D') AND e.status = '在职' GROUP BY d.dept_name LIMIT 5"""),
+WHERE pr.review_period = '2026H1' AND pr.grade IN ('C','D') AND e.status = '在职' GROUP BY d.dept_name ORDER BY 低绩效人数 DESC, 部门 ASC LIMIT 5"""),
 
 # ============ D1 组织与编制 ============
 dict(id="q13", domain="组织与编制", priority="P0", question="2025年各部门编制达成率（计划 vs 年末实际）？",
@@ -131,13 +134,13 @@ wren="""SELECT (SELECT sum(planned_headcount) FROM headcount_plan WHERE plan_yea
 (SELECT count(*) FROM employees WHERE status = '在职') AS 当前在职人数"""),
 
 # ============ D2 员工生命周期 ============
-dict(id="q16", domain="员工生命周期", priority="P1", question="2024年以来晋升人次与晋升率（期初2024-01-01）？",
-gt="""WITH p AS (SELECT count(*) AS n FROM promotions WHERE promo_date >= DATE '2024-01-01'),
+dict(id="q16", domain="员工生命周期", priority="P1", question="2024年以来截至2026-08-31晋升人数与晋升率（员工去重，期初2024-01-01）？",
+gt="""WITH p AS (SELECT count(DISTINCT emp_id) AS n FROM promotions WHERE promo_date BETWEEN DATE '2024-01-01' AND DATE '2026-08-31'),
 hc AS (SELECT count(*) AS n FROM employees WHERE hire_date < DATE '2024-01-01' AND (termination_date IS NULL OR termination_date >= DATE '2024-01-01'))
-SELECT p.n AS 晋升人次, hc.n AS 期初在职, round(p.n * 100.0 / hc.n, 2) AS 晋升率 FROM p, hc""",
-wren="""WITH p AS (SELECT count(*) AS n FROM promotions WHERE promo_date >= DATE '2024-01-01'),
+SELECT p.n AS 晋升人数, hc.n AS 期初在职, round(p.n * 100.0 / hc.n, 2) AS 晋升率 FROM p, hc""",
+wren="""WITH p AS (SELECT count(DISTINCT emp_id) AS n FROM promotions WHERE promo_date BETWEEN DATE '2024-01-01' AND DATE '2026-08-31'),
 hc AS (SELECT count(*) AS n FROM employees WHERE hire_date < DATE '2024-01-01' AND (termination_date IS NULL OR termination_date >= DATE '2024-01-01'))
-SELECT p.n AS 晋升人次, hc.n AS 期初在职, round(p.n * 100.0 / hc.n, 2) AS 晋升率 FROM p, hc"""),
+SELECT p.n AS 晋升人数, hc.n AS 期初在职, round(p.n * 100.0 / hc.n, 2) AS 晋升率 FROM p, hc"""),
 
 dict(id="q17", domain="员工生命周期", priority="P1", question="各晋升后职级的平均调薪幅度？",
 gt="""SELECT to_level AS 晋升后职级, count(*) AS 人次,
@@ -145,10 +148,10 @@ round(avg((salary_after - salary_before) * 100.0 / salary_before), 2) AS 平均�
 FROM promotions GROUP BY to_level""",
 wren="""SELECT to_level AS 晋升后职级, count(*) AS 人次,
 round(avg((salary_after - salary_before) * 100.0 / salary_before), 2) AS 平均调薪幅度 FROM promotions GROUP BY to_level"""),
-# 注: raise_pct 计算列因 wren-core 0.7.6 将 DOUBLE 表达式下推为 PG round(double,int) 而不可用, 改查询时计算
+# 晋升幅度在查询中用前后工资计算，模型保留原始工资与原因字段。
 
-dict(id="q18", domain="员工生命周期", priority="P1", question="90天内到期的履行中合同数与无固定期限在履约合同数？",
-gt="""SELECT (SELECT count(*) FROM contracts WHERE status = '履行中' AND end_date IS NOT NULL AND end_date <= current_date + 90) AS 即将到期合同,
+dict(id="q18", domain="员工生命周期", priority="P1", question="截至2026-08-31，未来90天内到期的履行中合同数与无固定期限在履约合同数（含快照日与第90天）？",
+gt="""SELECT (SELECT count(*) FROM contracts WHERE status = '履行中' AND end_date IS NOT NULL AND end_date BETWEEN DATE '2026-08-31' AND DATE '2026-08-31' + INTERVAL '90 days') AS 即将到期合同,
 (SELECT count(*) FROM contracts WHERE status = '履行中' AND contract_type = '无固定期限') AS 无固定期限在履约""",
 wren="""SELECT count(*) FILTER (WHERE is_expiring_soon) AS 即将到期合同,
 count(*) FILTER (WHERE contract_type = '无固定期限') AS 无固定期限在履约
@@ -210,13 +213,13 @@ FROM leave_balances WHERE balance_type = '年假' AND as_of_quarter = '2026Q2'""
 wren="""SELECT round(sum(used) * 100.0 / sum(entitled), 1) AS 年假使用率, sum(entitled) AS 总额度, sum(used) AS 已使用
 FROM leave_balances WHERE balance_type = '年假' AND as_of_quarter = '2026Q2'"""),
 
-dict(id="q27", domain="考勤假期", priority="P1", question="2025年（Q3快照）年假使用率最高的前3个部门？",
+dict(id="q27", ordered=True, domain="考勤假期", priority="P1", question="2025年（Q3快照）年假使用率最高的前3个部门？",
 gt="""SELECT d.dept_name AS 部门, round(sum(b.used) * 100.0 / sum(b.entitled), 1) AS 年假使用率
 FROM leave_balances b JOIN employees e ON b.emp_id = e.emp_id JOIN departments d ON d.dept_id = e.dept_id
-WHERE b.balance_type = '年假' AND b.as_of_quarter = '2025Q3' GROUP BY d.dept_name ORDER BY 年假使用率 DESC LIMIT 3""",
+WHERE b.balance_type = '年假' AND b.as_of_quarter = '2025Q3' GROUP BY d.dept_name ORDER BY 年假使用率 DESC, 部门 ASC LIMIT 3""",
 wren="""SELECT d.dept_name AS 部门, round(sum(b.used) * 100.0 / sum(b.entitled), 1) AS 年假使用率
 FROM leave_balances b JOIN employees e ON b.emp_id = e.emp_id JOIN departments d ON d.dept_id = e.dept_id
-WHERE b.balance_type = '年假' AND b.as_of_quarter = '2025Q3' GROUP BY d.dept_name ORDER BY 年假使用率 DESC LIMIT 3"""),
+WHERE b.balance_type = '年假' AND b.as_of_quarter = '2025Q3' GROUP BY d.dept_name ORDER BY 年假使用率 DESC, 部门 ASC LIMIT 3"""),
 
 # ============ D5 招聘用工 ============
 dict(id="q28", domain="招聘用工", priority="P0", question="2025年Offer接受率（已接受/已回复）？",
@@ -263,19 +266,19 @@ gt="""SELECT pool_type AS 类型, status AS 状态, count(*) AS 人数 FROM tale
 wren="""SELECT pool_type AS 类型, status AS 状态, count(*) AS 人数 FROM talent_pool GROUP BY pool_type, status"""),
 
 # ============ D7 员工关系 ============
-dict(id="q34", domain="员工关系", priority="P1", question="历年敬业度平均分趋势与参与人数？",
+dict(id="q34", ordered=True, domain="员工关系", priority="P1", question="历年敬业度平均分趋势与参与人数？",
 gt="""SELECT survey_year AS 年度, round(avg(engagement_score), 2) AS 平均敬业度, count(*) AS 参与人数
-FROM engagement_surveys GROUP BY survey_year""",
+FROM engagement_surveys GROUP BY survey_year ORDER BY 年度 ASC""",
 wren="""SELECT survey_year AS 年度, round(avg(engagement_score), 2) AS 平均敬业度, count(*) AS 参与人数
-FROM engagement_surveys GROUP BY survey_year"""),
+FROM engagement_surveys GROUP BY survey_year ORDER BY 年度 ASC"""),
 
-dict(id="q35", domain="员工关系", priority="P0", question="2024年以来离职面谈的真实原因Top5？",
+dict(id="q35", ordered=True, domain="员工关系", priority="P0", question="2024年以来离职面谈的真实原因Top5？",
 gt="""SELECT x.real_reason_category AS 真实原因, count(*) AS 人数 FROM exit_interviews x
 JOIN employees e ON x.emp_id = e.emp_id WHERE e.termination_date >= DATE '2024-01-01'
-GROUP BY x.real_reason_category LIMIT 5""",
+GROUP BY x.real_reason_category ORDER BY 人数 DESC, 真实原因 ASC LIMIT 5""",
 wren="""SELECT x.real_reason_category AS 真实原因, count(*) AS 人数 FROM exit_interviews x
 JOIN employees e ON x.emp_id = e.emp_id WHERE e.termination_date >= DATE '2024-01-01'
-GROUP BY x.real_reason_category LIMIT 5"""),
+GROUP BY x.real_reason_category ORDER BY 人数 DESC, 真实原因 ASC LIMIT 5"""),
 
 dict(id="q36", domain="员工关系", priority="P1", question="2024年调研中低敬业度（<3.0）与正常员工的其后离职比例对比？",
 gt="""SELECT CASE WHEN s.engagement_score < 3.0 THEN '低(<3.0)' ELSE '正常(>=3.0)' END AS 敬业度分组,
@@ -320,14 +323,14 @@ SELECT hc.n AS 期初在职, lv.v AS 主动离职人数, lv.i AS 被动离职人
 round(lv.v * 100.0 / hc.n, 2) AS 主动离职率, round(lv.i * 100.0 / hc.n, 2) AS 被动离职率,
 round(lv.t * 100.0 / hc.n, 2) AS 总离职率 FROM hc, lv"""),
 
-dict(id="q40", domain="人效分析", priority="P1", question="2026H1人均月度人力成本（含社保）最高的前5个部门？",
+dict(id="q40", ordered=True, domain="人效分析", priority="P1", question="2026H1人均月度人力成本（含社保，按期间发薪人次）最高的前5个部门？",
 gt="""SELECT d.dept_name AS 部门,
-round((sum(s.base_pay + s.overtime_pay + s.bonus) + sum(i.company_total)) / (count(DISTINCT s.emp_id) * 6.0), 0) AS 人均月成本
+round((sum(s.base_pay + s.overtime_pay + s.bonus) + sum(i.company_total)) / count(*), 0) AS 人均月成本
 FROM salary_payments s JOIN insurance_payments i ON i.emp_id = s.emp_id AND i.pay_period = s.pay_period
 JOIN employees e ON e.emp_id = s.emp_id JOIN departments d ON d.dept_id = e.dept_id
-WHERE s.pay_period BETWEEN '2026-01' AND '2026-06' GROUP BY d.dept_name ORDER BY 人均月成本 DESC LIMIT 5""",
+WHERE s.pay_period BETWEEN '2026-01' AND '2026-06' GROUP BY d.dept_name ORDER BY 人均月成本 DESC, 部门 ASC LIMIT 5""",
 wren="""SELECT dept_name AS 部门,
-round((sum(base_pay + overtime_pay + bonus) + sum(insurance_company)) / (count(DISTINCT emp_id) * 6.0), 0) AS 人均月成本
+round((sum(base_pay + overtime_pay + bonus) + sum(insurance_company)) / count(*), 0) AS 人均月成本
 FROM v_workforce_monthly WHERE pay_period BETWEEN '2026-01' AND '2026-06'
-GROUP BY dept_name ORDER BY 人均月成本 DESC LIMIT 5"""),
+GROUP BY dept_name ORDER BY 人均月成本 DESC, 部门 ASC LIMIT 5"""),
 ]

@@ -1,0 +1,186 @@
+{
+  "version": 1,
+  "snapshot_date": "2026-08-31",
+  "source_mdl_sha256": "90c2fc42a5a54965666e7d107dfc2353708bba2a2be4a99b6e1dd47ce6607cf6",
+  "query_spec_sha256": "3750600a8c4fbfa240f674ffdb22f1de84e63800ce67286a0b3b9ddb3c64fd63",
+  "exporter_sha256": "2fc0a8467a3370fd5bba954cd6de114cd28e967226e5bd9f21b7c1a2613005c3",
+  "mdl_sha256": "b9c1bbd7646bdc76575c1b09658369e92c3dd89b90a35b80550aae6ac6ac9b7d",
+  "duckdb_version": "1.5.5",
+  "wren_core_version": "0.7.6",
+  "row_policy": "all_rows_no_time_filter",
+  "tables": [
+    {
+      "name": "departments",
+      "file": "data/departments.parquet",
+      "columns": [
+        "dept_id",
+        "dept_name"
+      ],
+      "rows": 9,
+      "sha256": "b1413875727a0cd76b42e1608652fc4639f080824d3aa0087a6b4ce7cfd149a5",
+      "bytes": 469,
+      "source_content_sha256": "e95fe4c1e20c35e4442640656ddfae08712c314d5dbcf431d3a283c41b0bcdd8"
+    },
+    {
+      "name": "employees",
+      "file": "data/employees.parquet",
+      "columns": [
+        "emp_id",
+        "gender",
+        "hire_date",
+        "dept_id",
+        "job_level",
+        "status",
+        "base_salary",
+        "termination_date",
+        "termination_reason"
+      ],
+      "rows": 786,
+      "sha256": "4c5d1f5a0f118f9b23e2b1067a233684f87955962b2141ebd590fec6fb138fda",
+      "bytes": 8610,
+      "source_content_sha256": "f7bb19bb8881b2e666042f6f0cfcefebf459499010b79fb72b8d6da9ee505125"
+    },
+    {
+      "name": "salary_payments",
+      "file": "data/salary_payments.parquet",
+      "columns": [
+        "pay_id",
+        "emp_id",
+        "pay_period",
+        "base_pay",
+        "overtime_pay",
+        "bonus"
+      ],
+      "rows": 18085,
+      "sha256": "849f56e6ef1878949711a9d866805c784224a13672438adf2c49fa5b15c41b9a",
+      "bytes": 125560,
+      "source_content_sha256": "2c13845e8a0144de2e893e0e284daf93ab6ae2a476d1eaa112764c1070fb2e9b"
+    },
+    {
+      "name": "insurance_payments",
+      "file": "data/insurance_payments.parquet",
+      "columns": [
+        "ins_id",
+        "emp_id",
+        "pay_period",
+        "company_total"
+      ],
+      "rows": 18085,
+      "sha256": "e8e2b7f279c9a65234fe491cdb8a00583c44f849276cad8d30a127fc636ce29d",
+      "bytes": 78493,
+      "source_content_sha256": "ac99faad7a2140c478603fb3070f7f4aaf5a8a54dfce9d279840b89b1c8ce521"
+    },
+    {
+      "name": "headcount_plan",
+      "file": "data/headcount_plan.parquet",
+      "columns": [
+        "plan_id",
+        "plan_year",
+        "dept_id",
+        "planned_headcount"
+      ],
+      "rows": 36,
+      "sha256": "d2656281d9f45c3cbda0ecdbc401e485787dada7f578c6765b76261ad071d2f6",
+      "bytes": 866,
+      "source_content_sha256": "4e7679fdc4f34524a65dbd7a09c30444e2b1f2f235a958b0404fb352807246c3"
+    },
+    {
+      "name": "candidates",
+      "file": "data/candidates.parquet",
+      "columns": [
+        "cand_id",
+        "source",
+        "stage",
+        "applied_at",
+        "hired_emp_id"
+      ],
+      "rows": 1523,
+      "sha256": "e94c1041474cdc058aefec7a0af17531d2813d75e93a6bda46c522fb6db83d9f",
+      "bytes": 8488,
+      "source_content_sha256": "10f73e16c7e4f2712be20eedf53963d2bac93b48dc424b5087b33f4e6f8cfb62"
+    },
+    {
+      "name": "leave_requests",
+      "file": "data/leave_requests.parquet",
+      "columns": [
+        "leave_id",
+        "leave_type",
+        "start_date",
+        "days",
+        "status"
+      ],
+      "rows": 2241,
+      "sha256": "8629ae0c73d3c76437538c5644a6df3661bacf1baf9e7b2a96bb161795962b88",
+      "bytes": 11799,
+      "source_content_sha256": "730c9d55dad6455d57870bdc361cae84b70cc0770ddd75100fdf9056bea3b107"
+    },
+    {
+      "name": "offers",
+      "file": "data/offers.parquet",
+      "columns": [
+        "offer_id",
+        "offer_date",
+        "status",
+        "reject_reason"
+      ],
+      "rows": 573,
+      "sha256": "923bdee34340d87ab11bbbccb1a8087e2df6bd349fbfde2e4d48309c910cd7b1",
+      "bytes": 3167,
+      "source_content_sha256": "4ea7207909892f5dd65aecf52798297a53cff7e3e3f90b7f0b572ff3df6f325b"
+    },
+    {
+      "name": "recruitment_costs",
+      "file": "data/recruitment_costs.parquet",
+      "columns": [
+        "cost_id",
+        "channel",
+        "cost_month",
+        "amount"
+      ],
+      "rows": 137,
+      "sha256": "0d320f79831006fa9f50beac77b1ad7eb67862dcade62f76dbff507279685171",
+      "bytes": 1812,
+      "source_content_sha256": "8b001ea65819f56971fa2a22c2f7e7ec6a32c9c2a208ac119d6cfaf061e45fec"
+    },
+    {
+      "name": "performance_goals",
+      "file": "data/performance_goals.parquet",
+      "columns": [
+        "goal_id",
+        "emp_id",
+        "review_period",
+        "weight",
+        "completion_pct"
+      ],
+      "rows": 6557,
+      "sha256": "ba856eda358aa77de44b068b73b200edf0cca0dba0da02c487b87e34a190aa92",
+      "bytes": 37135,
+      "source_content_sha256": "4038f94854471090ea792bf04b7da898ad7d110bfa95314e32acf8b8b4435882"
+    },
+    {
+      "name": "engagement_surveys",
+      "file": "data/engagement_surveys.parquet",
+      "columns": [
+        "survey_id",
+        "survey_year",
+        "engagement_score"
+      ],
+      "rows": 1394,
+      "sha256": "b3ef68f9d28bd9000fd3b86a1e729f3c5f1b52b4b2019a4d4e26725890f044da",
+      "bytes": 4595,
+      "source_content_sha256": "1a4ef608d5f91b76fa738cd9814f15cd98173cc21fd63f5250fdd4ff1dd119ec"
+    },
+    {
+      "name": "exit_interviews",
+      "file": "data/exit_interviews.parquet",
+      "columns": [
+        "exit_id",
+        "real_reason_category"
+      ],
+      "rows": 196,
+      "sha256": "a53415d57c90d3675a125dcd91cb8943113bebc15b331a33e61ddb22d9f5c693",
+      "bytes": 965,
+      "source_content_sha256": "bb78650e467f8471470851b808c4ad810b52fac817e06965f675bff1b1cfaaaa"
+    }
+  ]
+}

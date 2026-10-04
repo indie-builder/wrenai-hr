@@ -98,8 +98,8 @@
 </div>
 
 <footer>
-  <b>查询路径：</b>本页所有指标由 wren-core-wasm 在浏览器内加载本项目 MDL 语义层后执行 SQL 计算得出，
-  数据来自随应用打包的 PostgreSQL 快照（parquet，25 张表）。口径定义见项目 <b>knowledge/rules/general.md</b>（v2 含编制/调薪/Offer/敬业度等扩展口径）。
+  <b>数据与口径：</b>本页加载随应用导出的 DuckDB 数据快照（Parquet），由浏览器语义引擎执行 Cube 聚合与复杂 SQL；数据库更新后需重新导出快照。
+  数据截止 2026-08-31；历史部门指标按员工当前档案部门归属，未还原调岗历史。口径定义见项目 <b>knowledge/rules/general.md</b>。
 </footer>
 
 <script type="module">
@@ -111,49 +111,53 @@ const setStatus = (msg, cls) => { const s = $("status"); s.textContent = msg; s.
 if (window.__loadErrMsg) throw new Error(window.__loadErrMsg);
 
 const { WrenEngine } = await import("https://unpkg.com/@wrenai/wren-core-wasm@0.4.1/dist/index.js");
-const mdl = await (await fetch("./mdl.json")).json();
-
+const { createQueryClient } = await import("./query-client.js");
+const fetchAsset = async (path, binary = false) => {
+  let response;
+  try {
+    response = await fetch(path, { cache: "no-cache" });
+  } catch {
+    throw new Error(`无法读取快照文件 ${path}，请检查本地服务和网络后刷新；数据更新后请重新导出快照。`);
+  }
+  if (!response.ok) throw new Error(`快照文件加载失败: ${path} (${response.status})，请重新导出快照后刷新。`);
+  return binary ? response.arrayBuffer() : response.json();
+};
+const [mdl, spec, manifest] = await Promise.all([
+  fetchAsset("./mdl.json"), fetchAsset("./query-spec.json"), fetchAsset("./snapshot-manifest.json"),
+]);
+if (manifest.snapshot_date !== spec.snapshot_date) throw new Error("查询配置与数据快照日期不一致，请重新导出快照");
+if (typeof WrenEngine.prototype.cubeQuery !== "function") throw new Error("语义引擎版本缺少 Cube 查询接口");
 const engine = await WrenEngine.init();
-// local 模式: 预注册快照 parquet (表名 = MDL 模型名), 再加载语义层
-const SNAPSHOT = ["departments", "employees", "salary_payments", "attendance_records",
-                  "leave_requests", "candidates", "interviews", "job_openings",
-                  "performance_reviews", "training_records", "transfers", "headcount_plan",
-                  "promotions", "contracts", "salary_changes", "insurance_payments",
-                  "awards_penalties", "overtime_requests", "leave_balances", "offers",
-                  "recruitment_costs", "performance_goals", "talent_pool",
-                  "engagement_surveys", "exit_interviews"];
-for (const name of SNAPSHOT) {
-  const buf = await (await fetch(`data/${name}.parquet`)).arrayBuffer();
-  await engine.registerParquet(name, buf);
+for (const table of manifest.tables) {
+  const buf = await fetchAsset(table.file, true);
+  await engine.registerParquet(table.name, buf);
 }
 await engine.loadMDL(mdl, { source: "./data/" });
-window.wrenEngine = engine; // 调试/演示: 控制台可直接 engine.query(sql)
-const q = (sql) => engine.query(sql);
-setStatus("✓ 语义引擎已就绪，正在执行语义层查询…", "ok");
+window.wrenEngine = engine;
+const client = createQueryClient(engine, spec);
+const q = client.query;
+// 集成验证入口：与 Python 相同查询配置、标准字段和结果顺序。
+window.dashboardResults = client.results;
+window.dashboardQuerySpec = spec;
+document.querySelector("header .sub").textContent = `数据快照截至 ${manifest.snapshot_date}`;
+setStatus(`✓ 已加载 ${manifest.tables.length} 张表的数据快照，正在执行 Cube 与语义 SQL 查询…`, "ok");
 
 const rows = (res, key) => res.map((r) => r[key]);
 
 /* ---------- KPI ---------- */
-const [hc] = await q("SELECT count(*) AS v FROM employees WHERE status = '在职'");
+const [hc] = await q("hc");
 $("kpi-hc").textContent = hc.v.toLocaleString("zh-CN");
 
-const [to] = await q(`WITH leavers AS (SELECT count(*) AS n FROM employees
-    WHERE termination_date >= DATE '2025-01-01' AND termination_date < DATE '2026-01-01'),
-  hc0 AS (SELECT count(*) AS n FROM employees WHERE hire_date < DATE '2025-01-01'
-    AND (termination_date IS NULL OR termination_date >= DATE '2025-01-01'))
-  SELECT round(l.n * 100.0 / h.n, 2) AS v FROM leavers l, hc0 h`);
+const [to] = await q("turnover");
 $("kpi-turnover").innerHTML = `${to.v}<small>%</small>`;
 
-const [cost] = await q(`SELECT round(sum(base_pay + overtime_pay + bonus) / 6, 0) AS v
-  FROM salary_payments WHERE pay_period BETWEEN '2026-01' AND '2026-06'`);
+const [cost] = await q("cost");
 $("kpi-cost").innerHTML = `¥${fmtW(Number(cost.v))}<small> 万</small>`;
 
-const [hire] = await q(`SELECT count(*) AS v FROM employees
-  WHERE hire_date BETWEEN DATE '2026-01-01' AND DATE '2026-08-31'`);
+const [hire] = await q("hire");
 $("kpi-hire").textContent = hire.v.toLocaleString("zh-CN");
 
-const [fun] = await q(`SELECT round(count(*) FILTER (WHERE stage = '已入职') * 100.0 / count(*), 1) AS v
-  FROM candidates WHERE applied_at BETWEEN DATE '2025-01-01' AND DATE '2025-12-31'`);
+const [fun] = await q("funnel");
 $("kpi-funnel").innerHTML = `${fun.v}<small>%</small>`;
 
 /* ---------- 图表公共样式 ---------- */
@@ -178,17 +182,14 @@ const AXIS = {
 };
 
 /* 1 各部门在职人数 */
-const dept = await q(`SELECT d.dept_name AS k, count(*) AS v FROM employees e
-  JOIN departments d ON e.dept_id = d.dept_id WHERE e.status = '在职'
-  GROUP BY d.dept_name ORDER BY v DESC`);
+const dept = await q("dept");
 mk("c1", { ...AXIS,
   xAxis: { ...AXIS.xAxis, data: rows(dept, "k"), axisLabel: { color: "#8a97b0", interval: 0, rotate: 30 } },
   series: [{ type: "bar", data: rows(dept, "v"), barMaxWidth: 26,
     itemStyle: { borderRadius: [6, 6, 0, 0], color: "#4f8cff" } }] });
 
 /* 2 月度人力成本趋势 */
-const costM = await q(`SELECT pay_period AS k, sum(base_pay + overtime_pay + bonus) AS v
-  FROM salary_payments WHERE pay_period >= '2025-01' GROUP BY pay_period ORDER BY k`);
+const costM = await q("costM");
 mk("c2", { ...AXIS,
   xAxis: { ...AXIS.xAxis, type: "category", data: rows(costM, "k") },
   yAxis: { ...AXIS.yAxis, axisLabel: { color: "#8a97b0", formatter: (v) => (v / 10000).toLocaleString("zh-CN") + "万" } },
@@ -197,22 +198,14 @@ mk("c2", { ...AXIS,
     areaStyle: { color: "rgba(62,207,142,.12)" } }] });
 
 /* 3 职级平均基本工资 */
-const lvl = await q(`SELECT job_level AS k, round(avg(base_salary), 0) AS v FROM employees
-  WHERE status = '在职' GROUP BY job_level
-  ORDER BY avg(base_salary) DESC`);
+const lvl = await q("lvl");
 mk("c3", { ...AXIS,
   xAxis: { ...AXIS.xAxis, data: rows(lvl, "k"), axisLabel: { color: "#8a97b0", interval: 0 } },
   series: [{ type: "bar", data: rows(lvl, "v"), barMaxWidth: 26,
     itemStyle: { borderRadius: [6, 6, 0, 0], color: "#a78bfa" } }] });
 
 /* 4 各部门离职率 2025 */
-const attr = await q(`WITH l AS (SELECT e.dept_id, count(*) AS lv FROM employees e
-    WHERE e.termination_date >= DATE '2025-01-01' AND e.termination_date < DATE '2026-01-01' GROUP BY e.dept_id),
-  h AS (SELECT e.dept_id, count(*) AS hc FROM employees e WHERE e.hire_date < DATE '2025-01-01'
-    AND (e.termination_date IS NULL OR e.termination_date >= DATE '2025-01-01') GROUP BY e.dept_id)
-  SELECT d.dept_name AS k, round(coalesce(l.lv,0) * 100.0 / h.hc, 1) AS v
-  FROM h JOIN departments d ON d.dept_id = h.dept_id LEFT JOIN l ON l.dept_id = h.dept_id
-  ORDER BY v DESC`);
+const attr = await q("attr");
 mk("c4", { ...AXIS,
   yAxis: { type: "category", data: rows(attr, "k"), axisLabel: { color: "#8a97b0" } },
   xAxis: { type: "value", splitLine: { lineStyle: { color: "#1c2536" } }, axisLabel: { color: "#8a97b0", formatter: "{value}%" } },
@@ -220,9 +213,7 @@ mk("c4", { ...AXIS,
     itemStyle: { borderRadius: [0, 6, 6, 0], color: "#ffb454" } }] });
 
 /* 5 假期结构 */
-const leave = await q(`SELECT leave_type AS k, sum(days) AS v FROM leave_requests
-  WHERE status = '已批准' AND start_date BETWEEN DATE '2025-01-01' AND DATE '2025-12-31'
-  GROUP BY leave_type ORDER BY v DESC`);
+const leave = await q("leave");
 mk("c5", {
   series: [{ type: "pie", radius: ["42%", "70%"], center: ["50%", "52%"],
     data: leave.map((r) => ({ name: r.k, value: r.v })),
@@ -230,12 +221,8 @@ mk("c5", {
     itemStyle: { borderColor: "#161e2e", borderWidth: 2 } }] });
 
 /* 6 新入职来源 + 性别构成 (左右复用) */
-const src = await q(`SELECT c.source AS k, count(*) AS v FROM candidates c
-  JOIN employees e ON c.hired_emp_id = e.emp_id
-  WHERE e.hire_date BETWEEN DATE '2026-01-01' AND DATE '2026-08-31'
-  GROUP BY c.source ORDER BY v DESC`);
-const gen = await q(`SELECT gender AS k, count(*) AS v FROM employees
-  WHERE status = '在职' GROUP BY gender`);
+const src = await q("src");
+const gen = await q("gen");
 mk("c6", {
   title: [{ text: "新入职来源", left: "25%", top: 4, textAlign: "center", textStyle: { color: "#8a97b0", fontSize: 12 } },
           { text: "性别构成", left: "75%", top: 4, textAlign: "center", textStyle: { color: "#8a97b0", fontSize: 12 } }],
@@ -252,26 +239,20 @@ mk("c6", {
 
 
 /* ---------- v2 扩展 KPI ---------- */
-const [tc] = await q(`WITH g AS (SELECT sum(base_pay + overtime_pay + bonus) AS v FROM v_workforce_monthly WHERE pay_period BETWEEN '2026-01' AND '2026-06'),
-  i AS (SELECT sum(insurance_company) AS v FROM v_workforce_monthly WHERE pay_period BETWEEN '2026-01' AND '2026-06')
-  SELECT round((g.v + i.v) / 6 / 10000, 1) AS v FROM g, i`);
+const [tc] = await q("totalcost");
 $("kpi-totalcost").innerHTML = `¥${Number(tc.v).toLocaleString("zh-CN", { maximumFractionDigits: 1 })}<small> 万</small>`;
 
-const [plan] = await q(`SELECT round(sum(actual_headcount) * 100.0 / sum(planned_headcount), 1) AS v
-  FROM v_headcount_vs_plan WHERE plan_year = 2025`);
+const [plan] = await q("plan");
 $("kpi-plan").innerHTML = `${plan.v}<small>%</small>`;
 
-const [off] = await q(`SELECT round(count(*) FILTER (WHERE status = '已接受') * 100.0
-  / NULLIF(count(*) FILTER (WHERE status IN ('已接受','已拒绝')), 0), 1) AS v
-  FROM offers WHERE offer_date BETWEEN DATE '2025-01-01' AND DATE '2025-12-31'`);
+const [off] = await q("offer");
 $("kpi-offer").innerHTML = `${off.v}<small>%</small>`;
 
-const [eng] = await q(`SELECT round(avg(engagement_score), 2) AS v FROM engagement_surveys WHERE survey_year = 2025`);
+const [eng] = await q("eng");
 $("kpi-eng").textContent = `${eng.v} / 5`;
 
 /* 7 编制 vs 年末实际 (2025) */
-const hp = await q(`SELECT dept_name AS k, planned_headcount AS p, actual_headcount AS a
-  FROM v_headcount_vs_plan WHERE plan_year = 2025`);
+const hp = await q("hp");
 mk("c7", { ...AXIS,
   xAxis: { ...AXIS.xAxis, data: rows(hp, "k"), axisLabel: { color: "#8a97b0", interval: 0, rotate: 30 } },
   series: [
@@ -281,9 +262,7 @@ mk("c7", { ...AXIS,
       itemStyle: { borderRadius: [4, 4, 0, 0], color: "#4f8cff" } }] });
 
 /* 8 人力总成本构成趋势 */
-const costC = await q(`SELECT pay_period AS k, sum(base_pay) AS b, sum(overtime_pay) AS o,
-  sum(bonus) AS bo, sum(insurance_company) AS ins
-  FROM v_workforce_monthly WHERE pay_period >= '2025-01' GROUP BY pay_period`);
+const costC = await q("costC");
 mk("c8", { ...AXIS,
   xAxis: { ...AXIS.xAxis, data: rows(costC, "k") },
   yAxis: { ...AXIS.yAxis, axisLabel: { color: "#8a97b0", formatter: (v) => (v / 10000).toLocaleString("zh-CN") + "万" } },
@@ -298,7 +277,7 @@ mk("c8", { ...AXIS,
       areaStyle: { color: "#a78bfa" } }] });
 
 /* 9 Offer 拒绝原因 */
-const rej = await q(`SELECT reject_reason AS k, count(*) AS v FROM offers WHERE status = '已拒绝' GROUP BY reject_reason`);
+const rej = await q("rej");
 mk("c9", {
   series: [{ type: "pie", radius: ["42%", "70%"], center: ["50%", "52%"],
     data: rej.map((r) => ({ name: r.k, value: r.v })),
@@ -306,27 +285,17 @@ mk("c9", {
     itemStyle: { borderColor: "#161e2e", borderWidth: 2 } }] });
 
 /* 10 渠道单人招聘成本 (2025) */
-const chCost = await q(`SELECT channel AS k, sum(amount) AS v FROM recruitment_costs
-  WHERE cost_month LIKE '2025%' GROUP BY channel`);
-const chHire = await q(`SELECT c.source AS k, count(*) AS v FROM candidates c
-  JOIN employees e ON c.hired_emp_id = e.emp_id
-  WHERE e.hire_date BETWEEN DATE '2025-01-01' AND DATE '2025-12-31' GROUP BY c.source`);
-const CH2SRC = { "招聘网站": "招聘网站", "猎头": "猎头", "内推奖励": "内推", "校园招聘": "校园招聘" };
-const hireMap = Object.fromEntries(rows(chHire, "k").map((k, i) => [k, chHire[i].v]));
-const costPerHire = chCost.map((r) => ({
-  k: r.k, v: r.v / (hireMap[CH2SRC[r.k]] || Infinity), n: hireMap[CH2SRC[r.k]] || 0 }))
-  .filter((r) => isFinite(r.v)).sort((a, b) => b.v - a.v);
+const costPerHire = await q("costPerHire");
 mk("c10", { ...AXIS,
   yAxis: { type: "category", data: rows(costPerHire, "k"), axisLabel: { color: "#8a97b0" } },
   xAxis: { type: "value", splitLine: { lineStyle: { color: "#1c2536" } }, axisLabel: { color: "#8a97b0", formatter: "¥{value}" } },
-  series: [{ type: "bar", data: costPerHire.map((r) => ({ value: Math.round(r.v),
-    label: { show: true, position: "right", color: "#8a97b0", fontSize: 11, formatter: `入职${r.n}人` } })),
+  series: [{ type: "bar", data: costPerHire.map((r) => ({ value: r.v == null ? null : Math.round(r.v),
+    label: { show: true, position: "right", color: "#8a97b0", fontSize: 11, formatter: r.n ? `入职${r.n}人` : "无入职人数，无法计算" } })),
     barMaxWidth: 16, itemStyle: { borderRadius: [0, 6, 6, 0], color: "#ff6b81" } }] });
 
 /* 11 离职原因: 档案 vs 面谈真实归因 */
-const arc = await q(`SELECT termination_reason AS k, count(*) AS v FROM employees
-  WHERE status = '离职' GROUP BY termination_reason ORDER BY v DESC LIMIT 6`);
-const real = await q(`SELECT real_reason_category AS k, count(*) AS v FROM exit_interviews GROUP BY real_reason_category ORDER BY v DESC LIMIT 6`);
+const arc = await q("arc");
+const real = await q("real");
 mk("c11", {
   title: [{ text: "档案离职原因", left: "25%", top: 4, textAlign: "center", textStyle: { color: "#8a97b0", fontSize: 12 } },
           { text: "面谈真实归因", left: "75%", top: 4, textAlign: "center", textStyle: { color: "#8a97b0", fontSize: 12 } }],
@@ -341,9 +310,7 @@ mk("c11", {
       itemStyle: { borderColor: "#161e2e", borderWidth: 2 } }] });
 
 /* 12 各部门绩效目标加权完成率 (2026H1) */
-const goal = await q(`SELECT d.dept_name AS k, sum(g.completion_pct * g.weight) / sum(g.weight) AS v
-  FROM performance_goals g JOIN employees e ON g.emp_id = e.emp_id JOIN departments d ON d.dept_id = e.dept_id
-  WHERE g.review_period = '2026H1' GROUP BY d.dept_name ORDER BY v DESC`);
+const goal = await q("goal");
 mk("c12", { ...AXIS,
   xAxis: { ...AXIS.xAxis, data: rows(goal, "k"), axisLabel: { color: "#8a97b0", interval: 0, rotate: 30 } },
   yAxis: { ...AXIS.yAxis, min: 40, axisLabel: { color: "#8a97b0", formatter: "{value}%" } },
@@ -357,7 +324,8 @@ document.querySelectorAll(".card").forEach((card) => {
   if (h && chartEl) { chartEl.setAttribute("role", "img"); chartEl.setAttribute("aria-label", h.textContent); }
 });
 
-setStatus("✓ 完成：全部指标由 wren-core-wasm 语义层在浏览器内计算（v2：25 表 / 12 图）", "ok");
+setStatus(`✓ 完成：数据快照 ${manifest.snapshot_date} · ${manifest.tables.length} 表 / 9 KPI / 12 图 · Cube 与语义 SQL 在浏览器内计算`, "ok");
+window.dashboardReady = true;
 </script>
 </body>
 </html>

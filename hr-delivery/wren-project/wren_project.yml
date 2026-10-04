@@ -3,5 +3,5 @@ name: hr_demo
 version: '1.0'
 catalog: wren
 schema: public
-data_source: postgres
-profile: hr_demo
+data_source: duckdb
+profile: hr_demo_duck

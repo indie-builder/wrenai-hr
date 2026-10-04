@@ -48,8 +48,3 @@ columns:
     type: VARCHAR
     properties:
       description: "晋升原因: 年度晋升/破格晋升/继任就任"
-    type: DOUBLE
-    is_calculated: true
-    expression: "round((salary_after - salary_before) * 100.0 / salary_before, 2)"
-    properties:
-      description: "晋升调薪幅度(%)"

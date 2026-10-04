@@ -288,9 +288,9 @@
           "name": "is_expiring_soon",
           "type": "BOOLEAN",
           "isCalculated": true,
-          "expression": "CASE WHEN status = '履行中' AND end_date IS NOT NULL AND end_date <= current_date + INTERVAL '90 days' THEN true ELSE false END",
+          "expression": "CASE WHEN status = '履行中' AND end_date IS NOT NULL AND end_date BETWEEN DATE '2026-08-31' AND DATE '2026-08-31' + INTERVAL '90 days' THEN true ELSE false END",
           "properties": {
-            "description": "是否90天内到期(履行中)"
+            "description": "是否在2026-08-31至其后90天内到期(含两端, 履行中)"
           }
         }
       ]
@@ -502,18 +502,18 @@
           "name": "age",
           "type": "INTEGER",
           "isCalculated": true,
-          "expression": "CAST(date_part('year', current_date) AS INTEGER) - CAST(date_part('year', birth_date) AS INTEGER)",
+          "expression": "CAST(date_part('year', DATE '2026-08-31') AS INTEGER) - CAST(date_part('year', birth_date) AS INTEGER)",
           "properties": {
-            "description": "年龄(岁), 由出生日期计算"
+            "description": "年龄(岁), 按2026-08-31所在年份减出生年份, 非周岁"
           }
         },
         {
           "name": "tenure_years",
           "type": "DOUBLE",
           "isCalculated": true,
-          "expression": "round((current_date - hire_date) / 365.25, 1)",
+          "expression": "round((DATE '2026-08-31' - hire_date) / 365.25, 1)",
           "properties": {
-            "description": "司龄(年), 由入职日期计算"
+            "description": "司龄(年), (2026-08-31减入职日期)/365.25, 四舍五入一位小数"
           }
         }
       ]
@@ -1455,12 +1455,10 @@
         },
         {
           "name": "reason",
-          "type": "DOUBLE",
+          "type": "VARCHAR",
           "properties": {
-            "description": "晋升调薪幅度(%)"
-          },
-          "isCalculated": true,
-          "expression": "round((salary_after - salary_before) * 100.0 / salary_before, 2)"
+            "description": "晋升原因: 年度晋升/破格晋升/继任就任"
+          }
         }
       ]
     },
@@ -2161,7 +2159,7 @@
       "properties": {
         "description": "在职员工宽表: 员工档案 + 部门名称, 仅 status=在职 (人员分析用)"
       },
-      "statement": "SELECT e.emp_id, e.emp_no, e.name, e.gender, e.birth_date, e.hire_date, e.dept_id, d.dept_name, d.location AS dept_location, e.job_title, e.job_level, e.employment_type, e.status, e.base_salary, e.work_city, e.education, CAST(date_part('year', current_date) AS INTEGER) - CAST(date_part('year', e.birth_date) AS INTEGER) AS age, round((current_date - e.hire_date) / 365.25, 1) AS tenure_years FROM employees e JOIN departments d ON e.dept_id = d.dept_id WHERE e.status = '在职'"
+      "statement": "SELECT e.emp_id, e.emp_no, e.name, e.gender, e.birth_date, e.hire_date, e.dept_id, d.dept_name, d.location AS dept_location, e.job_title, e.job_level, e.employment_type, e.status, e.base_salary, e.work_city, e.education, CAST(date_part('year', DATE '2026-08-31') AS INTEGER) - CAST(date_part('year', e.birth_date) AS INTEGER) AS age, round((DATE '2026-08-31' - e.hire_date) / 365.25, 1) AS tenure_years FROM employees e JOIN departments d ON e.dept_id = d.dept_id WHERE e.status = '在职'"
     },
     {
       "name": "v_attendance_daily",
@@ -2288,6 +2286,11 @@
       ],
       "dimensions": [
         {
+          "name": "plan_year",
+          "expression": "plan_year",
+          "type": "INTEGER"
+        },
+        {
           "name": "dept_name",
           "expression": "dept_name",
           "type": "VARCHAR"
@@ -2335,6 +2338,11 @@
         }
       ],
       "dimensions": [
+        {
+          "name": "pay_period",
+          "expression": "pay_period",
+          "type": "VARCHAR"
+        },
         {
           "name": "dept_name",
           "expression": "dept_name",
@@ -2406,9 +2414,19 @@
       "name": "total_cost",
       "baseObject": "v_workforce_monthly",
       "properties": {
-        "description": "人力总成本 cube: 基本工资/加班/奖金/社保企业缴纳分项聚合, 总成本在查询时相加"
+        "description": "人力总成本 cube: 税前应发加社保企业缴纳, 一人一月一行; 人均月成本=total_cost/person_months, 部门按当前档案归属"
       },
       "measures": [
+        {
+          "name": "total_cost",
+          "expression": "SUM(base_pay + overtime_pay + bonus + insurance_company)",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "person_months",
+          "expression": "COUNT(*)",
+          "type": "BIGINT"
+        },
         {
           "name": "payee_count",
           "expression": "COUNT(*)",
@@ -2436,6 +2454,11 @@
         }
       ],
       "dimensions": [
+        {
+          "name": "pay_period",
+          "expression": "pay_period",
+          "type": "VARCHAR"
+        },
         {
           "name": "dept_name",
           "expression": "dept_name",
@@ -2524,6 +2547,6 @@
       ]
     }
   ],
-  "dataSource": "postgres",
+  "dataSource": "duckdb",
   "layoutVersion": 3
 }

@@ -30,8 +30,8 @@
 | 人力总成本 / 完全用人成本 | 税前应发 + 社保公积金企业缴纳 (insurance_payments.company_total) |
 | 五险一金(企业) | insurance_payments: pension+medical+unemployment+injury+maternity+housing_fund |
 | 调薪 / 涨薪 | salary_changes; 渗透率 = 调薪去重人数 ÷ 期初在职 |
-| 晋升 / 升职 | promotions; 晋升率 = 晋升人数 ÷ 期初在职; 幅度看 raise_pct |
-| 合同续签 / 到期预警 | contracts; is_expiring_soon = 履行中且90天内到期 |
+| 晋升 / 升职 | promotions; 晋升率 = count(DISTINCT emp_id) ÷ 期初在职; 幅度在查询中按 (salary_after - salary_before) × 100.0 / salary_before 计算 |
+| 合同续签 / 到期预警 | contracts; is_expiring_soon = 履行中且在2026-08-31至其后90天闭区间内到期，排除此前已到期 |
 | 加班审批 / 加班单 | overtime_requests; 通过率 = 已批准 ÷ 全部 |
 | 调休补偿 | overtime_requests.compensation='调休' (1天=8小时) |
 | 假期余额 / 年假余额 | leave_balances 季度快照; 使用率 = used/entitled |

@@ -13,6 +13,9 @@ measures:
     expression: COUNT(*)
     type: BIGINT
 dimensions:
+  - name: plan_year
+    expression: plan_year
+    type: INTEGER
   - name: dept_name
     expression: dept_name
     type: VARCHAR
