@@ -174,6 +174,6 @@ python3 -m http.server 8317 --bind 127.0.0.1 \
 - 仿真 CSV、仪表盘 Parquet、验证结果是交付物；修改时关注来源、时间范围和可复现性。
 - 不提交 `.env`、虚拟环境、用户级连接凭据和 `.wren/memory/` 缓存；保持 `.gitignore` 生效。
 - 本项目已发布到公开仓库，提交前检查差异中是否混入实际凭据、真实个人数据或本地产物。
-- 旧 `validation/run_wren.sh` 含机器绝对路径，优先使用 v2 runner。
+- 已移除旧 `validation/run_wren.sh` 等早期脚本和输出，统一使用 `validation/v2/` runner。
 - 不默认修改或提交 `vendor/WrenAI/` 上游参考源码。
 - 完成工作后说明修改的文件、实际执行的验证和仍未验证的部分。

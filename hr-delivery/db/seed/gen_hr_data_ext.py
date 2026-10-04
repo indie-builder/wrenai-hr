@@ -9,6 +9,8 @@ HR v2 扩展数据生成器 (GOAL.md M1)
 """
 import csv, os, random, datetime as dt
 
+from seed_common import month_days, rand_workday, month_rand_workday, weighted, write_csv
+
 R = random.Random(2026)
 BASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "out")
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "out2")
@@ -21,25 +23,6 @@ def read(name):
 
 def d(s):
     return dt.date.fromisoformat(s) if s else None
-
-def rand_workday(d0, d1):
-    if d0 > d1:
-        d0 = d1
-    for _ in range(30):
-        c = d0 + dt.timedelta(days=R.randint(0, max((d1 - d0).days, 0)))
-        if c.weekday() < 5:
-            return c
-    return d0
-
-def month_days(y_, m_):
-    nxt = dt.date(y_ + (m_ == 12), (m_ % 12) + 1, 1)
-    return (nxt - dt.date(y_, m_, 1)).days
-
-def mrw(y_, m_):
-    return rand_workday(dt.date(y_, m_, 1), dt.date(y_, m_, month_days(y_, m_)))
-
-def clamp(v, lo, hi):
-    return max(lo, min(hi, v))
 
 employees = read("employees.csv")
 departments = read("departments.csv")
@@ -130,7 +113,7 @@ for year in (2023, 2024, 2025, 2026):
             continue
         chosen.add(e["emp_id"])
         idx = LEVELS.index(e["job_level"])
-        promo_date = mrw(year, 3)
+        promo_date = month_rand_workday(year, 3, R)
         sb = base_at(e, promo_date)
         sa = round(sb * R.uniform(1.18, 1.32) / 100) * 100
         promotions.append({"emp_id": e["emp_id"], "promo_date": promo_date,
@@ -138,8 +121,7 @@ for year in (2023, 2024, 2025, 2026):
                            "from_title": e["job_title"],
                            "to_title": ("高级" + e["job_title"].replace("高级", "")) if e["job_level"] == "中级" else e["job_title"],
                            "salary_before": float(sb), "salary_after": float(sa),
-                           "reason": weighted_reason if (weighted_reason := R.choices(
-                               ["年度晋升", "破格晋升", "继任就任"], weights=[75, 15, 10])[0]) else "年度晋升"})
+                           "reason": weighted([("年度晋升", 75), ("破格晋升", 15), ("继任就任", 10)], R)})
         promoted_set[e["emp_id"]] = promo_date
 
 # ---------------- 3. 劳动合同 contracts ----------------
@@ -180,8 +162,8 @@ for e in employees:
 
 # ---------------- 4. 调薪 salary_changes ----------------
 salary_changes = []
-for (yy, mm) in [(y_, m_) for y_ in (2023, 2024, 2025, 2026) for m_ in (4,)]:
-    eff = mrw(yy, mm)
+for (yy, mm) in [(y_, 4) for y_ in (2023, 2024, 2025, 2026)]:
+    eff = month_rand_workday(yy, mm, R)
     for e in employees:
         if not active_at(e, eff) or (eff - e["hire_date"]).days < 300:
             continue
@@ -199,7 +181,7 @@ for p in promotions:  # 晋升调薪
 for e in employees:   # 特批调薪 ~2%
     if e["status"] != "在职" or R.random() > 0.02:
         continue
-    eff = rand_workday(dt.date(2024, 1, 1), dt.date(2026, 7, 31))
+    eff = rand_workday(dt.date(2024, 1, 1), dt.date(2026, 7, 31), R)
     sb = base_at(e, eff)
     sa = round(sb * R.uniform(1.05, 1.15) / 100) * 100
     salary_changes.append({"emp_id": e["emp_id"], "effective_date": eff,
@@ -225,7 +207,7 @@ for r_ in reviews:
         if d0 > REF:
             continue
         cash = r_["grade"] == "S" or R.random() < 0.5
-        awards.append({"emp_id": e["emp_id"], "record_date": rand_workday(d0, dt.date(yy + 1, 2, 28)),
+        awards.append({"emp_id": e["emp_id"], "record_date": rand_workday(d0, dt.date(yy + 1, 2, 28), R),
                        "record_type": "奖励",
                        "category": "奖金" if cash else R.choice(["通报表扬", "优秀员工"]),
                        "amount": float(round(R.uniform(1000, 5000), 2)) if cash else None,
@@ -235,7 +217,7 @@ for r_ in reviews:
         d0 = dt.date(yy, 7, 1)
         if d0 > REF:
             continue
-        awards.append({"emp_id": e["emp_id"], "record_date": rand_workday(d0, dt.date(yy, 12, 31)),
+        awards.append({"emp_id": e["emp_id"], "record_date": rand_workday(d0, dt.date(yy, 12, 31), R),
                        "record_type": "处罚", "category": R.choice(["警告", "记过"]),
                        "amount": None,
                        "reason": R.choice(["阶段性目标未达成", "考勤纪律问题", "工作失误造成返工"]),
@@ -249,23 +231,21 @@ for e in employees:
         if (yy, mm) > (2026, 8) or not active_at(e, dt.date(yy, mm, month_days(yy, mm))):
             continue
         if R.random() < p_hc:
-            ot_day = mrw(yy, mm)
+            ot_day = month_rand_workday(yy, mm, R)
             if ot_day < e["hire_date"] or (e["termination_date"] and ot_day > e["termination_date"]):
                 continue
             planned = R.choice([2, 3, 4, 4, 6, 8])
-            st = R.choices(["已批准", "已拒绝", "待审批"], weights=[85, 10, 5])[0]
+            st = weighted([("已批准", 85), ("已拒绝", 10), ("待审批", 5)], R)
             overtime.append({"emp_id": e["emp_id"], "ot_date": ot_day, "planned_hours": planned,
                              "actual_hours": planned if st != "已拒绝" else None,
                              "reason": R.choice(["项目上线冲刺", "紧急故障处理", "月度结账", "客户交付",
                                                  "版本发布", "季度盘点"]),
                              "status": st,
-                             "compensation": R.choices(["调休", "加班费", "无"], weights=[60, 35, 5])[0] if st == "已批准" else "无",
+                             "compensation": weighted([("调休", 60), ("加班费", 35), ("无", 5)], R) if st == "已批准" else "无",
                              "applied_at": ot_day - dt.timedelta(days=R.randint(1, 5))})
 
 # ---------------- 8. 假期余额 leave_balances ----------------
-leave_balances = []
-QUARTERS = [(y_, q_) for y_ in (2025, 2026) for q_ in (1, 2, 3) if (y_, q_) != (2026, 3) or True]
-QUARTERS = [(2025, 1), (2025, 2), (2025, 3), (2026, 1), (2026, 2), (2026, 3)]
+QUARTERS = [(y_, q_) for y_ in (2025, 2026) for q_ in (1, 2, 3)]
 def qend(y_, q_):
     return dt.date(y_, q_ * 3, month_days(y_, q_ * 3))
 ot_comp_days = {}
@@ -273,8 +253,9 @@ for o in overtime:
     if o["compensation"] == "调休" and o["status"] == "已批准":
         ot_comp_days.setdefault(o["emp_id"], 0.0)
         ot_comp_days[o["emp_id"]] += o["planned_hours"] / 8.0
+leave_balances = []
 for e in employees:
-    tenure = clamp(int(((e["termination_date"] or REF) - e["hire_date"]).days / 365.25), 0, 10)
+    tenure = max(0, min(10, int(((e["termination_date"] or REF) - e["hire_date"]).days / 365.25)))
     entitled_al = 5 + min(10, tenure)
     for (yy, q_) in QUARTERS:
         qe = qend(yy, q_)
@@ -308,7 +289,7 @@ for c in candidates:
     else:
         st = "已拒绝"
         resp = od + dt.timedelta(days=R.randint(2, 8))
-        reason = R.choices(["薪酬不匹配", "已接其他offer", "家庭原因", "其他"], weights=[40, 30, 18, 12])[0]
+        reason = weighted([("薪酬不匹配", 40), ("已接其他offer", 30), ("家庭原因", 18), ("其他", 12)], R)
     offers.append({"cand_id": c["cand_id"], "offer_date": od, "offer_salary": c["expected_salary"],
                    "status": st, "response_date": resp, "reject_reason": reason})
 
@@ -347,7 +328,6 @@ goals = []
 for period in ("2024H1", "2024H2", "2025H1", "2025H2", "2026H1"):
     yy = int(period[:4])
     end = dt.date(yy, 6, 30) if period.endswith("H1") else dt.date(yy, 12, 31)
-    g = grade_of(0, "")  # noop
     for e in employees:
         if not active_at(e, end - dt.timedelta(days=30)) or (end - e["hire_date"]).days < 60:
             continue
@@ -364,9 +344,9 @@ for period in ("2024H1", "2024H2", "2025H1", "2025H2", "2026H1"):
             picks.append(R.choice(GENERIC) + f"({R.randint(2,9)})")
         for i in range(n):
             goals.append({"emp_id": e["emp_id"], "review_period": period,
-                          "goal_type": R.choices(["KPI", "OKR"], weights=[70, 30])[0],
+                          "goal_type": weighted([("KPI", 70), ("OKR", 30)], R),
                           "goal_desc": picks[i], "weight": wlist[i],
-                          "completion_pct": round(clamp(R.gauss(base_c, 12), 15, 100), 1)})
+                          "completion_pct": round(max(15, min(100, R.gauss(base_c, 12))), 1)})
 
 # ---------------- 12. 人才池 talent_pool ----------------
 talent = []
@@ -384,11 +364,11 @@ for e in active:
     talent.append({"emp_id": e["emp_id"],
                    "pool_type": "继任者" if is_successor else "高潜人才",
                    "target_position": f"{dept_name.replace('部', '')}总监" if is_successor else None,
-                   "potential_rating": R.choices(["高潜", "潜力之星"], weights=[60, 40])[0],
-                   "nominated_date": rand_workday(dt.date(2024, 6, 1), dt.date(2026, 6, 30)),
+                   "potential_rating": weighted([("高潜", 60), ("潜力之星", 40)], R),
+                   "nominated_date": rand_workday(dt.date(2024, 6, 1), dt.date(2026, 6, 30), R),
                    "nominated_by": director_of(e["dept_id"]) or "",
-                   "status": "已晋升" if e["emp_id"] in promoted_set else
-                             R.choices(["在池", "已移出"], weights=[92, 8])[0]})
+                   "status": "已晋升" if e["emp_id"] in promoted_set
+                             else weighted([("在池", 92), ("已移出", 8)], R)})
 talent = talent[:60]
 
 # ---------------- 13. 敬业度调研 engagement_surveys ----------------
@@ -400,8 +380,8 @@ for yy in (2023, 2024, 2025, 2026):
             continue
         leaving_soon = e["termination_date"] and 0 <= (e["termination_date"] - survey_day).days <= 365
         b = R.gauss(3.3, 0.45) - (0.5 if leaving_soon else 0)
-        dims = [clamp(R.gauss(b + R.uniform(-0.2, 0.2), 0.3), 1, 5) for _ in range(5)]
-        eng = round(clamp(sum(dims) / 5, 1, 5), 1)
+        dims = [max(1, min(5, R.gauss(b + R.uniform(-0.2, 0.2), 0.3))) for _ in range(5)]
+        eng = round(max(1, min(5, sum(dims) / 5)), 1)
         surveys.append({"emp_id": e["emp_id"], "survey_year": yy, "engagement_score": eng,
                         "recognition": round(dims[0], 1), "growth": round(dims[1], 1),
                         "pay_satisfaction": round(dims[2], 1), "manager_trust": round(dims[3], 1),
@@ -412,10 +392,10 @@ exits = []
 for e in terminated:
     if e["termination_date"] < dt.date(2023, 2, 1) or R.random() > 0.75:
         continue
-    ivd = rand_workday(e["termination_date"] - dt.timedelta(days=6), e["termination_date"])
-    real = R.choices(["薪酬福利", "职业发展", "管理问题", "工作文化", "家庭个人", "健康"],
-                     weights=[30, 25, 13, 8, 16, 8])[0]
-    sat = round(clamp(R.gauss(2.9, 1.0), 1, 5), 1)
+    ivd = rand_workday(e["termination_date"] - dt.timedelta(days=6), e["termination_date"], R)
+    real = weighted([("薪酬福利", 30), ("职业发展", 25), ("管理问题", 13), ("工作文化", 8),
+                     ("家庭个人", 16), ("健康", 8)], R)
+    sat = round(max(1, min(5, R.gauss(2.9, 1.0))), 1)
     exits.append({"emp_id": e["emp_id"], "interview_date": ivd, "real_reason_category": real,
                   "satisfaction": sat, "would_recommend": "t" if (sat >= 3) == (R.random() < 0.7) else "f",
                   "comment": R.choice(["直属上级管理风格是主要考虑因素", "外部机会薪酬高出30%以上",
@@ -423,73 +403,35 @@ for e in terminated:
                                        "工作强度长期偏高", "认同公司文化，个人规划调整"])})
 
 # ---------------- 写 CSV ----------------
-def write(name, header, rows, fmt):
-    with open(os.path.join(OUT, name), "w", newline="", encoding="utf-8") as f:
-        w = csv.writer(f)
-        w.writerow(header)
-        for r_ in rows:
-            w.writerow(fmt(r_))
+TABLES = [
+    ("headcount_plan.csv", ["plan_year", "dept_id", "planned_headcount", "budget_labor_cost", "approved_at"], headcount_plan),
+    ("promotions.csv", ["emp_id", "promo_date", "from_level", "to_level", "from_title", "to_title",
+                        "salary_before", "salary_after", "reason"], promotions),
+    ("contracts.csv", ["contract_no", "emp_id", "contract_type", "start_date", "end_date", "renewals",
+                       "status", "signed_date"], contracts),
+    ("salary_changes.csv", ["emp_id", "effective_date", "salary_before", "salary_after", "change_pct",
+                            "change_type"], salary_changes),
+    ("insurance_payments.csv", ["emp_id", "pay_period", "pension", "medical", "unemployment", "injury",
+                                "maternity", "housing_fund", "company_total"], insurance),
+    ("awards_penalties.csv", ["emp_id", "record_date", "record_type", "category", "amount", "reason",
+                              "approver_id"], awards),
+    ("overtime_requests.csv", ["emp_id", "ot_date", "planned_hours", "actual_hours", "reason", "status",
+                               "compensation", "applied_at"], overtime),
+    ("leave_balances.csv", ["emp_id", "balance_type", "as_of_quarter", "entitled", "used", "remaining",
+                            "expired"], leave_balances),
+    ("offers.csv", ["cand_id", "offer_date", "offer_salary", "status", "response_date", "reject_reason"], offers),
+    ("recruitment_costs.csv", ["channel", "cost_month", "amount", "notes"], costs),
+    ("performance_goals.csv", ["emp_id", "review_period", "goal_type", "goal_desc", "weight",
+                               "completion_pct"], goals),
+    ("talent_pool.csv", ["emp_id", "pool_type", "target_position", "potential_rating", "nominated_date",
+                         "nominated_by", "status"], talent),
+    ("engagement_surveys.csv", ["emp_id", "survey_year", "engagement_score", "recognition", "growth",
+                                "pay_satisfaction", "manager_trust", "work_life_balance"], surveys),
+    ("exit_interviews.csv", ["emp_id", "interview_date", "real_reason_category", "satisfaction",
+                             "would_recommend", "comment"], exits),
+]
+for name, header, rows in TABLES:
+    write_csv(OUT, name, header, rows)
 
-write("headcount_plan.csv", ["plan_year", "dept_id", "planned_headcount", "budget_labor_cost", "approved_at"],
-      headcount_plan, lambda r: [r["plan_year"], r["dept_id"], r["planned_headcount"], r["budget_labor_cost"], r["approved_at"]])
-write("promotions.csv", ["emp_id", "promo_date", "from_level", "to_level", "from_title", "to_title",
-                         "salary_before", "salary_after", "reason"],
-      promotions, lambda r: [r["emp_id"], r["promo_date"], r["from_level"], r["to_level"], r["from_title"],
-                             r["to_title"], r["salary_before"], r["salary_after"], r["reason"]])
-write("contracts.csv", ["contract_no", "emp_id", "contract_type", "start_date", "end_date", "renewals",
-                        "status", "signed_date"],
-      contracts, lambda r: [r["contract_no"], r["emp_id"], r["contract_type"], r["start_date"],
-                            r["end_date"] or "", r["renewals"], r["status"], r["signed_date"]])
-write("salary_changes.csv", ["emp_id", "effective_date", "salary_before", "salary_after", "change_pct", "change_type"],
-      salary_changes, lambda r: [r["emp_id"], r["effective_date"], r["salary_before"], r["salary_after"],
-                                 r["change_pct"], r["change_type"]])
-write("insurance_payments.csv", ["emp_id", "pay_period", "pension", "medical", "unemployment", "injury",
-                                 "maternity", "housing_fund", "company_total"],
-      insurance, lambda r: [r["emp_id"], r["pay_period"], r["pension"], r["medical"], r["unemployment"],
-                            r["injury"], r["maternity"], r["housing_fund"], r["company_total"]])
-write("awards_penalties.csv", ["emp_id", "record_date", "record_type", "category", "amount", "reason", "approver_id"],
-      awards, lambda r: [r["emp_id"], r["record_date"], r["record_type"], r["category"],
-                         r["amount"] if r["amount"] != "" and r["amount"] is not None else "",
-                         r["reason"], r["approver_id"]])
-write("overtime_requests.csv", ["emp_id", "ot_date", "planned_hours", "actual_hours", "reason", "status",
-                                "compensation", "applied_at"],
-      overtime, lambda r: [r["emp_id"], r["ot_date"], r["planned_hours"],
-                           r["actual_hours"] if r["actual_hours"] is not None else "", r["reason"],
-                           r["status"], r["compensation"], r["applied_at"]])
-write("leave_balances.csv", ["emp_id", "balance_type", "as_of_quarter", "entitled", "used", "remaining", "expired"],
-      leave_balances, lambda r: [r["emp_id"], r["balance_type"], r["as_of_quarter"], r["entitled"], r["used"],
-                                 r["remaining"], r["expired"]])
-write("offers.csv", ["cand_id", "offer_date", "offer_salary", "status", "response_date", "reject_reason"],
-      offers, lambda r: [r["cand_id"], r["offer_date"], r["offer_salary"], r["status"],
-                         r["response_date"] or "", r["reject_reason"] or ""])
-write("recruitment_costs.csv", ["channel", "cost_month", "amount", "notes"],
-      costs, lambda r: [r["channel"], r["cost_month"], r["amount"], r["notes"]])
-write("performance_goals.csv", ["emp_id", "review_period", "goal_type", "goal_desc", "weight", "completion_pct"],
-      goals, lambda r: [r["emp_id"], r["review_period"], r["goal_type"], r["goal_desc"], r["weight"], r["completion_pct"]])
-write("talent_pool.csv", ["emp_id", "pool_type", "target_position", "potential_rating", "nominated_date",
-                          "nominated_by", "status"],
-      talent, lambda r: [r["emp_id"], r["pool_type"], r["target_position"] or "", r["potential_rating"],
-                         r["nominated_date"], r["nominated_by"], r["status"]])
-write("engagement_surveys.csv", ["emp_id", "survey_year", "engagement_score", "recognition", "growth",
-                                 "pay_satisfaction", "manager_trust", "work_life_balance"],
-      surveys, lambda r: [r["emp_id"], r["survey_year"], r["engagement_score"], r["recognition"], r["growth"],
-                          r["pay_satisfaction"], r["manager_trust"], r["work_life_balance"]])
-write("exit_interviews.csv", ["emp_id", "interview_date", "real_reason_category", "satisfaction",
-                              "would_recommend", "comment"],
-      exits, lambda r: [r["emp_id"], r["interview_date"], r["real_reason_category"], r["satisfaction"],
-                        r["would_recommend"], r["comment"]])
-
-print(f"headcount_plan     {len(headcount_plan)}")
-print(f"promotions         {len(promotions)}")
-print(f"contracts          {len(contracts)}")
-print(f"salary_changes     {len(salary_changes)}")
-print(f"insurance_payments {len(insurance)}")
-print(f"awards_penalties   {len(awards)}")
-print(f"overtime_requests  {len(overtime)}")
-print(f"leave_balances     {len(leave_balances)}")
-print(f"offers             {len(offers)}")
-print(f"recruitment_costs  {len(costs)}")
-print(f"performance_goals  {len(goals)}")
-print(f"talent_pool        {len(talent)}")
-print(f"engagement_surveys {len(surveys)}")
-print(f"exit_interviews    {len(exits)}")
+for name, _, rows in TABLES:
+    print(f"{name[:-4]:<18} {len(rows)}")
