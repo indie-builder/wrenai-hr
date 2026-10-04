@@ -20,7 +20,8 @@
 - [PR #4 的 Linux MCP CI](https://github.com/indie-builder/wrenai-hr/actions/runs/37226271312) 已通过：完整 25 表数据包构建、31 项认证/协议/引擎测试，其中包含 41 题原生语义查询与独立标准 SQL 对照。
 - Linux 实际安装依赖加私有服务数据包共 **302,967,160 字节**，小于项目 450 MB 预检阈值。该数值不等于 Vercel 最终函数 bundle；最终打包仍需平台构建确认。
 - 本地官方 SDK 经真实 HTTP 完成工具发现、认证查询及写入拒绝。测试确认缺失/错误 Token 为 401，正确 Token 返回在职人数 528（快照 2026-08-31）。
-- **尚未部署 Vercel 公网**：当前 CLI 未登录，等待账号授权。不得将 Linux CI 成功视为已发布服务或已获得生产 URL。
+- 2026-10-05 已通过 Vercel 控制台导入 GitHub 主分支并部署，生产地址为 `https://wrenai-hr-mcp.vercel.app/mcp`。生产 Token 以敏感环境变量保存；预览环境不复用生产 Token。
+- 首次云端验证：`/health` 200、缺失/错误 Token 401、8 个工具发现和数据库静态路径 404 通过；查询子进程因隔离模式未加载 Vercel 依赖目录而返回 `QUERY_FAILED`。worker 已显式加入部署包 `_vendor` 和平台外置依赖 `/tmp/_vc_deps/lib/python3.12/site-packages`，仍保留 `-I` 与严格环境变量隔离。本地 32 项测试通过，包含无依赖解释器复现及修复回归；云端修复待重新部署验证。部署 Ready 和工具发现不代表查询可用。
 
 ## 本地运行
 
@@ -49,7 +50,7 @@ export MCP_URL=http://127.0.0.1:8320/mcp
 
 ## 部署到 Vercel
 
-1. 登录 `npx vercel@latest login`，选择自己的账号/团队，在仓库根目录执行 `npx vercel@latest link` 建立项目。项目 Root Directory 使用仓库根目录，Framework 选择 FastAPI。
+1. 在已登录的 Vercel 控制台导入 GitHub 仓库，或通过 `npx vercel@latest login` / `npx vercel@latest link` 建立项目。项目 Root Directory 使用仓库根目录，Framework 选择 FastAPI。当前项目 `wrenai-hr-mcp` 绑定 GitHub `main`，合并代码后自动部署生产。
 2. 在 Vercel Project Settings → Environment Variables 中添加 `MCP_AUTH_TOKEN`，使用至少 32 字符的高熵随机值；建议生成 48 个随机字节的 URL-safe Token。生产与预览使用不同 Token。不要把 Token 放进 `vercel.json`、命令行参数或客户端前端代码。
 3. 默认识别 `VERCEL_URL` 和 `VERCEL_PROJECT_PRODUCTION_URL`。使用自定义域名时，把准确域名加入 `MCP_ALLOWED_HOSTS`（逗号分隔，示例 `hr-api.example.com`）。通常服务端调用不带 `Origin`，无需设置 CORS；若客户端确实发送 Origin，使用 `MCP_ALLOWED_ORIGINS` 指定完整源，例如 `https://your-app.example.com`。Origin 允许名单不等于开启跨域浏览器调用。
 4. 执行 `npx vercel@latest deploy --prod`。Vercel 安装锁定依赖后运行 `python scripts/prepare_mcp.py`，生成只读数据库及语义包，随后打包函数。无需上传本地 `.venv`、DuckDB、凭据或检索缓存。

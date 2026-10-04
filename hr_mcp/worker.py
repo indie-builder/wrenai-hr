@@ -8,8 +8,14 @@ from pathlib import Path
 import resource
 import sys
 
-# -I excludes the working directory; only add this deployed package's own root.
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+# -I excludes cwd/PYTHONPATH. Vercel's HTTP bootstrap adds _vendor plus
+# externalized dependencies for large bundles; isolated workers need both too.
+# These paths are fixed by deployed code, never by a request or environment value.
+PACKAGE_ROOT = Path(__file__).resolve().parent.parent
+RUNTIME_PACKAGES = Path("/tmp/_vc_deps/lib") / f"python{sys.version_info.major}.{sys.version_info.minor}" / "site-packages"
+for directory in (PACKAGE_ROOT / "_vendor", RUNTIME_PACKAGES, PACKAGE_ROOT):
+    if directory.is_dir():
+        sys.path.insert(0, str(directory))
 from hr_mcp.engine import (MAX_OUTPUT_BYTES, MAX_ROWS, MCPQueryError,
                            SNAPSHOT_DATE, fail, validate_cube_request)
 
