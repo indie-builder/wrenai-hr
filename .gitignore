@@ -1,5 +1,8 @@
 # Local environments and credentials
 .venv/
+.venv-mcp/
+.vercel/
+hr_mcp/data/
 .env
 .env.*
 !.env.example

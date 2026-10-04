@@ -6,6 +6,7 @@
 - [迁移到新业务的操作指南](hr-delivery/docs/replication/README.md)
 - [Agent 工作约定](AGENTS.md)
 - [验证与问题处理记录](hr-delivery/validation/v2/matrix_v2.md)
+- [Vercel MCP 服务与 Token 接入](hr-delivery/docs/mcp-vercel.md)
 
 数据层为 DuckDB 单文件，25 张表、273,515 行仿真数据，覆盖八类 HR 业务。语义层包括 25 个模型、32 条关系、6 个视图、6 个 Cube，以及业务规则和查询示例。
 
@@ -21,6 +22,8 @@ python3 -m http.server 8317 --bind 127.0.0.1 \
   --directory hr-delivery/wren-project/apps/hr-overview
 ```
 
-打开 <http://127.0.0.1:8317>。全部数据均为仿真数据；本项目未实现真实 HR 系统接入、审批写入、生产权限或公网部署。浏览器计算不等于数据访问控制，也不意味着外部 Agent 离线运行。
+打开 <http://127.0.0.1:8317>。另提供带 Bearer Token 的只读 MCP Streamable HTTP 服务，Vercel 构建配置与接入方法见上述服务文档，实际部署状态以部署记录为准。
+
+全部数据均为仿真数据；本项目未实现真实 HR 系统接入、审批写入或按用户/部门授权。MCP Token 允许访问整份仿真数据，浏览器计算也不等于数据访问控制。外部 Agent 的联网方式由其运行环境决定。
 
 本地上游参考克隆 `vendor/WrenAI/` 不纳入仓库；运行时使用独立安装的 Wren CLI，关键依赖版本见 [requirements-demo.txt](requirements-demo.txt)。

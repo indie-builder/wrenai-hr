@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "fastapi",
+  "functions": {
+    "hr_mcp/server.py": {
+      "maxDuration": 60,
+      "excludeFiles": "{.git/**,.github/**,.agents/**,.venv/**,.venv-mcp/**,vendor/**,tests/**,scripts/**,hr-delivery/**,**/__pycache__/**,**/*.pyc}"
+    }
+  }
+}
