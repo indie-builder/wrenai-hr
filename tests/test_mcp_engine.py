@@ -10,6 +10,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import sysconfig
 import tempfile
 import unittest
 from unittest import mock
@@ -111,6 +112,33 @@ class EngineTests(unittest.TestCase):
         self.assertIn("employees", plan["planned_sql"])
         self.assertEqual(plan["rows"], [])
         self.assert_code("PLAN_FAILED", self.engine.query_sql, "SELECT missing_column FROM employees")
+
+    def test_vercel_vendor_dependencies_in_isolated_worker(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            deployed = Path(temporary) / "deployment"
+            package = deployed / "hr_mcp"
+            package.mkdir(parents=True)
+            for name in ("__init__.py", "engine.py", "worker.py"):
+                shutil.copyfile(ROOT / "hr_mcp" / name, package / name)
+            # A clean interpreter has no project site-packages. Dependencies
+            # are reachable only through the platform's deployed _vendor path.
+            environment = Path(temporary) / "clean-python"
+            subprocess.run([sys.executable, "-m", "venv", "--without-pip", str(environment)],
+                           check=True, capture_output=True, timeout=20)
+            python = environment / "bin/python"
+            command = [str(python), "-I", "-B", str(package / "worker.py"), str(self.data)]
+
+            def call(sql):
+                result = subprocess.run(command, input=json.dumps({"operation": "query", "sql": sql}),
+                                        text=True, capture_output=True, timeout=20, cwd=temporary,
+                                        env={"MCP_AUTH_TOKEN": "must-not-be-needed", "PYTHONPATH": "/invalid"})
+                self.assertEqual(result.returncode, 0)
+                return json.loads(result.stdout)
+
+            self.assertEqual(call("SELECT COUNT(*) AS n FROM employees")["error"]["code"], "QUERY_FAILED")
+            (deployed / "_vendor").symlink_to(sysconfig.get_path("purelib"), target_is_directory=True)
+            self.assertEqual(call("SELECT COUNT(*) AS n FROM employees")["result"]["rows"], [["3"]])
+            self.assertEqual(call("DELETE FROM employees")["error"]["code"], "SQL_REJECTED")
 
     def test_cube_query_filter_and_make_date(self):
         result = self.engine.query_cube("workforce", ["headcount"], ["dept_name"],

@@ -37,11 +37,17 @@ async def main():
                         "plan_sql", "query_sql", "query_cube"}
             assert expected <= names, "MCP工具清单不完整"
             result = await client.call_tool("query_sql", {"sql": "SELECT count(*) AS headcount FROM employees WHERE status = '在职'"})
-            assert not result.is_error, "认证查询失败"
+            assert not result.is_error, f"认证查询失败：{result.structured_content}"
+            assert result.structured_content["rows"] == [["528"]], "在职人数与交付快照不一致"
+            cube = await client.call_tool("query_cube", {"cube": "workforce", "measures": ["headcount"], "dimensions": []})
+            assert not cube.is_error, f"Cube 查询失败：{cube.structured_content}"
+            assert cube.structured_content["rows"] == [["528"]], "Cube 与语义 SQL 结果不一致"
             rejected = await client.call_tool("query_sql", {"sql": "DELETE FROM employees"})
             assert rejected.is_error, "写操作没有被拒绝"
+            assert rejected.structured_content["error"]["code"] == "SQL_REJECTED", "写操作未到达安全校验阶段"
             print(json.dumps({"status": "PASS", "transport": "Streamable HTTP", "authentication": "Bearer",
                               "tools": sorted(names), "query_result": result.model_dump(mode="json", exclude_none=True),
+                              "cube_result": cube.structured_content,
                               "write_rejected": True}, ensure_ascii=False, indent=2))
 
 
