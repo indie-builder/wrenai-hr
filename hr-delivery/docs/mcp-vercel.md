@@ -17,11 +17,13 @@
 
 ## 当前验收状态
 
-- [PR #4 的 Linux MCP CI](https://github.com/indie-builder/wrenai-hr/actions/runs/37226271312) 已通过：完整 25 表数据包构建、31 项认证/协议/引擎测试，其中包含 41 题原生语义查询与独立标准 SQL 对照。
-- Linux 实际安装依赖加私有服务数据包共 **302,967,160 字节**，小于项目 450 MB 预检阈值。该数值不等于 Vercel 最终函数 bundle；最终打包仍需平台构建确认。
+- [PR #5 的 Linux MCP CI](https://github.com/indie-builder/wrenai-hr/actions/runs/37227865181) 已通过：完整 25 表数据包构建、32 项认证/协议/引擎测试，其中包含 41 题原生语义查询与独立标准 SQL 对照，以及 Vercel 隔离依赖加载回归。
+- 首版 Linux 实际安装依赖加私有服务数据包共 **302,967,160 字节**，小于项目 450 MB 预检阈值。Vercel 已成功完成实际构建；平台对依赖进行外置优化，因此 CI 安装目录体积不能直接当作最终函数体积。
 - 本地官方 SDK 经真实 HTTP 完成工具发现、认证查询及写入拒绝。测试确认缺失/错误 Token 为 401，正确 Token 返回在职人数 528（快照 2026-08-31）。
 - 2026-10-05 已通过 Vercel 控制台导入 GitHub 主分支并部署，生产地址为 `https://wrenai-hr-mcp.vercel.app/mcp`。生产 Token 以敏感环境变量保存；预览环境不复用生产 Token。
-- 首次云端验证：`/health` 200、缺失/错误 Token 401、8 个工具发现和数据库静态路径 404 通过；查询子进程因隔离模式未加载 Vercel 依赖目录而返回 `QUERY_FAILED`。worker 已显式加入部署包 `_vendor` 和平台外置依赖 `/tmp/_vc_deps/lib/python3.12/site-packages`，仍保留 `-I` 与严格环境变量隔离。本地 32 项测试通过，包含无依赖解释器复现及修复回归；云端修复待重新部署验证。部署 Ready 和工具发现不代表查询可用。
+- [生产部署 67LwAqwAWUbq1Qcr5vtoKy4Rerda](https://vercel.com/lovemyrmbb-3480s-projects/wrenai-hr-mcp/67LwAqwAWUbq1Qcr5vtoKy4Rerda) 对应提交 `3a1205f`，已完成公网官方 SDK 验证：`/health` 200、缺失/错误 Token 401、8 个工具发现、SQL 与 Cube 均返回在职人数 528、DELETE 返回 `SQL_REJECTED`、数据库静态路径返回 404。
+- 公网 MCP 固定 SQL 回归 **41/41 通过**：逐题经 HTTPS `query_sql` 查询，并与本地只读数据库标准 SQL 比对。本地证据为 `hr-delivery/validation/v2/runs/mcp-production-20261005/regression.json`（不提交）。这是固定 SQL 执行对照，不代表实时自然语言生成准确率。
+- 首次部署发现隔离查询进程未加载平台依赖目录，已在 [PR #5](https://github.com/indie-builder/wrenai-hr/pull/5) 修复：显式加入部署包 `_vendor` 和平台外置依赖 `/tmp/_vc_deps/lib/python3.12/site-packages`，保留 `-I` 与严格环境变量隔离。不能只用部署 Ready、健康检查或工具发现代替真实查询验收。
 
 ## 本地运行
 
@@ -70,7 +72,7 @@ export MCP_URL=https://<生产域名>/mcp
 
 ```json
 {
-  "url": "https://<生产域名>/mcp",
+  "url": "https://wrenai-hr-mcp.vercel.app/mcp",
   "headers": {
     "Authorization": "Bearer <从服务端Secret读取的Token>"
   }
