@@ -1,0 +1,9 @@
+# Python 3.12; tested direct dependencies for build, regression and snapshot export.
+# This pins the analytics toolchain, not every transitive dependency.
+wrenai==0.13.4
+wren-core-py==0.7.6
+duckdb==1.5.5
+sqlglot==30.18.0
+pyarrow==25.0.1
+PyYAML==6.0.3
+# Optional semantic retrieval: pip install 'wrenai[memory]==0.13.4'

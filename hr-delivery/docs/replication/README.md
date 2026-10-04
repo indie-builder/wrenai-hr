@@ -6,7 +6,7 @@
 
 ## 适用范围与执行约定
 
-- 以下以**接入已有 PostgreSQL 数据库**为例，不需要重建业务数据库。
+- 以下新业务示例以**接入已有 PostgreSQL 数据库**为例，不需要重建业务数据库。现有 HR 参考项目已迁移至 DuckDB，复现它请使用步骤 16 和[交付 README](../../README.md)。
 - 新项目名使用 `sales-bi`，连接配置名使用 `sales_demo`；替换时保持全文一致。
 - CLI 参数依据本 HR 项目安装的 **wrenai 0.13.4** 核对。升级版本后应先检查 `--help` 并回归。
 - `[终端]` 是 Shell 命令；复制时去掉表格边框。末尾的 `\` 表示命令续行。
@@ -295,30 +295,30 @@ source .venv/bin/activate
 +--------+-------------------------------------------------------------------------------------------+
 | 15     | HR 项目中不能照搬的内容                                                                   |
 | 注意   |                                                                                           |
-|        | 1. db/load.sh 会 DROP SCHEMA public CASCADE，只用于重建演示库。                           |
-|        | 2. gen_models_v2.py 保留部分旧定义，重跑可能覆盖最终模型修正。                            |
-|        | 3. 原 run_all.py 写死 HR 容器、数据库、用户和路径，需要改造。                             |
+|        | 1. db/load_duckdb.sh 会替换本地演示库，不能用于保留人工修改的数据库。                     |
+|        | 2. 模型 YAML 是业务定义来源，修改后 validate/build/index，再做全量回归。                  |
+|        | 3. 当前 run_all.py 使用本地 DuckDB 与项目 profile；新项目应配置自己的数据源。              |
 |        | 4. DECIMAL 改为 DOUBLE 是特定版本的绕行方案，新业务要验证精度。                           |
 |        | 5. 不沿用旧虚拟环境、凭据、查询记忆索引或 HR 数据快照。                                   |
 |        | 6. 固定快照日与 current_date 应统一；历史部门归属要按新业务定义。                         |
 +--------+-------------------------------------------------------------------------------------------+
 | 16     | 运行现有 HR 参考项目                                                                      |
 | 参考   |                                                                                           |
-|        | [终端] 当前机器：                                                                         |
-|        | cd /Users/xbjt/Documents/myself/wrenai-hr                                                 |
+|        | [终端] 在 wrenai-hr 仓库根目录：                                                          |
+|        | cd <wrenai-hr 克隆路径>                                                                   |
 |        | python3 hr-delivery/validation/v2/run_all.py                                              |
 |        |                                                                                           |
-|        | 本次会话已实际验证：41/41 PASS，P0 口径题 11/11 PASS。                                    |
-|        | 前提：Docker 中 wrenai-hr-pg 运行，原项目连接配置可用。                                   |
-|        | 原 runner 每次覆盖 summary.csv；单题运行后需全量重跑恢复完整汇总。                        |
+|        | 当前环境：Python 3.12 + requirements-demo.txt，DuckDB public.duckdb 和项目 profile。      |
+|        | 初始化数据库与 profile 的具体步骤见 hr-delivery/README.md；无需 Docker。                 |
+|        | 运行结果以当次退出码、汇总及明细为准；已有 PASS 记录不替代本次执行。                      |
 |        |                                                                                           |
 |        | 当前仪表盘地址：http://127.0.0.1:8317                                                     |
 |        | 如果预览服务未运行，可在另一个终端执行：                                                  |
-|        | cd /Users/xbjt/Documents/myself/wrenai-hr                                                 |
+|        | cd <wrenai-hr 克隆路径>                                                                   |
 |        | python3 -m http.server 8317 --bind 127.0.0.1 \                                            |
 |        | --directory hr-delivery/wren-project/apps/hr-overview                                     |
 |        |                                                                                           |
-|        | 已有服务占用 8317 时不重复启动。换机器时替换项目绝对路径。                                |
+|        | 已有服务占用 8317 时不重复启动。                                                          |
 +--------+-------------------------------------------------------------------------------------------+
 ```
 
@@ -340,7 +340,8 @@ source .venv/bin/activate
 | [双路径题库](../../validation/v2/questions.py) | 标准 SQL 与语义 SQL 的组织方式 |
 | [回归执行器](../../validation/v2/run_all.py) | 现有比较逻辑与报告输出 |
 | [验证与问题处理记录](../../validation/v2/matrix_v2.md) | 验证覆盖、结果和引擎问题 |
-| [演示库装载脚本](../../db/load.sh) | 仅用于专用演示库，包含破坏性重建操作 |
+| [演示库装载脚本](../../db/load_duckdb.sh) | 仅用于专用演示库，成功后替换本地 DuckDB 文件 |
+| [快照导出脚本](../../scripts/export_dashboard.py) | 从只读数据库同步页面需要的 MDL 和 Parquet |
 
 ## 完成交付的判定
 

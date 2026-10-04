@@ -1,8 +1,14 @@
 name: total_cost
 base_object: v_workforce_monthly
 properties:
-  description: "人力总成本 cube: 基本工资/加班/奖金/社保企业缴纳分项聚合, 总成本在查询时相加"
+  description: "人力总成本 cube: 税前应发加社保企业缴纳, 一人一月一行; 人均月成本=total_cost/person_months, 部门按当前档案归属"
 measures:
+  - name: total_cost
+    expression: SUM(base_pay + overtime_pay + bonus + insurance_company)
+    type: DOUBLE
+  - name: person_months
+    expression: COUNT(*)
+    type: BIGINT
   - name: payee_count
     expression: COUNT(*)
     type: BIGINT
@@ -19,6 +25,9 @@ measures:
     expression: SUM(insurance_company)
     type: DOUBLE
 dimensions:
+  - name: pay_period
+    expression: pay_period
+    type: VARCHAR
   - name: dept_name
     expression: dept_name
     type: VARCHAR

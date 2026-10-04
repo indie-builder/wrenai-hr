@@ -47,6 +47,6 @@ columns:
   - name: is_expiring_soon
     type: BOOLEAN
     is_calculated: true
-    expression: "CASE WHEN status = '履行中' AND end_date IS NOT NULL AND end_date <= current_date + INTERVAL '90 days' THEN true ELSE false END"
+    expression: "CASE WHEN status = '履行中' AND end_date IS NOT NULL AND end_date BETWEEN DATE '2026-08-31' AND DATE '2026-08-31' + INTERVAL '90 days' THEN true ELSE false END"
     properties:
-      description: "是否90天内到期(履行中)"
+      description: "是否在2026-08-31至其后90天内到期(含两端, 履行中)"

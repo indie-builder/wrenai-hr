@@ -19,6 +19,9 @@ measures:
     expression: COUNT(*)
     type: BIGINT
 dimensions:
+  - name: pay_period
+    expression: pay_period
+    type: VARCHAR
   - name: dept_name
     expression: dept_name
     type: VARCHAR

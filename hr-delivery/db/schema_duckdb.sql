@@ -1,4 +1,14 @@
 -- ============================================================
+-- 星辰科技 HR 演示数据库 (DuckDB)
+-- 由 schema.sql 转换: SERIAL 主键改为 INTEGER (主键值由 build_duckdb.py 生成),
+--   不声明 REFERENCES 外键 (DuckDB 1.5 会即时执行外键校验, 自引用装载会失败;
+--   表间一致性由 CSV 源数据与装载顺序保证, 关系定义见 wren-project/relationships.yml)
+-- 业务时间范围: 2020-06 (公司成立) ~ 2026-08-31 (数据截至)
+-- 注意: 库文件必须命名为 public.duckdb —— wren 的 duckdb 连接器以文件名作为
+--       挂载 catalog 别名, MDL 规划 SQL 以 "public" 前缀限定物理表
+-- ============================================================
+
+-- ============================================================
 -- 星辰科技 HR 演示数据库 (PostgreSQL 16)
 -- 业务时间范围: 2020-06 (公司成立) ~ 2026-08-31 (数据截至)
 -- 薪资/考勤/绩效等记录自 2023-01 起完整保留
@@ -6,9 +16,9 @@
 
 -- 部门表
 CREATE TABLE departments (
-  dept_id          SERIAL PRIMARY KEY,
+  dept_id          INTEGER PRIMARY KEY,
   dept_name        VARCHAR(50)  NOT NULL UNIQUE,
-  parent_id        INTEGER      REFERENCES departments(dept_id),
+  parent_id        INTEGER     ,
   location         VARCHAR(30)  NOT NULL,
   established_date DATE         NOT NULL
 );
@@ -21,19 +31,19 @@ COMMENT ON COLUMN departments.established_date IS '部门成立日期';
 
 -- 员工主表
 CREATE TABLE employees (
-  emp_id             SERIAL PRIMARY KEY,
+  emp_id             INTEGER PRIMARY KEY,
   emp_no             VARCHAR(12)  NOT NULL UNIQUE,
   name               VARCHAR(30)  NOT NULL,
   gender             VARCHAR(4)   NOT NULL CHECK (gender IN ('男','女')),
   birth_date         DATE         NOT NULL,
   hire_date          DATE         NOT NULL,
-  dept_id            INTEGER      NOT NULL REFERENCES departments(dept_id),
+  dept_id            INTEGER      NOT NULL,
   job_title          VARCHAR(50)  NOT NULL,
   job_level          VARCHAR(10)  NOT NULL CHECK (job_level IN ('初级','中级','高级','专家','总监','副总裁')),
   employment_type    VARCHAR(10)  NOT NULL CHECK (employment_type IN ('全职','兼职','实习','外包')),
   status             VARCHAR(10)  NOT NULL CHECK (status IN ('在职','离职')),
   base_salary        NUMERIC(10,2) NOT NULL,
-  manager_id         INTEGER      REFERENCES employees(emp_id),
+  manager_id         INTEGER     ,
   work_city          VARCHAR(20)  NOT NULL,
   email              VARCHAR(80)  NOT NULL UNIQUE,
   phone              VARCHAR(20),
@@ -66,8 +76,8 @@ COMMENT ON COLUMN employees.is_voluntary      IS '是否主动离职: true主动
 
 -- 月度薪资发放记录
 CREATE TABLE salary_payments (
-  pay_id           SERIAL PRIMARY KEY,
-  emp_id           INTEGER      NOT NULL REFERENCES employees(emp_id),
+  pay_id           INTEGER PRIMARY KEY,
+  emp_id           INTEGER      NOT NULL,
   pay_period       CHAR(7)      NOT NULL,
   base_pay         NUMERIC(12,2) NOT NULL,
   overtime_pay     NUMERIC(12,2) NOT NULL DEFAULT 0,
@@ -92,8 +102,8 @@ COMMENT ON COLUMN salary_payments.pay_date       IS '发放日期(次月10日)';
 
 -- 每日考勤记录
 CREATE TABLE attendance_records (
-  att_id         SERIAL PRIMARY KEY,
-  emp_id         INTEGER    NOT NULL REFERENCES employees(emp_id),
+  att_id         INTEGER PRIMARY KEY,
+  emp_id         INTEGER    NOT NULL,
   att_date       DATE       NOT NULL,
   status         VARCHAR(10) NOT NULL CHECK (status IN ('正常','迟到','早退','旷工','请假','远程办公')),
   work_hours     NUMERIC(4,1) NOT NULL DEFAULT 8.0,
@@ -110,14 +120,14 @@ COMMENT ON COLUMN attendance_records.overtime_hours IS '当日加班小时数';
 
 -- 请假申请单
 CREATE TABLE leave_requests (
-  leave_id    SERIAL PRIMARY KEY,
-  emp_id      INTEGER    NOT NULL REFERENCES employees(emp_id),
+  leave_id    INTEGER PRIMARY KEY,
+  emp_id      INTEGER    NOT NULL,
   leave_type  VARCHAR(10) NOT NULL CHECK (leave_type IN ('年假','事假','病假','婚假','产假','陪产假','调休')),
   start_date  DATE       NOT NULL,
   end_date    DATE       NOT NULL,
   days        NUMERIC(4,1) NOT NULL,
   status      VARCHAR(10) NOT NULL CHECK (status IN ('已批准','待审批','已拒绝')),
-  approver_id INTEGER    REFERENCES employees(emp_id),
+  approver_id INTEGER   ,
   applied_at  TIMESTAMP  NOT NULL
 );
 COMMENT ON TABLE  leave_requests             IS '请假申请单: 员工提交的各类假期申请';
@@ -133,8 +143,8 @@ COMMENT ON COLUMN leave_requests.applied_at  IS '申请提交时间';
 
 -- 招聘岗位 (headcount 需求)
 CREATE TABLE job_openings (
-  opening_id  SERIAL PRIMARY KEY,
-  dept_id     INTEGER     NOT NULL REFERENCES departments(dept_id),
+  opening_id  INTEGER PRIMARY KEY,
+  dept_id     INTEGER     NOT NULL,
   job_title   VARCHAR(50) NOT NULL,
   job_level   VARCHAR(10) NOT NULL,
   headcount   INTEGER     NOT NULL,
@@ -160,15 +170,15 @@ COMMENT ON COLUMN job_openings.hired_count  IS '该岗位实际入职人数';
 
 -- 候选人
 CREATE TABLE candidates (
-  cand_id         SERIAL PRIMARY KEY,
+  cand_id         INTEGER PRIMARY KEY,
   name            VARCHAR(30) NOT NULL,
   gender          VARCHAR(4)  NOT NULL CHECK (gender IN ('男','女')),
-  opening_id      INTEGER     NOT NULL REFERENCES job_openings(opening_id),
+  opening_id      INTEGER     NOT NULL,
   source          VARCHAR(10) NOT NULL CHECK (source IN ('内推','招聘网站','猎头','校园招聘')),
   stage           VARCHAR(10) NOT NULL CHECK (stage IN ('简历筛选','面试中','已发offer','已入职','已淘汰','拒绝offer')),
   applied_at      DATE        NOT NULL,
   expected_salary NUMERIC(10,2),
-  hired_emp_id    INTEGER     REFERENCES employees(emp_id)
+  hired_emp_id    INTEGER
 );
 COMMENT ON TABLE  candidates                  IS '候选人表: 应聘各岗位的候选人及其进展';
 COMMENT ON COLUMN candidates.cand_id          IS '候选人ID(主键)';
@@ -183,10 +193,10 @@ COMMENT ON COLUMN candidates.hired_emp_id     IS '入职后关联的员工ID, �
 
 -- 面试记录
 CREATE TABLE interviews (
-  interview_id   SERIAL PRIMARY KEY,
-  cand_id        INTEGER    NOT NULL REFERENCES candidates(cand_id),
+  interview_id   INTEGER PRIMARY KEY,
+  cand_id        INTEGER    NOT NULL,
   round          VARCHAR(6) NOT NULL CHECK (round IN ('一面','二面','三面','HR面')),
-  interviewer_id INTEGER    REFERENCES employees(emp_id),
+  interviewer_id INTEGER   ,
   interview_date DATE       NOT NULL,
   score          NUMERIC(3,1),
   result         VARCHAR(6) NOT NULL CHECK (result IN ('通过','未通过','待定'))
@@ -202,12 +212,12 @@ COMMENT ON COLUMN interviews.result          IS '面试结果: 通过/未通过/
 
 -- 绩效考核
 CREATE TABLE performance_reviews (
-  review_id     SERIAL PRIMARY KEY,
-  emp_id        INTEGER     NOT NULL REFERENCES employees(emp_id),
+  review_id     INTEGER PRIMARY KEY,
+  emp_id        INTEGER     NOT NULL,
   review_period VARCHAR(8)  NOT NULL,
   score         NUMERIC(4,1) NOT NULL,
   grade         VARCHAR(2)  NOT NULL CHECK (grade IN ('S','A','B','C','D')),
-  reviewer_id   INTEGER     REFERENCES employees(emp_id),
+  reviewer_id   INTEGER    ,
   comment       TEXT,
   UNIQUE (emp_id, review_period)
 );
@@ -222,8 +232,8 @@ COMMENT ON COLUMN performance_reviews.comment       IS '考核评语';
 
 -- 培训记录
 CREATE TABLE training_records (
-  training_id  SERIAL PRIMARY KEY,
-  emp_id       INTEGER     NOT NULL REFERENCES employees(emp_id),
+  training_id  INTEGER PRIMARY KEY,
+  emp_id       INTEGER     NOT NULL,
   course_name  VARCHAR(60) NOT NULL,
   training_date DATE       NOT NULL,
   hours        NUMERIC(4,1) NOT NULL,
@@ -241,10 +251,10 @@ COMMENT ON COLUMN training_records.score        IS '结业得分(0-100)';
 
 -- 人事调动
 CREATE TABLE transfers (
-  transfer_id  SERIAL PRIMARY KEY,
-  emp_id       INTEGER NOT NULL REFERENCES employees(emp_id),
-  from_dept_id INTEGER REFERENCES departments(dept_id),
-  to_dept_id   INTEGER NOT NULL REFERENCES departments(dept_id),
+  transfer_id  INTEGER PRIMARY KEY,
+  emp_id       INTEGER NOT NULL,
+  from_dept_id INTEGER,
+  to_dept_id   INTEGER NOT NULL,
   transfer_date DATE   NOT NULL,
   reason       VARCHAR(20) NOT NULL
 );
@@ -262,9 +272,9 @@ COMMENT ON COLUMN transfers.reason         IS '调动原因: 组织调整/个人
 
 -- 编制规划
 CREATE TABLE headcount_plan (
-  plan_id           SERIAL PRIMARY KEY,
+  plan_id           INTEGER PRIMARY KEY,
   plan_year         INTEGER      NOT NULL,
-  dept_id           INTEGER      NOT NULL REFERENCES departments(dept_id),
+  dept_id           INTEGER      NOT NULL,
   planned_headcount INTEGER      NOT NULL,
   budget_labor_cost NUMERIC(14,2) NOT NULL,
   approved_at       DATE         NOT NULL,
@@ -280,8 +290,8 @@ COMMENT ON COLUMN headcount_plan.approved_at     IS '预算批准日期(上年11
 
 -- 晋升记录
 CREATE TABLE promotions (
-  promo_id      SERIAL PRIMARY KEY,
-  emp_id        INTEGER      NOT NULL REFERENCES employees(emp_id),
+  promo_id      INTEGER PRIMARY KEY,
+  emp_id        INTEGER      NOT NULL,
   promo_date    DATE         NOT NULL,
   from_level    VARCHAR(10)  NOT NULL,
   to_level      VARCHAR(10)  NOT NULL,
@@ -305,8 +315,8 @@ COMMENT ON COLUMN promotions.reason       IS '晋升原因: 年度晋升/破格�
 
 -- 劳动合同
 CREATE TABLE contracts (
-  contract_id SERIAL PRIMARY KEY,
-  emp_id      INTEGER      NOT NULL REFERENCES employees(emp_id),
+  contract_id INTEGER PRIMARY KEY,
+  emp_id      INTEGER      NOT NULL,
   contract_no VARCHAR(20)  NOT NULL UNIQUE,
   contract_type VARCHAR(20) NOT NULL CHECK (contract_type IN ('固定期限','无固定期限','实习协议','劳务协议')),
   start_date  DATE         NOT NULL,
@@ -328,8 +338,8 @@ COMMENT ON COLUMN contracts.signed_date     IS '签订日期';
 
 -- 调薪记录
 CREATE TABLE salary_changes (
-  change_id     SERIAL PRIMARY KEY,
-  emp_id        INTEGER      NOT NULL REFERENCES employees(emp_id),
+  change_id     INTEGER PRIMARY KEY,
+  emp_id        INTEGER      NOT NULL,
   effective_date DATE        NOT NULL,
   salary_before NUMERIC(10,2) NOT NULL,
   salary_after  NUMERIC(10,2) NOT NULL,
@@ -347,8 +357,8 @@ COMMENT ON COLUMN salary_changes.change_type    IS '调薪类型: 年度调薪/�
 
 -- 社保公积金企业缴纳
 CREATE TABLE insurance_payments (
-  ins_id       SERIAL PRIMARY KEY,
-  emp_id       INTEGER      NOT NULL REFERENCES employees(emp_id),
+  ins_id       INTEGER PRIMARY KEY,
+  emp_id       INTEGER      NOT NULL,
   pay_period   CHAR(7)      NOT NULL,
   pension      NUMERIC(10,2) NOT NULL,
   medical      NUMERIC(10,2) NOT NULL,
@@ -373,14 +383,14 @@ COMMENT ON COLUMN insurance_payments.company_total IS '企业缴纳合计(元)';
 
 -- 奖惩记录
 CREATE TABLE awards_penalties (
-  record_id  SERIAL PRIMARY KEY,
-  emp_id     INTEGER      NOT NULL REFERENCES employees(emp_id),
+  record_id  INTEGER PRIMARY KEY,
+  emp_id     INTEGER      NOT NULL,
   record_date DATE        NOT NULL,
   record_type VARCHAR(10) NOT NULL CHECK (record_type IN ('奖励','处罚')),
   category   VARCHAR(20)  NOT NULL,
   amount     NUMERIC(10,2),
   reason     VARCHAR(100) NOT NULL,
-  approver_id INTEGER     REFERENCES employees(emp_id)
+  approver_id INTEGER
 );
 COMMENT ON TABLE  awards_penalties              IS '奖惩记录: 员工奖励与处罚';
 COMMENT ON COLUMN awards_penalties.record_id    IS '记录ID(主键)';
@@ -394,8 +404,8 @@ COMMENT ON COLUMN awards_penalties.approver_id  IS '审批人员工ID';
 
 -- 加班申请
 CREATE TABLE overtime_requests (
-  ot_id        SERIAL PRIMARY KEY,
-  emp_id       INTEGER      NOT NULL REFERENCES employees(emp_id),
+  ot_id        INTEGER PRIMARY KEY,
+  emp_id       INTEGER      NOT NULL,
   ot_date      DATE         NOT NULL,
   planned_hours NUMERIC(4,1) NOT NULL,
   actual_hours NUMERIC(4,1),
@@ -417,8 +427,8 @@ COMMENT ON COLUMN overtime_requests.applied_at    IS '申请日期(加班前)';
 
 -- 假期余额
 CREATE TABLE leave_balances (
-  balance_id  SERIAL PRIMARY KEY,
-  emp_id      INTEGER      NOT NULL REFERENCES employees(emp_id),
+  balance_id  INTEGER PRIMARY KEY,
+  emp_id      INTEGER      NOT NULL,
   balance_type VARCHAR(10) NOT NULL CHECK (balance_type IN ('年假','调休')),
   as_of_quarter CHAR(6)    NOT NULL,
   entitled    NUMERIC(5,1) NOT NULL,
@@ -439,8 +449,8 @@ COMMENT ON COLUMN leave_balances.expired        IS '本期已失效(天, 年度�
 
 -- Offer 记录
 CREATE TABLE offers (
-  offer_id     SERIAL PRIMARY KEY,
-  cand_id      INTEGER      NOT NULL REFERENCES candidates(cand_id),
+  offer_id     INTEGER PRIMARY KEY,
+  cand_id      INTEGER      NOT NULL,
   offer_date   DATE         NOT NULL,
   offer_salary NUMERIC(10,2) NOT NULL,
   status       VARCHAR(10)  NOT NULL CHECK (status IN ('待回复','已接受','已拒绝')),
@@ -458,7 +468,7 @@ COMMENT ON COLUMN offers.reject_reason    IS '拒绝原因: 薪酬不匹配/已�
 
 -- 招聘渠道费用
 CREATE TABLE recruitment_costs (
-  cost_id    SERIAL PRIMARY KEY,
+  cost_id    INTEGER PRIMARY KEY,
   channel    VARCHAR(10)  NOT NULL,
   cost_month CHAR(7)      NOT NULL,
   amount     NUMERIC(12,2) NOT NULL,
@@ -473,8 +483,8 @@ COMMENT ON COLUMN recruitment_costs.notes       IS '备注';
 
 -- 绩效目标
 CREATE TABLE performance_goals (
-  goal_id       SERIAL PRIMARY KEY,
-  emp_id        INTEGER      NOT NULL REFERENCES employees(emp_id),
+  goal_id       INTEGER PRIMARY KEY,
+  emp_id        INTEGER      NOT NULL,
   review_period VARCHAR(8)   NOT NULL,
   goal_type     VARCHAR(6)   NOT NULL CHECK (goal_type IN ('KPI','OKR')),
   goal_desc     VARCHAR(120) NOT NULL,
@@ -493,13 +503,13 @@ COMMENT ON COLUMN performance_goals.completion_pct  IS '完成率(%)';
 
 -- 人才池
 CREATE TABLE talent_pool (
-  pool_id        SERIAL PRIMARY KEY,
-  emp_id         INTEGER      NOT NULL REFERENCES employees(emp_id),
+  pool_id        INTEGER PRIMARY KEY,
+  emp_id         INTEGER      NOT NULL,
   pool_type      VARCHAR(10)  NOT NULL CHECK (pool_type IN ('高潜人才','继任者')),
   target_position VARCHAR(50),
   potential_rating VARCHAR(10) NOT NULL,
   nominated_date DATE         NOT NULL,
-  nominated_by   INTEGER      REFERENCES employees(emp_id),
+  nominated_by   INTEGER     ,
   status         VARCHAR(10)  NOT NULL CHECK (status IN ('在池','已晋升','已移出'))
 );
 COMMENT ON TABLE  talent_pool                    IS '人才池: 高潜人才与关键岗位继任者';
@@ -514,8 +524,8 @@ COMMENT ON COLUMN talent_pool.status             IS '状态: 在池/已晋升/�
 
 -- 敬业度调研
 CREATE TABLE engagement_surveys (
-  survey_id   SERIAL PRIMARY KEY,
-  emp_id      INTEGER      NOT NULL REFERENCES employees(emp_id),
+  survey_id   INTEGER PRIMARY KEY,
+  emp_id      INTEGER      NOT NULL,
   survey_year INTEGER      NOT NULL,
   engagement_score NUMERIC(3,1) NOT NULL,
   recognition NUMERIC(3,1) NOT NULL,
@@ -538,8 +548,8 @@ COMMENT ON COLUMN engagement_surveys.work_life_balance IS '工作生活平衡维
 
 -- 离职面谈
 CREATE TABLE exit_interviews (
-  exit_id       SERIAL PRIMARY KEY,
-  emp_id        INTEGER      NOT NULL REFERENCES employees(emp_id),
+  exit_id       INTEGER PRIMARY KEY,
+  emp_id        INTEGER      NOT NULL,
   interview_date DATE        NOT NULL,
   real_reason_category VARCHAR(20) NOT NULL,
   satisfaction  NUMERIC(3,1) NOT NULL,

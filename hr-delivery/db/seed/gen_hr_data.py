@@ -3,25 +3,20 @@
 """
 星辰科技 HR 演示数据生成器
 - 固定随机种子, 完全可复现
-- 输出 CSV 到同目录 out/, 由 psql \\copy 装载
+- 输出 CSV 到同目录 out/, 由 build_duckdb.py 装载
 - 业务规律: 薪酬与职级/城市/部门挂钩, 离职率与司龄/绩效/部门相关,
   招聘金三银四季节性, 年终奖次年1月发放, 候选人漏斗与入职员工闭环关联
 """
-import csv, os, random, datetime as dt
+import os, random, datetime as dt
+
+from seed_common import month_days, rand_workday, month_rand_workday, weighted, write_csv
 
 random.seed(42)
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "out")
 os.makedirs(OUT, exist_ok=True)
 
 REF = dt.date(2026, 9, 1)          # 数据截至 2026-08-31
-PAY_START = dt.date(2023, 1, 1)    # 薪资/绩效数据起点
-MONTHS = []                        # 2023-01 .. 2026-08
-y, m = 2023, 1
-for _ in range(44):
-    MONTHS.append((y, m))
-    m += 1
-    if m == 13:
-        y, m = y + 1, 1
+MONTHS = [(2023 + i // 12, i % 12 + 1) for i in range(44)]   # 2023-01 .. 2026-08
 
 # ---------------- 基础字典 ----------------
 DEPTS = [  # (名称, 办公地, 薪酬系数)
@@ -48,35 +43,22 @@ LEVEL_SALARY = {  # (下限k, 上限k) 月基本工资
     "初级": (9, 14), "中级": (15, 22), "高级": (23, 32),
     "专家": (33, 48), "总监": (45, 65), "副总裁": (70, 90),
 }
+GENDER_W = [("男", 55), ("女", 45)]
+SOURCE_W = [("内推", 25), ("招聘网站", 45), ("猎头", 12), ("校园招聘", 18)]
 CITY_MULT = {"北京": 1.05, "上海": 1.00, "深圳": 0.95, "杭州": 0.90, "成都": 0.75, "远程": 0.85}
 CITIES = ["北京", "上海", "深圳", "杭州", "成都", "远程"]
 SURNAME = "王李张刘陈杨黄赵吴周徐孙马朱胡郭何林罗高郑梁谢宋唐许韩冯邓曹彭曾肖田董潘袁蔡蒋余杜叶程魏苏吕"
 MALE_GIVEN = ["伟", "强", "磊", "军", "洋", "勇", "杰", "涛", "斌", "波", "辉", "刚", "健", "明", "俊", "帆", "宇", "浩", "凯", "晨", "子轩", "浩然", "俊杰", "志强", "建国", "建华", "晓东", "文博", "天宇", "思远"]
 FEMALE_GIVEN = ["芳", "娟", "敏", "静", "丽", "娜", "艳", "琳", "雪", "慧", "颖", "婷", "玉", "莹", "雪莲", "雨欣", "梦琪", "欣怡", "晓燕", "海燕", "佳怡", "思琪", "晓雯", "雅静", "诗涵"]
-EDU = ["大专", "本科", "硕士", "博士"]
-LEAVE_TYPES = ["年假", "事假", "病假", "调休", "婚假", "产假", "陪产假"]
 TERMINATE_REASONS_V = ["个人原因", "职业发展", "薪酬原因", "家庭原因", "健康原因", "深造学习"]
 TERMINATE_REASONS_I = ["业绩不达标", "组织调整", "合同到期"]
 TRAINING_COURSES = ["新员工入职培训", "信息安全与合规培训", "管理力提升工作坊", "跨部门沟通协作",
                     "技术分享会", "销售技巧实战营", "数据分析基础", "时间管理与效率提升", "领导力发展计划"]
 
-def month_days(y_, m_):
-    nxt = dt.date(y_ + (m_ == 12), (m_ % 12) + 1, 1)
-    return (nxt - dt.date(y_, m_, 1)).days
-
-def rand_workday(d0, d1):
-    """d0<=d1 区间内随机一个工作日"""
-    if d0 > d1:
-        d0 = d1
-    span = (d1 - d0).days
-    for _ in range(30):
-        c = d0 + dt.timedelta(days=random.randint(0, max(span, 0)))
-        if c.weekday() < 5:
-            return c
-    return d0
-
-def month_rand_workday(y_, m_):
-    return rand_workday(dt.date(y_, m_, 1), dt.date(y_, m_, month_days(y_, m_)))
+DEPT_MULT = {d: mult for d, _, mult in DEPTS}
+DEPT_ID = {dn: i for i, (dn, _, _) in enumerate(DEPTS, 1)}
+dept_loc = {dn: loc for dn, loc, _ in DEPTS}
+ID_DEPT = {i: dn for i, (dn, _, _) in enumerate(DEPTS, 1)}
 
 def pick_name(seen, gender):
     while True:
@@ -85,19 +67,10 @@ def pick_name(seen, gender):
             seen.add(n)
             return n
 
-def weighted(pairs):
-    xs, ws = zip(*pairs)
-    return random.choices(xs, weights=ws, k=1)[0]
-
 def salary_for(level, dept, city):
     lo, hi = LEVEL_SALARY[level]
     v = random.uniform(lo, hi) * DEPT_MULT[dept] * CITY_MULT.get(city, 1.0) * 1000
     return float(max(5000, round(v / 100) * 100))
-
-DEPT_MULT = {d: mult for d, _, mult in DEPTS}
-DEPT_ID = {dn: i for i, (dn, _, _) in enumerate(DEPTS, 1)}
-dept_loc = {dn: loc for dn, loc, _ in DEPTS}
-ID_DEPT = {i: dn for i, (dn, _, _) in enumerate(DEPTS, 1)}
 
 def tax_of(taxable):
     """简化月度个税"""
@@ -115,10 +88,10 @@ for i, (dn, loc, _) in enumerate(DEPTS, 1):
 
 # ---------------- 2. 员工 ----------------
 employees = []          # dict
-_seen_names, _used_emp_ids = set(), set()
+_seen_names = set()
 def add_emp(hire_date, dept, title, level, city=None, etype=None, gender=None, age=None, salary=None, edu=None):
     eid = len(employees) + 1
-    gender = gender or weighted([("男", 55), ("女", 45)])
+    gender = gender or weighted(GENDER_W)
     if age is None:
         if level in ("总监", "副总裁"):
             age = random.randint(33, 48)
@@ -144,9 +117,6 @@ def add_emp(hire_date, dept, title, level, city=None, etype=None, gender=None, a
     }
     employees.append(emp)
     return emp
-
-DEPT_ID = {dn: i for i, (dn, _, _) in enumerate(DEPTS, 1)}
-dept_loc = {dn: loc for dn, loc, _ in DEPTS}
 
 # CEO
 ceo = add_emp(dt.date(2020, 6, 1), "总经办", "总经理", "副总裁", gender="男", age=42, etype="全职", edu="硕士")
@@ -195,7 +165,7 @@ def add_opening(opened, dept=None, title=None, level=None):
     return job_openings[-1]
 
 for (yy, mm) in MONTHS:
-    for _ in range(random.choices([0, 1, 2, 3], weights=[35, 35, 22, 8])[0]):
+    for _ in range(weighted([(0, 35), (1, 35), (2, 22), (3, 8)])):
         add_opening(month_rand_workday(yy, mm))
 
 # ---------------- 4. 月度入职 (金三银四/金九银十, 候选人闭环) ----------------
@@ -229,11 +199,11 @@ for (yy, mm) in hires_plan:
     emp["manager_id"] = random.choice(DIRECTORS[o["_dept"]])["emp_id"]
     o["hired_count"] += 1
     # 对应候选人(已入职)
-    gender = weighted([("男", 55), ("女", 45)])
+    gender = weighted(GENDER_W)
     candidates.append({
         "cand_id": len(candidates) + 1, "name": pick_name(_cand_names, gender), "gender": gender,
         "opening_id": o["opening_id"],
-        "source": weighted([("内推", 25), ("招聘网站", 45), ("猎头", 12), ("校园招聘", 18)]),
+        "source": weighted(SOURCE_W),
         "stage": "已入职",
         "applied_at": hire_date - dt.timedelta(days=random.randint(20, 45)),
         "expected_salary": round(random.uniform(float(lo), float(hi)) / 100) * 100,
@@ -251,7 +221,7 @@ for o in job_openings:
         o["status"] = "已关闭"
         o["closed_at"] = min(o["opened_at"] + dt.timedelta(days=random.randint(30, 150)), REF - dt.timedelta(days=1))
     for _ in range(random.randint(2, 6)):
-        gender = weighted([("男", 55), ("女", 45)])
+        gender = weighted(GENDER_W)
         applied = o["opened_at"] + dt.timedelta(days=random.randint(0, 25))
         if applied >= REF:
             continue
@@ -261,7 +231,7 @@ for o in job_openings:
         candidates.append({
             "cand_id": len(candidates) + 1, "name": pick_name(_cand_names, gender), "gender": gender,
             "opening_id": o["opening_id"],
-            "source": weighted([("内推", 25), ("招聘网站", 45), ("猎头", 12), ("校园招聘", 18)]),
+            "source": weighted(SOURCE_W),
             "stage": stage, "applied_at": applied,
             "expected_salary": round(random.uniform(float(o["salary_min"]), float(o["salary_max"])) / 100) * 100,
             "hired_emp_id": None,
@@ -272,6 +242,9 @@ def active_in_month(e, yy, mm):
     ms = dt.date(yy, mm, 1)
     me = dt.date(yy, mm, month_days(yy, mm))
     return e["hire_date"] <= me and (e["termination_date"] is None or e["termination_date"] >= ms)
+
+INVOLUNTARY = list(zip(TERMINATE_REASONS_I, (45, 35, 20)))
+VOLUNTARY = list(zip(TERMINATE_REASONS_V, (30, 25, 18, 12, 8, 7)))
 
 for (yy, mm) in MONTHS:
     for e in employees:
@@ -301,13 +274,9 @@ for (yy, mm) in MONTHS:
             td = month_rand_workday(yy, mm)
             if e["employment_type"] == "实习":
                 reason, vol = "实习结束", True
-            elif random.random() < 0.16:
-                reason, vol = weighted([(TERMINATE_REASONS_I[0], 45), (TERMINATE_REASONS_I[1], 35),
-                                        (TERMINATE_REASONS_I[2], 20)]), False
             else:
-                reason, vol = weighted([(TERMINATE_REASONS_V[0], 30), (TERMINATE_REASONS_V[1], 25),
-                                        (TERMINATE_REASONS_V[2], 18), (TERMINATE_REASONS_V[3], 12),
-                                        (TERMINATE_REASONS_V[4], 8), (TERMINATE_REASONS_V[5], 7)]), True
+                reason, vol = ((weighted(INVOLUNTARY), False) if random.random() < 0.16
+                               else (weighted(VOLUNTARY), True))
             e["status"] = "离职"
             e["termination_date"] = td
             e["termination_reason"] = reason
@@ -322,12 +291,9 @@ salary_payments = []
 for (yy, mm) in MONTHS:
     mf = dt.date(yy, mm, 1)
     me = dt.date(yy, mm, month_days(yy, mm))
-    pay_day = dt.date(yy, mm, 10)
     nxt_y, nxt_m = (yy, mm + 1) if mm < 12 else (yy + 1, 1)
-    if (nxt_y, nxt_m) > (2026, 8):
-        pay_day = dt.date(2026, 9, 10)
-    else:
-        pay_day = dt.date(nxt_y, nxt_m, 10)
+    pay_day = (dt.date(2026, 9, 10) if (nxt_y, nxt_m) > (2026, 8)
+               else dt.date(nxt_y, nxt_m, 10))
     for e in employees:
         if e["hire_date"] > me:
             continue
@@ -356,6 +322,10 @@ for (yy, mm) in MONTHS:
 PERIODS = [(yy, h) for yy in (2023, 2024, 2025, 2026) for h in (1, 2) if (yy, h) != (2026, 2)]
 PERIOD_END = {(yy, h): (dt.date(yy, 6, 30) if h == 1 else dt.date(yy, 12, 31)) for yy, h in PERIODS}
 SENIORS = [e["emp_id"] for e in employees if e["job_level"] in ("高级", "专家", "总监", "副总裁")]
+GRADE_W_DEFAULT = [("S", 10), ("A", 25), ("B", 45), ("C", 15), ("D", 5)]
+GRADE_W_LEAVING = [("S", 4), ("A", 15), ("B", 40), ("C", 28), ("D", 13)]
+GRADE_W_FLEX = [("S", 3), ("A", 15), ("B", 42), ("C", 28), ("D", 12)]
+SCORE_RANGE = {"S": (88, 97), "A": (78, 87), "B": (65, 77), "C": (50, 64), "D": (30, 49)}
 reviews = []
 rid = 0
 for (yy, h) in PERIODS:
@@ -365,15 +335,11 @@ for (yy, h) in PERIODS:
             continue
         if e["termination_date"] is not None and e["termination_date"] < end - dt.timedelta(days=30):
             continue
-        w = [("S", 10), ("A", 25), ("B", 45), ("C", 15), ("D", 5)]
-        if e["termination_date"] is not None and (e["termination_date"] - end).days < 365:
-            w = [("S", 4), ("A", 15), ("B", 40), ("C", 28), ("D", 13)]
-        if e["employment_type"] in ("外包", "实习"):
-            w = [("S", 3), ("A", 15), ("B", 42), ("C", 28), ("D", 12)]
+        w = (GRADE_W_FLEX if e["employment_type"] in ("外包", "实习")
+             else GRADE_W_LEAVING if e["termination_date"] is not None and (e["termination_date"] - end).days < 365
+             else GRADE_W_DEFAULT)
         g = weighted(w)
-        score = round(random.uniform(88, 97) if g == "S" else random.uniform(78, 87) if g == "A"
-                      else random.uniform(65, 77) if g == "B" else random.uniform(50, 64) if g == "C"
-                      else random.uniform(30, 49), 1)
+        score = round(random.uniform(*SCORE_RANGE[g]), 1)
         rid += 1
         reviews.append({"review_id": rid, "emp_id": e["emp_id"], "review_period": f"{yy}H{h}",
                         "score": score, "grade": g, "reviewer_id": e["manager_id"],
@@ -382,28 +348,20 @@ for (yy, h) in PERIODS:
                                                   "明显低于预期，已沟通改进计划", "成长速度快，可承担更大职责"])})
 
 # ---------------- 8. 请假单 ----------------
+LEAVE_DAYS = {"年假": [0.5, 1, 1, 2, 2, 3, 5], "病假": [0.5, 1, 1, 2, 3],
+              "婚假": [3, 5, 10], "产假": [98, 128, 158]}
 leaves = []
 lid = 0
 for e in employees:
     start_y = max(2023, e["hire_date"].year)
     end_y = e["termination_date"].year if e["termination_date"] else 2026
     for yy in range(start_y, end_y + 1):
-        for _ in range(random.choices([0, 1, 2, 3, 4], weights=[22, 30, 26, 14, 8])[0]):
+        for _ in range(weighted([(0, 22), (1, 30), (2, 26), (3, 14), (4, 8)])):
+            age = yy - e["birth_date"].year
             lt = weighted([("年假", 38), ("病假", 18), ("事假", 12), ("调休", 18),
-                           ("婚假", 3), ("产假", 7 if e["gender"] == "女" and 24 <= (yy - e["birth_date"].year) <= 38 else 0),
-                           ("陪产假", 4 if e["gender"] == "男" and 25 <= (yy - e["birth_date"].year) <= 40 else 0)])
-            if lt == "年假":
-                days = random.choice([0.5, 1, 1, 2, 2, 3, 5])
-            elif lt in ("病假",):
-                days = random.choice([0.5, 1, 1, 2, 3])
-            elif lt == "婚假":
-                days = random.choice([3, 5, 10])
-            elif lt == "产假":
-                days = random.choice([98, 128, 158])
-            elif lt == "陪产假":
-                days = 15
-            else:
-                days = random.choice([0.5, 1, 1, 2])
+                           ("婚假", 3), ("产假", 7 if e["gender"] == "女" and 24 <= age <= 38 else 0),
+                           ("陪产假", 4 if e["gender"] == "男" and 25 <= age <= 40 else 0)])
+            days = 15 if lt == "陪产假" else random.choice(LEAVE_DAYS.get(lt, [0.5, 1, 1, 2]))
             d0 = dt.date(yy, random.randint(1, 12), 1)
             sd = rand_workday(d0, d0 + dt.timedelta(days=27))
             ed = sd + dt.timedelta(days=max(0, int(days) - 1))
@@ -422,7 +380,6 @@ interviews = []
 iid = 0
 ROUNDS = ["一面", "二面", "三面", "HR面"]
 for c in candidates:
-    opening = next(o for o in job_openings if o["opening_id"] == c["opening_id"])
     if c["stage"] == "简历筛选":
         continue
     n = {"已淘汰": random.randint(1, 2), "面试中": random.randint(1, 2), "已发offer": random.randint(2, 3),
@@ -468,7 +425,7 @@ trid = 0
 for e in employees:
     if random.random() > 0.08:
         continue
-    for _ in range(random.choices([1, 2], weights=[80, 20])[0]):
+    for _ in range(weighted([(1, 80), (2, 20)])):
         d = rand_workday(max(e["hire_date"] + dt.timedelta(days=180), dt.date(2023, 1, 1)),
                          (e["termination_date"] or REF) - dt.timedelta(days=1))
         if d >= REF:
@@ -481,82 +438,31 @@ for e in employees:
         e["dept_id"] = DEPT_ID[to_d]  # 最近一次调动后部门
 
 # ---------------- 写 CSV ----------------
-def write(name, header, rows, fmt):
-    with open(os.path.join(OUT, name), "w", newline="", encoding="utf-8") as f:
-        w = csv.writer(f)
-        w.writerow(header)
-        for r in rows:
-            w.writerow(fmt(r))
-
-write("departments.csv", ["dept_id", "dept_name", "parent_id", "location", "established_date"],
-      departments, lambda r: [r["dept_id"], r["dept_name"], "", r["location"], r["established_date"]])
-
-write("employees.csv",
-      ["emp_id", "emp_no", "name", "gender", "birth_date", "hire_date", "dept_id", "job_title",
-       "job_level", "employment_type", "status", "base_salary", "manager_id", "work_city", "email",
-       "phone", "education", "termination_date", "termination_reason", "is_voluntary"],
-      employees, lambda e: [e["emp_id"], e["emp_no"], e["name"], e["gender"], e["birth_date"],
-                            e["hire_date"], e["dept_id"], e["job_title"], e["job_level"],
-                            e["employment_type"], e["status"], e["base_salary"],
-                            e["manager_id"] or "", e["work_city"], e["email"], e["phone"],
-                            e["education"], e["termination_date"] or "", e["termination_reason"] or "",
-                            "" if e["is_voluntary"] is None else ("t" if e["is_voluntary"] else "f")])
-
-write("salary_payments.csv",
-      ["emp_id", "pay_period", "base_pay", "overtime_pay", "bonus", "social_insurance", "income_tax",
-       "net_pay", "pay_date"],
-      salary_payments, lambda r: [r["emp_id"], r["pay_period"], r["base_pay"], r["overtime_pay"],
-                                  r["bonus"], r["social_insurance"], r["income_tax"], r["net_pay"],
-                                  r["pay_date"]])
-
-write("leave_requests.csv",
-      ["emp_id", "leave_type", "start_date", "end_date", "days", "status", "approver_id", "applied_at"],
-      leaves, lambda r: [r["emp_id"], r["leave_type"], r["start_date"], r["end_date"], r["days"],
-                         r["status"], r["approver_id"] or "", r["applied_at"]])
-
-write("job_openings.csv",
-      ["dept_id", "job_title", "job_level", "headcount", "salary_min", "salary_max", "status",
-       "opened_at", "closed_at", "hired_count"],
-      job_openings, lambda o: [o["dept_id"], o["job_title"], o["job_level"], o["headcount"],
-                               o["salary_min"], o["salary_max"], o["status"], o["opened_at"],
-                               o["closed_at"] or "", o["hired_count"]])
-
-write("candidates.csv",
-      ["name", "gender", "opening_id", "source", "stage", "applied_at", "expected_salary", "hired_emp_id"],
-      candidates, lambda c: [c["name"], c["gender"], c["opening_id"], c["source"], c["stage"],
-                             c["applied_at"], c["expected_salary"] or "", c["hired_emp_id"] or ""])
-
-write("interviews.csv",
-      ["cand_id", "round", "interviewer_id", "interview_date", "score", "result"],
-      interviews, lambda r: [r["cand_id"], r["round"], r["interviewer_id"] or "", r["interview_date"],
-                             r["score"] if r["score"] is not None else "", r["result"]])
-
-write("performance_reviews.csv",
-      ["emp_id", "review_period", "score", "grade", "reviewer_id", "comment"],
-      reviews, lambda r: [r["emp_id"], r["review_period"], r["score"], r["grade"],
-                          r["reviewer_id"] or "", r["comment"]])
-
-write("training_records.csv",
-      ["emp_id", "course_name", "training_date", "hours", "completed", "score"],
-      trainings, lambda r: [r["emp_id"], r["course_name"], r["training_date"], r["hours"],
-                            "t" if r["completed"] else "f",
-                            r["score"] if r["score"] is not None else ""])
-
-write("transfers.csv",
-      ["emp_id", "from_dept_id", "to_dept_id", "transfer_date", "reason"],
-      transfers, lambda r: [r["emp_id"], r["from_dept_id"] or "", r["to_dept_id"], r["transfer_date"],
-                            r["reason"]])
+TABLES = [
+    ("departments.csv", ["dept_id", "dept_name", "parent_id", "location", "established_date"], departments),
+    ("employees.csv", ["emp_id", "emp_no", "name", "gender", "birth_date", "hire_date", "dept_id",
+                       "job_title", "job_level", "employment_type", "status", "base_salary", "manager_id",
+                       "work_city", "email", "phone", "education", "termination_date", "termination_reason",
+                       "is_voluntary"], employees),
+    ("salary_payments.csv", ["emp_id", "pay_period", "base_pay", "overtime_pay", "bonus", "social_insurance",
+                             "income_tax", "net_pay", "pay_date"], salary_payments),
+    ("leave_requests.csv", ["emp_id", "leave_type", "start_date", "end_date", "days", "status",
+                            "approver_id", "applied_at"], leaves),
+    ("job_openings.csv", ["dept_id", "job_title", "job_level", "headcount", "salary_min", "salary_max",
+                          "status", "opened_at", "closed_at", "hired_count"], job_openings),
+    ("candidates.csv", ["name", "gender", "opening_id", "source", "stage", "applied_at",
+                        "expected_salary", "hired_emp_id"], candidates),
+    ("interviews.csv", ["cand_id", "round", "interviewer_id", "interview_date", "score", "result"], interviews),
+    ("performance_reviews.csv", ["emp_id", "review_period", "score", "grade", "reviewer_id", "comment"], reviews),
+    ("training_records.csv", ["emp_id", "course_name", "training_date", "hours", "completed", "score"], trainings),
+    ("transfers.csv", ["emp_id", "from_dept_id", "to_dept_id", "transfer_date", "reason"], transfers),
+]
+for name, header, rows in TABLES:
+    write_csv(OUT, name, header, rows)
 
 # ---------------- 摘要 ----------------
 active = [e for e in employees if e["status"] == "在职"]
 terminated = [e for e in employees if e["status"] == "离职"]
-print(f"departments        {len(departments)}")
-print(f"employees          {len(employees)}  (在职 {len(active)} / 离职 {len(terminated)})")
-print(f"salary_payments    {len(salary_payments)}")
-print(f"leave_requests     {len(leaves)}")
-print(f"job_openings       {len(job_openings)}")
-print(f"candidates         {len(candidates)}")
-print(f"interviews         {len(interviews)}")
-print(f"performance_reviews {len(reviews)}")
-print(f"training_records   {len(trainings)}")
-print(f"transfers          {len(transfers)}")
+for name, _, rows in TABLES:
+    print(f"{name[:-4]:<18} {len(rows)}")
+print(f"{'employees':<18} {len(employees)}  (在职 {len(active)} / 离职 {len(terminated)})")

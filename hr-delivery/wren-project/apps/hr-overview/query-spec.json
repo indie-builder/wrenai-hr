@@ -1,0 +1,132 @@
+{
+  "version": 1,
+  "snapshot_date": "2026-08-31",
+  "sdk_version": "0.4.1",
+  "tables": {
+    "departments": ["dept_id", "dept_name"],
+    "employees": ["emp_id", "gender", "hire_date", "dept_id", "job_level", "status", "base_salary", "termination_date", "termination_reason"],
+    "salary_payments": ["pay_id", "emp_id", "pay_period", "base_pay", "overtime_pay", "bonus"],
+    "insurance_payments": ["ins_id", "emp_id", "pay_period", "company_total"],
+    "headcount_plan": ["plan_id", "plan_year", "dept_id", "planned_headcount"],
+    "candidates": ["cand_id", "source", "stage", "applied_at", "hired_emp_id"],
+    "leave_requests": ["leave_id", "leave_type", "start_date", "days", "status"],
+    "offers": ["offer_id", "offer_date", "status", "reject_reason"],
+    "recruitment_costs": ["cost_id", "channel", "cost_month", "amount"],
+    "performance_goals": ["goal_id", "emp_id", "review_period", "weight", "completion_pct"],
+    "engagement_surveys": ["survey_id", "survey_year", "engagement_score"],
+    "exit_interviews": ["exit_id", "real_reason_category"]
+  },
+  "view_columns": {
+    "v_active_employees": ["dept_name", "job_level", "gender", "base_salary"],
+    "v_monthly_salary": ["pay_period", "base_pay", "overtime_pay", "bonus"],
+    "v_workforce_monthly": ["pay_period", "base_pay", "overtime_pay", "bonus", "insurance_company"],
+    "v_headcount_vs_plan": ["plan_year", "dept_name", "planned_headcount", "actual_headcount"]
+  },
+  "queries": {
+    "hc": {
+      "cube": {"cube": "workforce", "measures": ["headcount"]},
+      "fields": {"v": "headcount"},
+      "reference_sql": "SELECT count(*) AS v FROM employees WHERE status = '在职'"
+    },
+    "turnover": {
+      "sql": "WITH leavers AS (SELECT count(*) AS n FROM employees WHERE termination_date >= DATE '2025-01-01' AND termination_date < DATE '2026-01-01'), hc0 AS (SELECT count(*) AS n FROM employees WHERE hire_date < DATE '2025-01-01' AND (termination_date IS NULL OR termination_date >= DATE '2025-01-01')) SELECT round(l.n * 100.0 / h.n, 2) AS v FROM leavers l, hc0 h"
+    },
+    "cost": {
+      "cube": {"cube": "labor_cost", "measures": ["gross_cost"], "filters": [{"dimension": "pay_period", "operator": "gte", "value": "2026-01"}, {"dimension": "pay_period", "operator": "lte", "value": "2026-06"}]},
+      "fields": {"v": {"field": "gross_cost", "divide": 6, "round": 0}},
+      "reference_sql": "SELECT round(sum(base_pay + overtime_pay + bonus) / 6, 0) AS v FROM salary_payments WHERE pay_period BETWEEN '2026-01' AND '2026-06'"
+    },
+    "hire": {
+      "sql": "SELECT count(*) AS v FROM employees WHERE hire_date BETWEEN DATE '2026-01-01' AND DATE '2026-08-31'"
+    },
+    "funnel": {
+      "cube": {"cube": "recruitment", "measures": ["candidate_count", "hired_count"], "filters": [{"dimension": "applied_at", "operator": "gte", "value": "2025-01-01"}, {"dimension": "applied_at", "operator": "lt", "value": "2026-01-01"}]},
+      "fields": {"v": {"field": "hired_count", "divide_by": "candidate_count", "multiply": 100, "round": 1}},
+      "reference_sql": "SELECT round(count(*) FILTER (WHERE stage = '已入职') * 100.0 / count(*), 1) AS v FROM candidates WHERE applied_at BETWEEN DATE '2025-01-01' AND DATE '2025-12-31'"
+    },
+    "dept": {
+      "cube": {"cube": "workforce", "measures": ["headcount"], "dimensions": ["dept_name"]},
+      "fields": {"k": "dept_name", "v": "headcount"},
+      "sort": [{"field": "v", "direction": "desc"}, {"field": "k"}],
+      "reference_sql": "SELECT d.dept_name AS k, count(*) AS v FROM employees e JOIN departments d ON e.dept_id = d.dept_id WHERE e.status = '在职' GROUP BY d.dept_name"
+    },
+    "costM": {
+      "cube": {"cube": "labor_cost", "measures": ["gross_cost"], "dimensions": ["pay_period"], "filters": [{"dimension": "pay_period", "operator": "gte", "value": "2025-01"}]},
+      "fields": {"k": "pay_period", "v": "gross_cost"},
+      "sort": [{"field": "k"}],
+      "reference_sql": "SELECT pay_period AS k, sum(base_pay + overtime_pay + bonus) AS v FROM salary_payments WHERE pay_period >= '2025-01' GROUP BY pay_period"
+    },
+    "lvl": {
+      "cube": {"cube": "workforce", "measures": ["avg_base_salary"], "dimensions": ["job_level"]},
+      "fields": {"k": "job_level", "v": {"field": "avg_base_salary", "round": 0}},
+      "sort": [{"field": "v", "direction": "desc"}, {"field": "k"}],
+      "reference_sql": "SELECT job_level AS k, round(avg(base_salary), 0) AS v FROM employees WHERE status = '在职' GROUP BY job_level"
+    },
+    "attr": {
+      "sql": "WITH l AS (SELECT e.dept_id, count(*) AS lv FROM employees e WHERE e.termination_date >= DATE '2025-01-01' AND e.termination_date < DATE '2026-01-01' GROUP BY e.dept_id), h AS (SELECT e.dept_id, count(*) AS hc FROM employees e WHERE e.hire_date < DATE '2025-01-01' AND (e.termination_date IS NULL OR e.termination_date >= DATE '2025-01-01') GROUP BY e.dept_id) SELECT d.dept_name AS k, round(coalesce(l.lv,0) * 100.0 / h.hc, 1) AS v FROM h JOIN departments d ON d.dept_id = h.dept_id LEFT JOIN l ON l.dept_id = h.dept_id",
+      "sort": [{"field": "v", "direction": "desc"}, {"field": "k"}]
+    },
+    "leave": {
+      "sql": "SELECT leave_type AS k, sum(days) AS v FROM leave_requests WHERE status = '已批准' AND start_date BETWEEN DATE '2025-01-01' AND DATE '2025-12-31' GROUP BY leave_type",
+      "sort": [{"field": "v", "direction": "desc"}, {"field": "k"}]
+    },
+    "src": {
+      "sql": "SELECT c.source AS k, count(*) AS v FROM candidates c JOIN employees e ON c.hired_emp_id = e.emp_id WHERE e.hire_date BETWEEN DATE '2026-01-01' AND DATE '2026-08-31' GROUP BY c.source",
+      "sort": [{"field": "v", "direction": "desc"}, {"field": "k"}]
+    },
+    "gen": {
+      "cube": {"cube": "workforce", "measures": ["headcount"], "dimensions": ["gender"]},
+      "fields": {"k": "gender", "v": "headcount"},
+      "sort": [{"field": "k"}],
+      "reference_sql": "SELECT gender AS k, count(*) AS v FROM employees WHERE status = '在职' GROUP BY gender"
+    },
+    "totalcost": {
+      "cube": {"cube": "total_cost", "measures": ["total_cost", "person_months"], "filters": [{"dimension": "pay_period", "operator": "gte", "value": "2026-01"}, {"dimension": "pay_period", "operator": "lte", "value": "2026-06"}]},
+      "fields": {"v": {"field": "total_cost", "divide": 60000, "round": 1}, "person_months": "person_months"},
+      "reference_sql": "SELECT round(sum(s.base_pay + s.overtime_pay + s.bonus + i.company_total) / 60000, 1) AS v, count(*) AS person_months FROM salary_payments s JOIN insurance_payments i ON i.emp_id = s.emp_id AND i.pay_period = s.pay_period JOIN employees e ON e.emp_id = s.emp_id JOIN departments d ON d.dept_id = e.dept_id WHERE s.pay_period BETWEEN '2026-01' AND '2026-06'"
+    },
+    "plan": {
+      "cube": {"cube": "headcount_plan_cube", "measures": ["actual_total", "planned_total"], "filters": [{"dimension": "plan_year", "operator": "eq", "value": 2025}]},
+      "fields": {"v": {"field": "actual_total", "divide_by": "planned_total", "multiply": 100, "round": 1}},
+      "reference_sql": "SELECT round(sum(actual_headcount) * 100.0 / sum(planned_headcount), 1) AS v FROM v_headcount_vs_plan WHERE plan_year = 2025"
+    },
+    "offer": {
+      "sql": "SELECT round(count(*) FILTER (WHERE status = '已接受') * 100.0 / NULLIF(count(*) FILTER (WHERE status IN ('已接受','已拒绝')), 0), 1) AS v FROM offers WHERE offer_date BETWEEN DATE '2025-01-01' AND DATE '2025-12-31'"
+    },
+    "eng": {
+      "sql": "SELECT round(avg(engagement_score), 2) AS v FROM engagement_surveys WHERE survey_year = 2025"
+    },
+    "hp": {
+      "cube": {"cube": "headcount_plan_cube", "measures": ["planned_total", "actual_total"], "dimensions": ["dept_name"], "filters": [{"dimension": "plan_year", "operator": "eq", "value": 2025}]},
+      "fields": {"k": "dept_name", "p": "planned_total", "a": "actual_total"},
+      "sort": [{"field": "k"}],
+      "reference_sql": "SELECT dept_name AS k, planned_headcount AS p, actual_headcount AS a FROM v_headcount_vs_plan WHERE plan_year = 2025"
+    },
+    "costC": {
+      "cube": {"cube": "total_cost", "measures": ["base_total", "overtime_total", "bonus_total", "insurance_total"], "dimensions": ["pay_period"], "filters": [{"dimension": "pay_period", "operator": "gte", "value": "2025-01"}]},
+      "fields": {"k": "pay_period", "b": "base_total", "o": "overtime_total", "bo": "bonus_total", "ins": "insurance_total"},
+      "sort": [{"field": "k"}],
+      "reference_sql": "SELECT pay_period AS k, sum(base_pay) AS b, sum(overtime_pay) AS o, sum(bonus) AS bo, sum(insurance_company) AS ins FROM v_workforce_monthly WHERE pay_period >= '2025-01' GROUP BY pay_period"
+    },
+    "rej": {
+      "sql": "SELECT reject_reason AS k, count(*) AS v FROM offers WHERE status = '已拒绝' GROUP BY reject_reason",
+      "sort": [{"field": "k"}]
+    },
+    "costPerHire": {
+      "sql": "WITH costs AS (SELECT channel, sum(amount) AS cost FROM recruitment_costs WHERE cost_month LIKE '2025%' GROUP BY channel), hires AS (SELECT c.source, count(*) AS n FROM candidates c JOIN employees e ON c.hired_emp_id = e.emp_id WHERE e.hire_date BETWEEN DATE '2025-01-01' AND DATE '2025-12-31' GROUP BY c.source) SELECT costs.channel AS k, costs.cost / NULLIF(hires.n, 0) AS v, coalesce(hires.n, 0) AS n FROM costs LEFT JOIN hires ON hires.source = CASE WHEN costs.channel = '内推奖励' THEN '内推' ELSE costs.channel END",
+      "sort": [{"field": "v", "direction": "desc"}, {"field": "k"}]
+    },
+    "arc": {
+      "sql": "SELECT termination_reason AS k, count(*) AS v FROM employees WHERE status = '离职' GROUP BY termination_reason ORDER BY v DESC, k LIMIT 6",
+      "sort": [{"field": "v", "direction": "desc"}, {"field": "k"}]
+    },
+    "real": {
+      "sql": "SELECT real_reason_category AS k, count(*) AS v FROM exit_interviews GROUP BY real_reason_category ORDER BY v DESC, k LIMIT 6",
+      "sort": [{"field": "v", "direction": "desc"}, {"field": "k"}]
+    },
+    "goal": {
+      "sql": "SELECT d.dept_name AS k, sum(g.completion_pct * g.weight) / sum(g.weight) AS v FROM performance_goals g JOIN employees e ON g.emp_id = e.emp_id JOIN departments d ON d.dept_id = e.dept_id WHERE g.review_period = '2026H1' GROUP BY d.dept_name",
+      "sort": [{"field": "v", "direction": "desc"}, {"field": "k"}]
+    }
+  }
+}

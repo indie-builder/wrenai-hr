@@ -11,8 +11,8 @@
   - 期间离职人数: `termination_date` 落在期间内的员工数（含主动与被动，含实习/外包）。
   - 期初在职人数: `hire_date < 期间开始日` 且（`termination_date IS NULL` 或 `termination_date >= 期间开始日`）。
   - 年离职率直接用年离职人数/年初人数（不做年化折算）；跨年比较时按自然年。
-- **司龄**: `tenure_years`（计算列，(current_date − hire_date)/365.25）。**年龄**: `age`（计算列，按出生年与当前年差）。
-- 组织架构为一级扁平部门（9 个），无部门层级汇总；`employees.dept_id` 为员工**当前**部门。
+- **司龄**: `tenure_years`（计算列，`round((DATE '2026-08-31' - hire_date) / 365.25, 1)`）。**年龄**: `age`（计算列，快照年份减出生年份，保留年份差定义，非周岁）。模型、视图与查询均使用快照日期，不随执行日变化。
+- 组织架构为一级扁平部门（9 个），无部门层级汇总；`employees.dept_id` 为员工**当前**部门。按此字段汇总历史离职率、薪资或成本时，须注明按当前档案部门归属，未还原调岗历史。
 
 ## 薪酬与成本口径
 - 所有金额单位为**人民币元/月**，均为**税前**，另有说明除外。
@@ -38,12 +38,12 @@
 ## v2 扩展域口径
 - **编制达成率** = 年末实际在职人数 ÷ 计划编制（`v_headcount_vs_plan`：planned_headcount vs actual_headcount），按部门×年度统计；实际 = hire_date ≤ 年末 且未在年末前离职。
 - **人力总成本** = 税前应发（base_pay+overtime_pay+bonus）+ 社保公积金企业缴纳（`insurance_payments.company_total`）。可用 `v_workforce_monthly` 视图分项聚合后相加。
-- **人均人力成本** = 期间人力总成本 ÷ 期间发薪人次（或月均在职人数，引用时注明分母口径）。
+- **人均月度人力成本**（含社保）= 期间人力总成本 ÷ 期间发薪人次；一人一月一条薪资记录，分母为所选期间的薪资行数（`COUNT(*)`，即人月），不能用期间去重人数×月份数替代。`total_cost` Cube 的 `total_cost` 与 `person_months` 可复用此口径；若另用月均在职人数计算期间人均成本，需明确单位、期间和分母，不能混作人均月度成本。
 - **调薪渗透率** = 期间有调薪记录（`salary_changes`）的去重员工数 ÷ 期间期初在职人数。**调薪幅度** 用 `change_pct`（百分比）。
-- **晋升率** = 期间晋升人数（`promotions` 去重）÷ 期初在职人数；晋升调薪幅度看 `promotions.raise_pct`。
+- **晋升率** = 期间晋升人数（`count(DISTINCT promotions.emp_id)`）÷ 期初在职人数；晋升人次另用晋升记录数，不能替代人数作晋升率分子。晋升调薪幅度在查询中按 `(salary_after - salary_before) * 100.0 / salary_before` 计算，平均幅度先逐条计算后取平均并四舍五入。
 - **加班审批通过率** = `overtime_requests.status='已批准'` 的加班单 ÷ 全部加班单；**调休补偿占比** = compensation='调休' 的已批准加班单 ÷ 已批准加班单。
 - **年假使用率** = 截至期末已使用年假 ÷ 当年年度额度（`leave_balances`: used/entitled，type='年假'）；`expired` 为年度清零损失。
-- **合同到期预警** = `contracts.is_expiring_soon`（计算列：履行中且 end_date ≤ 当前+90天）；"无固定期限"合同 end_date 为空。
+- **合同到期预警** = `contracts.is_expiring_soon`（计算列：履行中且 `end_date BETWEEN DATE '2026-08-31' AND DATE '2026-08-31' + INTERVAL '90 days'`，含两端，排除快照日前已到期）；"无固定期限"合同 end_date 为空。
 - **目标完成率** = `performance_goals.completion_pct` 按 weight 加权平均（同员工同周期权重和为100）；与 `performance_reviews.grade` 同周期关联分析。
 - **敬业度** = `engagement_surveys.engagement_score`（1-5，年度）；低敬业度阈值 < 3.0。
 - **主动离职率 / 被动离职率** = 官方离职率口径下按 `is_voluntary` 拆分：主动 = is_voluntary=true；被动（辞退等）= false。
@@ -55,3 +55,5 @@
 - 枚举值均为中文原值（如 '在职'、'技术部'、'年假'、'S'），WHERE 条件直接使用中文等值，不要翻译成英文。
 - 绩效等级 S 最好 D 最差；C/D 视为低绩效。
 - 员工数 count 用 `emp_id`；薪资聚合前确认粒度（`salary_payments` 一人一月一行）。
+- 排名与 TopN 显式按指标降序排列，同值按部门名或原因名称升序作稳定次序，再取 LIMIT；月度/年度趋势按时间升序。
+- 固定回归题 q11 保留原有简化加班口径：期间加班总时长 ÷（期间有考勤的去重员工数×6个月）。此题未按实际出勤人月加权，不能据此推导 q40 的发薪人次分母。
