@@ -197,7 +197,7 @@ python3 run_all.py --domain 人效分析
 
 ### 尚未验证的边界
 
-- `.github/workflows/hr-demo.yml` 已加入新工作区安装、独立 profile、构库、静态检查、回归和快照检查；**尚未提交/推送，未运行 GitHub Linux CI**。本地通过不替代远程运行结果。
+- 本轮本地验收时尚未提交/推送；随后 [PR #3](https://github.com/indie-builder/wrenai-hr/pull/3) 的 [GitHub Linux CI](https://github.com/indie-builder/wrenai-hr/actions/runs/37225440806) 已实际通过依赖安装、39 项测试、构库、静态检查、41 题回归与快照检查，并合并为 `3b14879`。远端图表工厂重构整合后，浏览器 23 个查询及 12 图也再次核对通过。
 - 未进行 41 题全量独立 NL 生成、多轮稳定性或不同模型对比；评测器负责执行与评分，实际模型来源由生成记录提供，不自行调用付费模型。
 - 未接入真实 HR、部署公网、验证生产权限或改变 DOUBLE 在精确财务计算上的限制。
 - 未恢复已取消的 PostgreSQL↔DuckDB 交叉验证。当前数据重建可复现性由独立种子与现有 DuckDB 逐表核对支持。

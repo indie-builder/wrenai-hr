@@ -34,7 +34,8 @@
 - `hr-delivery/wren-project/target/mdl.json`：语义模型构建产物，优先修改 YAML 源文件后构建。
 - `hr-delivery/wren-project/apps/hr-overview/`：仪表盘 HTML、共享查询配置、裁剪后的 MDL、所需 Parquet 和快照清单。
 - `hr-delivery/scripts/export_dashboard.py`：从只读 DuckDB 导出并校验仪表盘依赖；数据库种子不依赖仪表盘产物。
-- `hr-delivery/validation/v2/`：当前统一验证入口；上一层保留早期脚本和输出。
+- `hr-delivery/validation/v2/`：当前统一验证入口；旧版脚本与过时输出已移除。
+- `hr_mcp/`、`scripts/prepare_mcp.py`：独立的只读 Streamable HTTP 服务与构建期私有数据包；Token 由环境变量提供，构建产物不提交。
 - `vendor/WrenAI/`：本地未修改的上游参考克隆，Git 忽略，其他机器可能不存在。
 - `.venv/`、`.env`、`.wren/memory/`：本地环境、凭据、可重建索引，不提交。
 
@@ -167,6 +168,14 @@ python3 -m http.server 8317 --bind 127.0.0.1 \
 也可在语义目录执行 `../../.venv/bin/wren genbi verify hr-overview` 检查已注册应用文件。文件预检不能替代浏览器图表、加载错误和数字一致性检查。
 
 页面使用 ECharts 和 `@wrenai/wren-core-wasm` 的 CDN 资源，首次加载需要网络。数据库更新不会自动刷新 Parquet；修改数据后，从根目录运行 `.venv/bin/python hr-delivery/scripts/export_dashboard.py`，再以 `--check` 核对快照哈希、源数据与全部页面查询。表列和查询需求统一修改 `apps/hr-overview/query-spec.json`，不要直接向产物目录复制整库数据。`wren genbi build` 输出构建指令，不会自动写出完整应用。
+
+## MCP 服务
+
+- 部署与接入见 `hr-delivery/docs/mcp-vercel.md`。运行依赖单独使用根 `pyproject.toml` / `uv.lock`，本地使用 `.venv-mcp`，避免覆盖分析演示环境。
+- Vercel 从仓库根构建 `scripts/prepare_mcp.py`，数据放 `hr_mcp/data/` 函数私有目录；不得将数据库或业务上下文放进 `public/` 或配置静态文件路由。
+- `/mcp` 使用 Streamable HTTP 与 Bearer Token；`MCP_AUTH_TOKEN` 缺失时必须拒绝服务，不添加开发后门。Token 不提交、不打印、不写入URL；`.env.mcp` 是本地忽略文件。
+- 语义模型及规则仍按上文维护；服务执行保持语义和规划后物理 SQL 两次校验、只读 worker 与资源限制。新增工具不得默认开放写入或文件访问。
+- 服务修改后运行 `python -m unittest discover -s tests -v`，以官方客户端 `scripts/check_mcp.py` 验证认证和工具调用。Linux CI、本地 HTTP 与 Vercel 公网验证分开报告。
 
 ## 数据与版本管理
 

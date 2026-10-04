@@ -1,0 +1,37 @@
+name: MCP service validation
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mcp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          python-version: '3.12'
+      - name: Install locked MCP dependencies
+        run: uv sync --locked
+      - name: Build private read-only data bundle
+        run: uv run --no-sync python scripts/prepare_mcp.py
+      - name: Authentication, protocol and query tests
+        run: uv run --no-sync python -m unittest discover -s tests -v
+      - name: Check deployment dependency and data size
+        run: |
+          uv run --no-sync python - <<'PY'
+          import sysconfig
+          from pathlib import Path
+          paths = [Path(sysconfig.get_paths()['purelib']), Path('hr_mcp')]
+          size = sum(p.stat().st_size for root in paths for p in root.rglob('*') if p.is_file())
+          print(f'Installed dependencies and private service bundle: {size:,} bytes')
+          assert size < 450_000_000, 'Keep room below Vercel Python 500MB limit'
+          PY
