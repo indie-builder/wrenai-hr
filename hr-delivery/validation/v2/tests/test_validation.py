@@ -15,7 +15,6 @@ sys.path.insert(0, str(BASE / "eval"))
 import run_all as runner
 import check_semantics as semantics
 import nl_eval
-from sql_policy import PolicyError, validate_sql
 
 
 class ComparisonTests(unittest.TestCase):
@@ -124,42 +123,6 @@ class ExecutionTests(unittest.TestCase):
                     runner.output_directory([question], subset=True, output=root)
 
 
-class SqlSafetyTests(unittest.TestCase):
-    def test_safe_ctes_join_aggregates_and_ordering_pass(self):
-        sql = "WITH hc AS (SELECT dept_id, COUNT(*) n FROM employees GROUP BY dept_id) SELECT dept_id, round(n*100.0 / sum(n) OVER(), 2) FROM hc ORDER BY n DESC"
-        self.assertIn("SELECT", validate_sql(sql, {"employees"}))
-        validate_sql("SELECT CAST('2026-08-31' AS DATE) - INTERVAL '90' DAY FROM employees", {"employees"})
-
-    def test_file_network_write_and_unknown_function_inputs_are_blocked(self):
-        attacks = [
-            "SELECT * FROM read_csv_auto('/etc/passwd')",
-            "SELECT * FROM read_parquet('https://example.com/data')",
-            "SELECT * FROM '/tmp/file.parquet'",
-            "SELECT * FROM glob('/tmp/*')",
-            "SELECT getenv('TOKEN')",
-            "SELECT query('SELECT * FROM employees')",
-            "SELECT * FROM sqlite_scan('/tmp/private.db', 'users')",
-            "SELECT * FROM duckdb_secrets()",
-            "SELECT nextval('s') FROM employees",
-            "SELECT * FROM employees; COPY employees TO '/tmp/stolen'",
-            "SELECT * INTO new_table FROM employees",
-            "WITH x AS (DELETE FROM employees RETURNING *) SELECT * FROM x",
-            "WITH employees AS (SELECT * FROM secret) SELECT * FROM employees",
-            "SELECT * FROM system.information_schema.tables",
-            "SELECT main.read_blob('/tmp/file')",
-            "PRAGMA version", "INSTALL httpfs", "ATTACH '/tmp/file' AS other",
-            "WITH RECURSIVE x AS (SELECT 1 UNION ALL SELECT 1 FROM x) SELECT * FROM x",
-        ]
-        for sql in attacks:
-            with self.subTest(sql=sql), self.assertRaises(PolicyError):
-                validate_sql(sql, {"employees"})
-
-    def test_cte_shadowing_does_not_allow_unknown_physical_source(self):
-        with self.assertRaises(PolicyError):
-            validate_sql("WITH employees AS (SELECT * FROM secret) SELECT * FROM employees", {"employees"})
-        validate_sql('SELECT * FROM "public"."employees"', {"employees"}, physical=True)
-
-
 class WorkerTests(unittest.TestCase):
     def test_readonly_database_handles_quote_in_path_and_disables_external_access(self):
         import duckdb
@@ -173,6 +136,10 @@ class WorkerTests(unittest.TestCase):
             for sql in ("DELETE FROM employees", "SELECT * FROM read_csv_auto('/etc/passwd')", "SELECT 1; SELECT 2"):
                 with self.subTest(sql=sql):
                     self.assertFalse(runner.run_gt(sql, db_file=db, python=sys.executable).ok)
+            limited = runner.run_gt("SELECT i FROM range(10001) t(i)", db_file=db, python=sys.executable)
+            self.assertFalse(limited.ok)
+            self.assertEqual(limited.error_type, "RowLimitExceeded")
+            self.assertEqual(limited.stdout, "")
             with duckdb.connect(str(db), read_only=True) as con:
                 self.assertEqual(con.execute("SELECT count(*) FROM employees").fetchone(), (2,))
 

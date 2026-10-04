@@ -5,20 +5,20 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import threading
-import time
-import types
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-import httpx
+import anyio
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 
-from hr_mcp.server import BUNDLE_FILES, MAX_BODY_BYTES, SNAPSHOT_DATE, app, create_app
+from hr_mcp.contracts import BUNDLE_FILES, ERROR_MESSAGES, MAX_BODY_BYTES, MCPQueryError, SNAPSHOT_DATE
+from hr_mcp.server import app, create_app
 
 TOKEN = "unit-test-key-that-is-at-least-32-characters"
 AUTH = {"Authorization": f"Bearer {TOKEN}"}
@@ -107,7 +107,7 @@ class ServerTests(unittest.TestCase):
     def test_entrypoint_is_fastapi_without_build_dependency(self):
         self.assertIsInstance(app, FastAPI)
         with tempfile.TemporaryDirectory() as folder, patch.dict(os.environ, {"MCP_DATA_DIR": folder}):
-            with patch("hr_mcp.server.importlib.import_module") as loader:
+            with patch("hr_mcp.runtime.load_engine") as loader:
                 application = create_app(token=TOKEN, allowed_hosts=["testserver"])
                 loader.assert_not_called()
                 with TestClient(application) as client:
@@ -116,6 +116,21 @@ class ServerTests(unittest.TestCase):
                     self.assertEqual(response.json()["status"], "not_ready")
                     self.assertEqual(client.post("/mcp", headers=HEADERS, json=initialize()).status_code, 503)
                 loader.assert_not_called()
+
+    def test_entrypoint_import_neither_checks_bundle_nor_loads_analytics_dependencies(self):
+        probe = subprocess.run(
+            [sys.executable, "-c", """
+import sys
+from pathlib import Path
+from unittest.mock import patch
+with patch.object(Path, 'is_file', side_effect=AssertionError('bundle touched')):
+    import hr_mcp.server
+assert not {'hr_mcp.engine', 'hr_query', 'duckdb', 'wren_core', 'sqlglot'} & sys.modules.keys()
+"""],
+            capture_output=True, text=True, timeout=20,
+            cwd=Path(__file__).resolve().parents[1],
+        )
+        self.assertEqual(probe.returncode, 0, probe.stderr)
 
     def test_health_is_public_minimal_and_docs_and_data_are_not_routes(self):
         with TestClient(self.make_app()) as client:
@@ -318,19 +333,12 @@ class ServerTests(unittest.TestCase):
         asyncio.run(exercise())
 
     def test_tool_errors_are_safe_and_schema_validation_never_calls_engine(self):
-        class MCPQueryError(Exception):
-            def __init__(self, code, message):
-                self.code, self.message = code, message
-                super().__init__(message)
-
-        fake_module = types.ModuleType("hr_mcp.engine")
-        fake_module.MCPQueryError = MCPQueryError
-        with patch.dict(sys.modules, {"hr_mcp.engine": fake_module}), TestClient(self.make_app()) as client:
+        with TestClient(self.make_app()) as client:
             request = rpc("tools/call", {"name": "query_sql", "arguments": {"sql": "SELECT 1"}})
-            self.engine.failure = MCPQueryError("INVALID_SQL", "仅支持单条只读查询。")
+            self.engine.failure = MCPQueryError("SQL_REJECTED")
             response = client.post("/mcp", headers=HEADERS, json=request).json()["result"]
             self.assertTrue(response["isError"])
-            self.assertEqual(response["structuredContent"]["error"], {"code": "INVALID_SQL", "message": "仅支持单条只读查询。"})
+            self.assertEqual(response["structuredContent"]["error"], {"code": "SQL_REJECTED", "message": ERROR_MESSAGES["SQL_REJECTED"]})
             self.engine.failure = RuntimeError(f"/private/local.duckdb token={TOKEN}")
             with self.assertLogs(level="INFO") as logs:
                 response = client.post("/mcp", headers=HEADERS, json=request)
@@ -346,80 +354,93 @@ class ServerTests(unittest.TestCase):
             self.assertEqual(len(self.engine.calls), before)
 
     def test_lazy_bundle_initialization_and_missing_file_health(self):
-        created = []
-        fake_module = types.ModuleType("hr_mcp.engine")
-
-        def constructor(folder):
-            created.append(folder)
-            return self.engine
-
-        fake_module.AnalyticsEngine = constructor
-        with tempfile.TemporaryDirectory() as folder, patch.dict(os.environ, {"MCP_DATA_DIR": folder}), patch.dict(sys.modules, {"hr_mcp.engine": fake_module}):
+        with tempfile.TemporaryDirectory() as folder, patch.dict(os.environ, {"MCP_DATA_DIR": folder}), \
+                patch("hr_mcp.runtime.load_engine", return_value=self.engine) as factory:
             data_dir = Path(folder)
-            for name in BUNDLE_FILES:
+            for name in (*BUNDLE_FILES, "manifest.json"):
                 (data_dir / name).write_text("{}")
             application = self.make_app(engine=None)
-            self.assertEqual(created, [])
+            factory.assert_not_called()
             with TestClient(application) as client:
                 self.assertEqual(client.get("/health").status_code, 200)
-                self.assertEqual(created, [data_dir])
-                (data_dir / "public.duckdb").unlink()
-                self.assertEqual(client.get("/health").status_code, 503)
-                response = client.post("/mcp", headers=HEADERS, json=initialize())
-                self.assertEqual(response.status_code, 503)
+                factory.assert_called_once_with(data_dir)
+                # Both request guard and tool invocation reuse cached readiness.
+                with patch.object(Path, "is_file", side_effect=AssertionError("unexpected file scan")):
+                    result = client.post("/mcp", headers=HEADERS, json=rpc("tools/call", {"name": "get_context", "arguments": {}}))
+                    self.assertFalse(result.json()["result"]["isError"])
+                for name in (*BUNDLE_FILES, "manifest.json"):
+                    with self.subTest(name=name):
+                        (data_dir / name).unlink()
+                        self.assertEqual(client.get("/health").status_code, 503)
+                        self.assertEqual(client.post("/mcp", headers=HEADERS, json=initialize()).status_code, 503)
+                        (data_dir / name).write_text("{}")
+                        self.assertEqual(client.get("/health").status_code, 200)
+                factory.assert_called_once_with(data_dir)
 
     def test_invalid_bundle_initialization_does_not_leak_exception(self):
-        fake_module = types.ModuleType("hr_mcp.engine")
-
-        def constructor(folder):
-            raise RuntimeError(f"private bundle {folder} token={TOKEN}")
-
-        fake_module.AnalyticsEngine = constructor
-        with tempfile.TemporaryDirectory() as folder, patch.dict(os.environ, {"MCP_DATA_DIR": folder}), patch.dict(sys.modules, {"hr_mcp.engine": fake_module}):
-            for name in BUNDLE_FILES:
+        with tempfile.TemporaryDirectory() as folder, \
+                patch("hr_mcp.runtime.load_engine", side_effect=RuntimeError(f"private bundle {folder} token={TOKEN}")):
+            for name in (*BUNDLE_FILES, "manifest.json"):
                 (Path(folder) / name).touch()
-            with TestClient(self.make_app(engine=None)) as client:
+            with TestClient(self.make_app(engine=None, data_dir=Path(folder))) as client:
                 response = client.get("/health")
                 self.assertEqual(response.status_code, 503)
                 self.assertNotIn(folder, response.text)
                 self.assertNotIn(TOKEN, response.text)
 
-    def test_engine_work_runs_off_loop_and_at_most_two_calls_per_instance(self):
-        class SlowEngine(FakeEngine):
-            def __init__(self):
-                super().__init__()
-                self.active = 0
-                self.maximum = 0
-                self.guard = threading.Lock()
+    def test_configuration_is_captured_when_app_is_created(self):
+        with tempfile.TemporaryDirectory() as folder:
+            data_dir = Path(folder)
+            for name in (*BUNDLE_FILES, "manifest.json"):
+                (data_dir / name).touch()
+            with patch.dict(os.environ, {"MCP_AUTH_TOKEN": TOKEN, "MCP_DATA_DIR": folder,
+                                         "MCP_ALLOWED_HOSTS": "testserver", "MCP_ALLOWED_ORIGINS": "https://client.example"}):
+                application = create_app(engine_factory=lambda directory: self.engine)
+            with patch.dict(os.environ, {key: "changed" for key in ENV_KEYS}), TestClient(application) as client:
+                self.assertEqual(client.get("/health").status_code, 200)
+                response = client.post("/mcp", headers={**HEADERS, "Origin": "https://client.example"}, json=initialize())
+                self.assertEqual(response.status_code, 200, response.text)
 
-            def query_sql(self, sql):
-                self.record("query_sql", sql)
-                with self.guard:
-                    self.active += 1
-                    self.maximum = max(self.maximum, self.active)
-                try:
-                    time.sleep(0.05)
-                    return self.query_result()
-                finally:
-                    with self.guard:
-                        self.active -= 1
+    def test_official_sdk_with_real_engine_queries_cube_and_rejects_sql(self):
+        import httpx2
+        from mcp import ClientSession
+        from mcp.client.streamable_http import streamable_http_client
+        from fixtures import fixture
 
-        engine = SlowEngine()
-        application = self.make_app(engine=engine)
+        with tempfile.TemporaryDirectory() as folder:
+            data_dir = Path(folder) / "bundle"
+            fixture(data_dir)
+            application = create_app(token=TOKEN, allowed_hosts=["testserver"], data_dir=data_dir)
 
-        async def exercise():
-            async with application.router.lifespan_context(application):
-                async with httpx.AsyncClient(transport=httpx.ASGITransport(app=application), base_url="http://testserver") as client:
-                    responses = await asyncio.gather(*[
-                        client.post("/mcp", headers=HEADERS, json=rpc("tools/call", {"name": "query_sql", "arguments": {"sql": "SELECT 1"}}, index))
-                        for index in range(6)
-                    ])
-                    self.assertTrue(all(response.status_code == 200 for response in responses))
-                    self.assertTrue(all(not response.json()["result"]["isError"] for response in responses))
-                    self.assertNotIn(threading.get_ident(), engine.thread_ids)
+            async def exercise():
+                async with application.router.lifespan_context(application):
+                    async with httpx2.AsyncClient(transport=httpx2.ASGITransport(app=application), headers=AUTH) as client:
+                        async with streamable_http_client("http://testserver/mcp", http_client=client) as streams:
+                            async with ClientSession(*streams) as session:
+                                await session.initialize()
+                                context = await session.call_tool("get_context", {})
+                                self.assertEqual(context.structured_content["snapshot_date"], SNAPSHOT_DATE)
+                                query = await session.call_tool("query_sql", {"sql": "SELECT COUNT(*) AS n FROM employees"})
+                                self.assertFalse(query.is_error)
+                                self.assertEqual(query.structured_content["rows"], [["3"]])
+                                plan = await session.call_tool("plan_sql", {"sql": "SELECT COUNT(*) AS n FROM v_active_employees"})
+                                self.assertFalse(plan.is_error)
+                                self.assertFalse(plan.structured_content["executed"])
+                                cube = await session.call_tool("query_cube", {
+                                    "cube": "workforce", "measures": ["headcount"], "dimensions": ["dept_name"],
+                                    "filters": [{"dimension": "dept_name", "operator": "eq", "value": "技术部"}],
+                                })
+                                self.assertFalse(cube.is_error)
+                                self.assertEqual(cube.structured_content["rows"], [["技术部", "1"]])
+                                for sql in ("DELETE FROM employees", "SELECT * FROM read_csv('/private-file')"):
+                                    rejected = await session.call_tool("query_sql", {"sql": sql})
+                                    self.assertTrue(rejected.is_error)
+                                    self.assertEqual(rejected.structured_content["error"], {
+                                        "code": "SQL_REJECTED", "message": ERROR_MESSAGES["SQL_REJECTED"],
+                                    })
+                                    self.assertEqual(json.loads(rejected.content[0].text), rejected.structured_content)
 
-        asyncio.run(exercise())
-        self.assertEqual(engine.maximum, 2)
+            anyio.run(exercise)
 
 
 if __name__ == "__main__":

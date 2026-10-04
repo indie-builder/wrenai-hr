@@ -2,61 +2,52 @@
 from __future__ import annotations
 
 import base64
-import importlib.util
 import json
 from pathlib import Path
 import resource
 import sys
 
-# -I excludes cwd/PYTHONPATH. Vercel's HTTP bootstrap adds _vendor plus
-# externalized dependencies for large bundles; isolated workers need both too.
-# These paths are fixed by deployed code, never by a request or environment value.
-PACKAGE_ROOT = Path(__file__).resolve().parent.parent
-RUNTIME_PACKAGES = Path("/tmp/_vc_deps/lib") / f"python{sys.version_info.major}.{sys.version_info.minor}" / "site-packages"
-for directory in (PACKAGE_ROOT / "_vendor", RUNTIME_PACKAGES, PACKAGE_ROOT):
+
+def runtime_paths(package_root: Path) -> tuple[Path, ...]:
+    """Use only code-owned paths for the isolated Vercel dependency adapter."""
+    external = Path("/tmp/_vc_deps/lib") / f"python{sys.version_info.major}.{sys.version_info.minor}" / "site-packages"
+    return package_root / "_vendor", external, package_root
+
+
+# -I excludes cwd/PYTHONPATH. Vercel externalizes dependencies for large bundles.
+# These paths are fixed by deployed code, never a request or environment value.
+for directory in runtime_paths(Path(__file__).resolve().parent.parent):
     if directory.is_dir():
         sys.path.insert(0, str(directory))
-from hr_mcp.engine import (MAX_OUTPUT_BYTES, MAX_ROWS, MCPQueryError,
-                           SNAPSHOT_DATE, fail, validate_cube_request)
 
-
-def load_module(path: Path, name: str):
-    """Use a private module object, never mutate the offline evaluator's imports."""
-    spec = importlib.util.spec_from_file_location(name, path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-def load_policy(data_dir: Path):
-    policy = load_module(data_dir / "sql_policy.py", "_hr_mcp_sql_policy")
-    # Wren emits MAKE_DATE for q13 and the headcount cube. SQLGlot represents
-    # this confirmed DuckDB date constructor as DateFromParts (not Anonymous).
-    policy.SAFE_NODES = policy.SAFE_NODES | frozenset({"datefromparts"})
-    return policy
+from hr_mcp.contracts import MAX_INPUT_BYTES, MAX_OUTPUT_BYTES, MAX_ROWS, MCPQueryError, SNAPSHOT_DATE, fail
+from hr_mcp.cube import validate_cube_request
 
 
 def apply_limits():
     resource.setrlimit(resource.RLIMIT_CPU, (15, 16))
     resource.setrlimit(resource.RLIMIT_FSIZE, (MAX_OUTPUT_BYTES, MAX_OUTPUT_BYTES))
     resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
-    # macOS does not enforce RLIMIT_AS reliably; DuckDB still enforces its own
-    # 512 MB cap there. Linux/Vercel also bounds the planner/process address space.
+    # DuckDB enforces its own memory cap on all platforms. Linux/Vercel also
+    # bounds the planner/process address space; macOS does not reliably do so.
     if sys.platform.startswith("linux"):
         resource.setrlimit(resource.RLIMIT_AS, (2 * 1024**3, 2 * 1024**3))
 
 
 def execute(data_dir: Path, request: dict):
-    mdl = json.loads((data_dir / "mdl.json").read_text(encoding="utf-8"))
-    policy = load_policy(data_dir)
-    semantic, physical = policy.mdl_tables(mdl)
     operation = request.get("operation")
     if operation not in {"plan", "query", "cube"}:
         fail("INVALID_ARGUMENT")
+    from hr_query import sql_policy as policy
+    from hr_query.duckdb_worker import RowLimitExceeded, query as query_database
     from wren_core import SessionContext, cube_query_to_sql
 
+    mdl = json.loads((data_dir / "mdl.json").read_text(encoding="utf-8"))
+    semantic, physical = policy.mdl_tables(mdl)
     if operation == "cube":
-        query = request.get("cube_query", {})
+        query = request.get("cube_query")
+        if not isinstance(query, dict):
+            fail("INVALID_ARGUMENT")
         query = validate_cube_request(mdl, query.get("cube"), query.get("measures"),
                                       query.get("dimensions"), query.get("filters"))
         try:
@@ -82,13 +73,10 @@ def execute(data_dir: Path, request: dict):
         return {"snapshot_date": SNAPSHOT_DATE, "semantic_sql": semantic_sql,
                 "planned_sql": planned_sql, "executed": False,
                 "columns": [], "rows": [], "row_count": 0, "complete": True}
-    query_worker = load_module(data_dir / "sql_worker.py", "_hr_mcp_sql_worker")
     try:
-        result = query_worker.query(str(data_dir / "public.duckdb"), planned_sql, max_rows=MAX_ROWS)
-    except ValueError as exc:
-        if str(exc) == "row limit exceeded; query not scored":
-            fail("ROW_LIMIT")
-        fail("QUERY_FAILED")
+        result = query_database(str(data_dir / "public.duckdb"), planned_sql, max_rows=MAX_ROWS)
+    except RowLimitExceeded:
+        fail("ROW_LIMIT")
     except MemoryError:
         fail("RESOURCE_LIMIT")
     except Exception as exc:
@@ -103,20 +91,25 @@ def execute(data_dir: Path, request: dict):
     return result
 
 
+def read_request(raw: bytes) -> dict:
+    if len(raw) > MAX_INPUT_BYTES:
+        fail("INVALID_ARGUMENT")
+    try:
+        request = json.loads(raw)
+    except (ValueError, UnicodeError):
+        fail("INVALID_ARGUMENT")
+    if not isinstance(request, dict):
+        fail("INVALID_ARGUMENT")
+    return request
+
+
 def main():
     try:
         apply_limits()
         data_dir = Path(sys.argv[1]).resolve()
-        # SQL is capped at 50k characters; this also bounds escaped input bytes.
-        raw = sys.stdin.buffer.read(512 * 1024 + 1)
-        if len(raw) > 512 * 1024:
-            fail("INVALID_ARGUMENT")
-        request = json.loads(raw)
-        if not isinstance(request, dict):
-            fail("INVALID_ARGUMENT")
+        request = read_request(sys.stdin.buffer.read(MAX_INPUT_BYTES + 1))
         result = execute(data_dir, request)
-        response = {"result": result}
-        encoded = json.dumps(response, ensure_ascii=False, allow_nan=False).encode()
+        encoded = json.dumps({"result": result}, ensure_ascii=False, allow_nan=False).encode()
         if len(encoded) + 1 > MAX_OUTPUT_BYTES:
             fail("OUTPUT_LIMIT")
     except MCPQueryError as exc:

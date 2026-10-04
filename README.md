@@ -22,7 +22,7 @@ python3 -m http.server 8317 --bind 127.0.0.1 \
   --directory hr-delivery/wren-project/apps/hr-overview
 ```
 
-打开 <http://127.0.0.1:8317>。另提供带 Bearer Token 的只读 MCP Streamable HTTP 服务，Vercel 构建配置与接入方法见上述服务文档，实际部署状态以部署记录为准。
+打开 <http://127.0.0.1:8317>。另提供带 Bearer Token 的只读 MCP Streamable HTTP 服务：`hr_mcp/` 负责传输与语义规划，`hr_query/` 提供 MCP 和离线验证共用的 SQL 校验与只读执行，`scripts/prepare_mcp.py` 构建私有数据包。Vercel 构建配置与接入方法见上述服务文档，实际部署状态以部署记录为准。
 
 全部数据均为仿真数据；本项目未实现真实 HR 系统接入、审批写入或按用户/部门授权。MCP Token 允许访问整份仿真数据，浏览器计算也不等于数据访问控制。外部 Agent 的联网方式由其运行环境决定。
 

@@ -6,16 +6,35 @@
 
 ## 组成
 
-- `hr_mcp/server.py`：FastAPI 与官方 MCP SDK 2.3.0，无状态 HTTP、JSON 响应、Token/Host/Origin 校验。
-- `hr_mcp/engine.py`、`worker.py`：Wren 原生规划和受限 DuckDB 查询，独立进程执行与超时控制。
+- `hr_mcp/server.py`：FastAPI 入口与官方 MCP SDK 2.3.0 的装配；无状态 HTTP、JSON 响应、Token/Host/Origin 校验。
+- `hr_mcp/contracts.py`：应用版本、快照日期、数据包格式与执行上限的统一定义。
+- `hr_mcp/runtime.py`、`transport.py`：查询容量、就绪检查与 HTTP 认证/请求防护。
+- `hr_mcp/engine.py`、`worker.py`、`cube.py`：分析 Interface、Wren 原生规划、Cube 请求校验和受限 DuckDB 查询，独立进程执行与超时控制。
+- `hr_query/sql_policy.py`、`duckdb_worker.py`：MCP 与离线验证共用的 SQL 白名单和只读执行代码；包导入不加载 MCP SDK 或 DuckDB。
 - `scripts/prepare_mcp.py`：构建时从确定性种子生成私有 `hr_mcp/data/`，不替换开发用数据库。
-- `pyproject.toml`、`uv.lock`：独立的 Python 3.12 服务依赖，不携带 Wren CLI、embedding、Arrow 或浏览器仪表盘。
-- `vercel.json`：服务入口及执行时长，排除仅用于构建的源数据和测试。
+- `pyproject.toml`、`uv.lock`：独立的 Python 3.12 运行依赖，不携带 Wren CLI、embedding、Arrow 或浏览器仪表盘。
+- `vercel.json`：服务入口及执行时长，排除仅用于构建的源数据和测试；`hr_query/` 随函数源码打包。
 - `scripts/check_mcp.py`：使用官方客户端检验鉴权、工具发现、真实查询与写入拒绝。
+- `scripts/smoke_mcp.py`：使用临时本地端口和内存 Token 启动实际 HTTP 服务，调用官方客户端后关闭；可直接复现本地与 CI 验证。
 
 快照为 **2026-08-31**。模型与数据更新后需要重新构建和部署。构建输入保留在仓库，但最终数据库放在函数私有目录；没有静态文件路由，不能把该目录移到 Vercel `public/`。
 
-## 当前验收状态
+数据包格式 v2 只包含 `public.duckdb`、`mdl.json`、`context.json` 和 `manifest.json`；共享 Python 源码保留在 `hr_query/`，不再复制进 `data/`。清单记录各数据文件哈希、确定性种子、语义定义、运行源码、构建脚本及部署配置的来源哈希，并记录应用版本、可取得的 Git 提交（无 Git 元数据时为 null）、锁文件摘要和实际直接依赖版本。已有 v1 包仅在文件完整、哈希匹配且没有额外文件时升级；合法 v2 包同样检查后替换。构建经过 staging、真实 SQL/Cube 检查和源文件复核后才替换旧包，失败时保留旧包。
+
+MCP CI 在独立的 `.venv` 中安装语义验证工具，先执行 `check_semantics.py --build-check`，再用 `.venv-mcp` 构建并测试函数运行代码。Vercel 构建使用已提交的 `target/mdl.json`；轻量构建只核对来源在构建期间未变化，不能独立证明 YAML 与 MDL 一致。发布前需确认部署提交通过语义一致性检查；CI 必需状态、主分支保护和 Vercel 自动部署是否等待这些检查，本次重构未验证或更改。
+
+## 本次重构验证
+
+2026-10-05 本地执行通过：根目录 MCP/共享查询测试 51 项（其中一个测试回放全部 41 道固定 SQL）、离线验证测试 36 项、独立 Wren CLI 双路径回归 41/41，以及语义静态检查与隔离构建一致性检查。实际 HTTP 官方客户端完成认证、8 个工具、SQL/Cube 在职人数 528、写入拒绝及数据路径 404 验证。私有 v2 包包含 25 表、273,515 行；查询期间使用固定快照 2026-08-31。这些记录不代表自然语言生成准确率，也不代表 Linux CI 或本次 Vercel 公网部署已验证。
+
+```bash
+.venv-mcp/bin/python scripts/prepare_mcp.py
+.venv-mcp/bin/python scripts/smoke_mcp.py
+```
+
+## 历史部署验收
+
+以下记录对应重构前提交，不替代本次代码的 CI 和公网验收；本次重构未部署到 Vercel。
 
 - [PR #5 的 Linux MCP CI](https://github.com/indie-builder/wrenai-hr/actions/runs/37227865181) 已通过：完整 25 表数据包构建、32 项认证/协议/引擎测试，其中包含 41 题原生语义查询与独立标准 SQL 对照，以及 Vercel 隔离依赖加载回归。
 - 首版 Linux 实际安装依赖加私有服务数据包共 **302,967,160 字节**，小于项目 450 MB 预检阈值。Vercel 已成功完成实际构建；平台对依赖进行外置优化，因此 CI 安装目录体积不能直接当作最终函数体积。
@@ -118,8 +137,8 @@ Agent 先获取上下文和模型说明；聚合优先复用 Cube，其他分析
 
 ## 运行边界
 
-- 每实例最多同时执行 2 个引擎操作；其他请求可能排队，调用方应限制并发并设置超时，不建议突发批量调用。每次规划/查询有独立子进程超时，DuckDB 只读并关闭文件/网络扩展访问。SQL 白名单是受信客户端的防护，不等同于多租户操作系统沙箱。
-- HTTP 请求上限 64 KiB；每次查询最长 20 秒，最多 1,000 行，输出另有字节限制。返回的非空值使用字符串以保留数值表示，`complete=true` 表示完整返回；超限返回明确错误，避免将截断结果当作完整答案。
+- 每实例最多同时执行 2 个规划、SQL 或 Cube 操作；额外请求排队最多 5 秒，超时返回 `QUEUE_TIMEOUT`。健康检查和模型/上下文查询使用独立容量，不占用查询名额。已启动同步查询遇到请求取消时，名额在该任务结束后才释放；调用方应限制并发并设置超时，不建议突发批量调用。DuckDB 只读并关闭文件/网络扩展访问。SQL 白名单是受信客户端的防护，不等同于多租户操作系统沙箱。
+- HTTP 请求上限 64 KiB；隔离 worker 启动后每次规划/查询有 20 秒期限，不包含之前的排队和 HTTP 传输时间，不承诺 HTTP 总耗时为 20 秒。最多返回 1,000 行，输出另有字节限制。返回的非空值使用字符串以保留数值表示，`complete=true` 表示完整返回；超限返回明确错误，避免将截断结果当作完整答案。
 - 无状态实例和只读快照适合当前小型仿真数据。更大的数据或频繁更新应改用独立查询后端，不能依赖函数本地文件持续写入。
 - Token 在服务端环境变量中保存，轮换时更新调用方 Secret 并重新部署；当前只接受单个有效 Token。
 - 本地、Linux CI、Vercel 构建、云端 MCP 调用是不同验证层；实际部署状态以部署记录为准。

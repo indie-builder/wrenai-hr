@@ -27,9 +27,11 @@ import math
 from pathlib import Path
 import sys
 
+# Direct script execution must find both the runner and the shared root package.
+sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import run_all as regression
-from sql_policy import PolicyError, mdl_tables, validate_sql
+from hr_query.sql_policy import PolicyError, mdl_tables, validate_sql
 
 
 def write_json(path, value):

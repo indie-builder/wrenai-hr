@@ -35,7 +35,9 @@
 - `hr-delivery/wren-project/apps/hr-overview/`：仪表盘 HTML、共享查询配置、裁剪后的 MDL、所需 Parquet 和快照清单。
 - `hr-delivery/scripts/export_dashboard.py`：从只读 DuckDB 导出并校验仪表盘依赖；数据库种子不依赖仪表盘产物。
 - `hr-delivery/validation/v2/`：当前统一验证入口；旧版脚本与过时输出已移除。
-- `hr_mcp/`、`scripts/prepare_mcp.py`：独立的只读 Streamable HTTP 服务与构建期私有数据包；Token 由环境变量提供，构建产物不提交。
+- `hr_mcp/`：只读 Streamable HTTP 运行代码；`contracts.py` 统一版本、快照日期、数据包格式与执行上限，`data/` 仅存忽略提交的私有数据产物。
+- `hr_query/`：MCP 与离线验证共用的 SQL policy 和 DuckDB 只读 worker；共享执行代码在此维护。
+- `scripts/prepare_mcp.py`：从确定性种子构建 MCP 数据包，校验来源与查询后替换，保留开发数据库。
 - `vendor/WrenAI/`：本地未修改的上游参考克隆，Git 忽略，其他机器可能不存在。
 - `.venv/`、`.env`、`.wren/memory/`：本地环境、凭据、可重建索引，不提交。
 
@@ -172,7 +174,8 @@ python3 -m http.server 8317 --bind 127.0.0.1 \
 ## MCP 服务
 
 - 部署与接入见 `hr-delivery/docs/mcp-vercel.md`。运行依赖单独使用根 `pyproject.toml` / `uv.lock`，本地使用 `.venv-mcp`，避免覆盖分析演示环境。
-- Vercel 从仓库根构建 `scripts/prepare_mcp.py`，数据放 `hr_mcp/data/` 函数私有目录；不得将数据库或业务上下文放进 `public/` 或配置静态文件路由。
+- Vercel 从仓库根构建 `scripts/prepare_mcp.py`。v2 包在 `hr_mcp/data/` 函数私有目录，仅含数据库、MDL、公开业务上下文和来源清单；共享 Python 源码随 `hr_query/` 打包。不得将数据库或业务上下文放进 `public/` 或配置静态文件路由。
+- 修改语义定义后先通过 `check_semantics.py --build-check`，再构建 MCP 包。MCP CI 在独立语义环境执行该检查，Vercel 轻量构建使用已提交 MDL；发布前确认同一部署提交通过检查，不能把来源哈希当作编译一致性的证明。构建支持完整合法 v1 包升级，目录含额外文件或哈希不符时保留原目录并报错。
 - `/mcp` 使用 Streamable HTTP 与 Bearer Token；`MCP_AUTH_TOKEN` 缺失时必须拒绝服务，不添加开发后门。Token 不提交、不打印、不写入URL；`.env.mcp` 是本地忽略文件。
 - 语义模型及规则仍按上文维护；服务执行保持语义和规划后物理 SQL 两次校验、只读 worker 与资源限制。新增工具不得默认开放写入或文件访问。
 - 服务修改后运行 `python -m unittest discover -s tests -v`，以官方客户端 `scripts/check_mcp.py` 验证认证和工具调用。Linux CI、本地 HTTP 与 Vercel 公网验证分开报告。

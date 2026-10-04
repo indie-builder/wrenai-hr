@@ -27,6 +27,7 @@ PROJECT = ROOT / "wren-project"
 WREN = ROOT.parent / ".venv/bin/wren"
 VENV_PY = ROOT.parent / ".venv/bin/python"
 DUCKDB_FILE = ROOT / "db/duckdb/public.duckdb"
+DUCKDB_WORKER = ROOT.parent / "hr_query/duckdb_worker.py"
 NUM_TOL = 0.011
 
 
@@ -100,7 +101,7 @@ def run_process(argv, *, cwd=None, env=None, timeout=180, input_text=None):
     # Worker emits one class name. Never persist arbitrary stderr from Wren/driver.
     safe_types = {"BinderException", "CatalogException", "ParserException", "IOException",
                   "OutOfMemoryException", "PermissionException", "InvalidInputException",
-                  "ConversionException", "ValueError", "KeyError", "TypeError",
+                  "ConversionException", "ValueError", "RowLimitExceeded", "KeyError", "TypeError",
                   "ModuleNotFoundError", "Error"}
     error_type = proc.stderr.strip() if proc.stderr.strip() in safe_types else None
     return Execution(stdout=proc.stdout if proc.returncode == 0 else "",
@@ -122,7 +123,7 @@ def run_gt(sql, *, db_file=None, python=None, timeout=180):
     if not db_file.is_file():
         return Execution(status="missing_database")
     py = python or (VENV_PY if VENV_PY.exists() else sys.executable)
-    execution = run_process([py, HERE / "sql_worker.py"], timeout=timeout,
+    execution = run_process([py, DUCKDB_WORKER], timeout=timeout,
                             input_text=json.dumps({"database": str(db_file), "sql": sql}))
     if not execution.ok:
         return execution
