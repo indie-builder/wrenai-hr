@@ -1,6 +1,7 @@
 .git
 .github
 .agents
+.claude
 .venv
 .venv-mcp
 vendor
