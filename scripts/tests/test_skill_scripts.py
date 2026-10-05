@@ -7,7 +7,8 @@ import unittest
 from _support import TemporaryScriptTests, cases, load_module
 
 SKILL_SCRIPTS = Path(__file__).resolve().parents[2] / ".agents/skills/semantic-analytics/scripts"
-RUN_ALL, LOAD_DB, SCAFFOLD = (load_module(SKILL_SCRIPTS / f"{name}.py") for name in ("run_all", "load_db", "scaffold"))
+RUN_ALL, LOAD_DB, SCAFFOLD, CONTRACT = (
+    load_module(SKILL_SCRIPTS / f"{name}.py") for name in ("run_all", "load_db", "scaffold", "result_contract"))
 HAS_DUCKDB = importlib.util.find_spec("duckdb") is not None
 HAS_YAML = importlib.util.find_spec("yaml") is not None
 
@@ -64,37 +65,32 @@ class LoadDatabaseTests(TemporaryScriptTests):
 
 
 @cases("check_comparisons", {
-    "non_finite_numbers_fail_even_when_identical": tuple((f"v\n{left}\n", f"v\n{right}\n", False, {}) for left, right in
-        (("NaN", "1"), ("1", "NaN"), ("NaN", "NaN"), ("Infinity", "Infinity"), ("-Infinity", "-Infinity"))),
-    "zero_tolerance_rejects_approximate_values": (
-        ("v\n1.000\n", "v\n1.005\n", True, {}), ("v\n1.000\n", "v\n1.005\n", False, {"tolerance": 0})),
-    "decimal_comparison_preserves_precision_and_tolerance_boundary": (
-        ("v\n9007199254740992\n", "v\n9007199254740993\n", False, {"tolerance": 0}),
-        ("v\n0.1\n", "v\n0.101\n", True, {"tolerance": "0.001"}), ("v\n0.1\n", "v\n0.101000000000000001\n", False, {"tolerance": "0.001"})),
-    "boolean_case_and_short_forms_are_normalized": tuple(
-        ("flag\nTrue\nFalse\n", right, True, {}) for right in ("flag\ntrue\nfalse\n", "flag\nt\nf\n")),
     "multiset_permutation_passes_unordered_and_fails_ordered": tuple(
         ("v\n2\n1\n2\n", "v\n2\n2\n1\n", not ordered, {"ordered": ordered, "tolerance": 0}) for ordered in (False, True)),
-    "multiset_preserves_duplicate_counts": (("v\n2\n1\n2\n", "v\n1\n2\n1\n", False, {"tolerance": 0}),),
-    "numeric_multiset_matches_across_lexical_sort_boundary": (("v\n10.000\n10.009\n", "v\n9.999\n10.001\n", True, {"tolerance": "0.008"}),),
+    "zero_tolerance_rejects_approximate_values": (
+        ("v\n1.000\n", "v\n1.005\n", True, {}), ("v\n1.000\n", "v\n1.005\n", False, {"tolerance": 0})),
+    "boolean_case_and_short_forms_are_normalized": tuple(
+        ("flag\nTrue\nFalse\n", right, True, {}) for right in ("flag\ntrue\nfalse\n", "flag\nt\nf\n")),
+    "non_finite_numbers_fail_even_when_identical": (("v\nNaN\n", "v\nNaN\n", False, {}),),
     "empty_results_require_explicit_permission": tuple(
         (text, text, allowed and bool(text), {"allow_empty": allowed}) for text in ("v\n", "") for allowed in (False, True)),
     "truncated_csv_is_rejected": (("v\n1\n", "v\n1", False, {}),),
-    "badrow_csv_is_rejected": (("v\n1\n", "v\n1,2\n", False, {}),),
-    "duplicateheader_csv_is_rejected": (("v,v\n1,2\n", "v,v\n1,2\n", False, {}),),
 })
 class CompareTests(unittest.TestCase):
+    # 冒烟集：完整比对契约矩阵在 hr-demo/validation/v2/tests/test_validation.py 维护。
     def check_comparisons(self, *rows):
         for gt, wren, expected, options in rows:
             with self.subTest(gt=gt, wren=wren, options=options):
-                ok, message = RUN_ALL.compare(gt, wren, **options)
+                ok, message = CONTRACT.compare(gt, wren, **options)[:2]
                 self.assertEqual(ok, expected, message)
 
 
 @unittest.skipUnless(HAS_DUCKDB, "duckdb 未安装：跳过 runner 双路径回归")
 @cases("check_failure", {
-    "nonzero_exit_is_sanitized_cleans_csv_and_continues": ("stub_fail", "Wren执行失败: exit=1", 3),
-    "timeout_fails_without_csv_and_continues": ("stub_timeout", "Wren执行超时(>1s)", 1),
+    "nonzero_exit_is_sanitized_cleans_csv_and_continues":
+        ("stub_fail", "执行失败 GT=ok (exit=0) Wren=process_error (exit=1)", 3),
+    "timeout_fails_without_csv_and_continues":
+        ("stub_timeout", "执行失败 GT=ok (exit=0) Wren=timeout (exit=None)", 1),
 })
 class RunnerExecutionTests(TemporaryScriptTests):
     PRIVATE_ERROR = "private-error-marker token=fake-test-token"
