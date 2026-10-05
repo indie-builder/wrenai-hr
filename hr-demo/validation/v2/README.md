@@ -29,7 +29,7 @@ python3 hr-demo/validation/v2/run_all.py --output-dir hr-demo/validation/v2/runs
 ```bash
 # 验证程序、数据构建与仪表盘导出工具的单元及集成测试
 .venv/bin/python -m unittest discover -s hr-demo/validation/v2/tests -v
-# YAML/规则静态检查，以及隔离构建与 target 的一致性
+# YAML/规则静态检查，轻量编译与隔离 Wren 构建及存在的本地 target 一致性
 .venv/bin/python hr-demo/validation/v2/check_semantics.py --build-check
 # 页面快照哈希、源数据和全部页面查询的一致性
 .venv/bin/python hr-demo/scripts/export_dashboard.py --check

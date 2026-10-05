@@ -319,6 +319,7 @@ source .venv/bin/activate
 |        | 当前仪表盘地址：http://127.0.0.1:8317                                                     |
 |        | 如果预览服务未运行，可在另一个终端执行：                                                  |
 |        | cd <wrenai-hr 克隆路径>                                                                   |
+|        | .venv/bin/python hr-demo/scripts/export_dashboard.py                                      |
 |        | python3 -m http.server 8317 --bind 127.0.0.1 \                                            |
 |        | --directory hr-demo/wren-project/apps/hr-overview                                     |
 |        |                                                                                           |

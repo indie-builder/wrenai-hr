@@ -71,22 +71,26 @@ class AnalyticsEngine:
         return result
 
     def list_models(self) -> list:
-        return [{"name": item["name"], "kind": item["kind"], "description": item["description"]}
-                for item in self._models.values()]
+        return self._summaries(self._models, ("name", "kind", "description"))
 
     def describe_model(self, name: str) -> dict:
-        if not isinstance(name, str) or name not in self._models:
-            fail("MODEL_NOT_FOUND")
-        return copy.deepcopy(self._models[name])
+        return self._describe(self._models, name, "MODEL_NOT_FOUND")
 
     def list_cubes(self) -> list:
-        return [{"name": item["name"], "description": item["description"]}
-                for item in self._cubes.values()]
+        return self._summaries(self._cubes, ("name", "description"))
 
     def describe_cube(self, name: str) -> dict:
-        if not isinstance(name, str) or name not in self._cubes:
-            fail("CUBE_NOT_FOUND")
-        return copy.deepcopy(self._cubes[name])
+        return self._describe(self._cubes, name, "CUBE_NOT_FOUND")
+
+    @staticmethod
+    def _summaries(items, fields):
+        return [{field: item[field] for field in fields} for item in items.values()]
+
+    @staticmethod
+    def _describe(items, name, error):
+        if not isinstance(name, str) or name not in items:
+            fail(error)
+        return copy.deepcopy(items[name])
 
     def plan_sql(self, sql: str) -> QueryResult:
         return self._sql("plan", sql)

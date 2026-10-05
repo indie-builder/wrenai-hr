@@ -17,11 +17,12 @@
 环境:
   WREN_BIN  wren CLI 路径 (默认取 PATH 上的 wren)
 """
-import argparse, csv, hashlib, io, math, os, re, shutil, subprocess, sys
-from decimal import Decimal, InvalidOperation
+import argparse, csv, hashlib, math, os, re, shutil, subprocess, sys
 from pathlib import Path
 
-DEFAULT_TOL = 0.011
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from result_contract import (NUM_TOL as DEFAULT_TOL, compare as compare_results,
+                             norm_cell, numeric_tolerance, parse_csv, rows_equal)
 DEFAULT_TIMEOUT = 180
 # 可写入 summary 的错误类别白名单; 其余 stderr 一律归类, 避免异常原文 (可能含连接串) 落盘
 SAFE_ERROR_TYPES = {
@@ -62,6 +63,15 @@ def load_env(project: Path):
         env.setdefault(key, value.strip())
     return env
 
+def run_process(command, *, timeout, **options):
+    """Return complete process output, or an explicit timeout without partial evidence."""
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, timeout=timeout, **options)
+        return result.stdout, result.stderr, result.returncode
+    except subprocess.TimeoutExpired:
+        return "", "", None
+
+
 def run_gt_duckdb(sql: str, db: str, timeout: float):
     """duckdb 只读挂载执行 gt SQL。返回 (stdout, stderr, returncode); returncode=None 表示超时。"""
     code = (
@@ -75,114 +85,34 @@ def run_gt_duckdb(sql: str, db: str, timeout: float):
         "finally:\n"
         "    con.close()\n"
     )
-    try:
-        p = subprocess.run([sys.executable, "-c", code, sql], capture_output=True, text=True, timeout=timeout)
-    except subprocess.TimeoutExpired:
-        return "", "", None
-    return p.stdout, p.stderr, p.returncode
+    return run_process([sys.executable, "-c", code, sql], timeout=timeout)
 
 def run_wren(sql: str, wren: str, project: Path, env, timeout: float):
     """wren query 经语义层执行。返回 (stdout, stderr, returncode); returncode=None 表示超时。"""
-    try:
-        p = subprocess.run([wren, "query", "--sql", sql, "-o", "csv", "-q"],
-                           capture_output=True, text=True, timeout=timeout,
-                           cwd=str(project), env=env)
-    except subprocess.TimeoutExpired:
-        return "", "", None
-    return p.stdout, p.stderr, p.returncode
+    return run_process([wren, "query", "--sql", sql, "-o", "csv", "-q"],
+                       timeout=timeout, cwd=str(project), env=env)
 
-def parse_csv(text):
-    rows = list(csv.reader(io.StringIO(text.strip())))
-    if not rows:
-        return [], []
-    return [h.strip() for h in rows[0]], rows[1:]
-
-def norm_cell(cell):
-    value = "" if cell is None else str(cell).strip()
-    if value in ("", "NULL", "None"):
-        return ""
-    if value.lower() in ("t", "true"):
-        return "true"
-    if value.lower() in ("f", "false"):
-        return "false"
-    return value
-
-def cell_key(cell):
-    value = norm_cell(cell)
-    try:
-        return ("n", Decimal(value))
-    except InvalidOperation:
-        return ("s", value)
-
-def numeric_tolerance(value):
-    try:
-        tolerance = Decimal(str(value))
-    except InvalidOperation:
-        raise ValueError("tolerance必须为非负有限数值") from None
-    if not tolerance.is_finite() or tolerance < 0:
-        raise ValueError("tolerance必须为非负有限数值")
-    return tolerance
-
-def rows_equal(left, right, tol):
-    if len(left) != len(right):
-        return False
-    for a, b in zip(left, right):
-        ka, kb = cell_key(a), cell_key(b)
-        if ka[0] != kb[0]:
-            return False
-        if ka[0] == "n":
-            # NaN/Infinity 代表无效指标, 即使两侧同为 NaN 也不算一致
-            if not ka[1].is_finite() or not kb[1].is_finite() or abs(ka[1] - kb[1]) > tol:
-                return False
-        elif ka[1] != kb[1]:
-            return False
-    return True
-
-def compare(gt_text, wren_text, *, ordered=False, allow_empty=False, tolerance=DEFAULT_TOL):
-    tol = numeric_tolerance(tolerance)
-    if not isinstance(ordered, bool) or not isinstance(allow_empty, bool):
-        raise ValueError("ordered和allow_empty必须为bool")
-    gh, gr = parse_csv(gt_text)
-    wh, wr = parse_csv(wren_text)
-    if gh != wh:
-        return False, f"列名不一致 gt={gh} wren={wh}"
-    if len(gr) != len(wr):
-        return False, f"行数不一致 gt={len(gr)} wren={len(wr)}"
-    if not gr:
-        return (True, "OK (允许空结果)") if allow_empty else (False, "空结果")
-    if ordered:
-        for i, (a, b) in enumerate(zip(gr, wr), 1):
-            if not rows_equal(a, b, tol):
-                return False, f"第{i}行不一致 (有序比对)"
-    else:
-        # 多重集比对保留重复行计数: 词法排序会误配 9.999/10.001 这类近似值,
-        # 贪心可能占错行, 失败时用回溯 (增广路径) 找等价匹配
-        candidates = [[j for j, row in enumerate(wr) if rows_equal(a, row, tol)] for a in gr]
-        assigned = {}
-
-        def match(index, seen):
-            for j in candidates[index]:
-                if j in seen:
-                    continue
-                seen.add(j)
-                if j not in assigned or match(assigned[j], seen):
-                    assigned[j] = index
-                    return True
-            return False
-
-        for i in sorted(range(len(gr)), key=lambda i: len(candidates[i])):
-            if not match(i, set()):
-                return False, f"第{i + 1}行无等价匹配 (多重集比对)"
-    return True, "OK"
+def compare(gt_text, wren_text, **options):
+    # Complete CSV is required; a header-only result can explicitly allow no rows.
+    return compare_results(gt_text, wren_text, **options)[:2]
 
 def last_stderr_line(stderr_text):
     lines = (stderr_text or "").strip().splitlines()
     return lines[-1].strip() if lines else ""
 
-def error_type(stderr_text, rc):
-    """summary 用的错误类别; 未知 stderr 不落原文, 只记退出码。"""
-    last = last_stderr_line(stderr_text)
-    return last if last in SAFE_ERROR_TYPES else f"exit={rc}"
+def evaluate(question, outputs, timeout, tolerance=None):
+    for side, (text, stderr, rc) in outputs.items():
+        if rc is None:
+            return False, f"{side}执行超时(>{timeout:g}s)"
+        if rc:
+            last = last_stderr_line(stderr)
+            return False, f"{side}执行失败: {last if last in SAFE_ERROR_TYPES else f'exit={rc}'}"
+    try:
+        return compare(outputs["GT"][0], outputs["Wren"][0],
+                       ordered=question.get("ordered", False), allow_empty=question.get("allow_empty", False),
+                       tolerance=question.get("tolerance", DEFAULT_TOL) if tolerance is None else tolerance)
+    except ValueError as exc:
+        return False, f"题库元数据错误: {exc}"
 
 def subset_key(args, qs):
     if args.domain and not args.only:
@@ -235,32 +165,12 @@ def main():
     results_log = []
     for q in qs:
         qid = q["id"]
-        gt_out, gt_err, gt_rc = run_gt_duckdb(q["gt"], db_path, args.timeout)
-        wren_out, wren_err, wren_rc = run_wren(q["wren"], wren, project, env, args.timeout)
-        if gt_rc is None:
-            ok, msg = False, f"GT执行超时(>{args.timeout:g}s)"
-            summary_msg = msg
-        elif wren_rc is None:
-            ok, msg = False, f"Wren执行超时(>{args.timeout:g}s)"
-            summary_msg = msg
-        elif gt_rc != 0:
-            detail = last_stderr_line(gt_err)
-            ok, msg = False, f"GT执行失败: {detail[:160] if detail else f'退出码={gt_rc}'}"
-            summary_msg = f"GT执行失败: {error_type(gt_err, gt_rc)}"
-        elif wren_rc != 0:
-            detail = last_stderr_line(wren_err)
-            ok, msg = False, f"Wren执行失败: {detail[:160] if detail else f'退出码={wren_rc}'}"
-            summary_msg = f"Wren执行失败: {error_type(wren_err, wren_rc)}"
-        else:
-            tol = args.tol if args.tol is not None else q.get("tolerance", DEFAULT_TOL)
-            try:
-                ok, msg = compare(gt_out, wren_out, ordered=q.get("ordered", False),
-                                  allow_empty=q.get("allow_empty", False), tolerance=tol)
-                summary_msg = msg
-            except ValueError as e:
-                ok, msg, summary_msg = False, f"题库元数据错误: {e}", f"题库元数据错误: {e}"
+        outputs = {"GT": run_gt_duckdb(q["gt"], db_path, args.timeout),
+                   "Wren": run_wren(q["wren"], wren, project, env, args.timeout)}
+        ok, msg = evaluate(q, outputs, args.timeout, args.tol)
         # 失败题目不落 CSV, 并清掉上次运行的同名文件, 避免残留过期"证据"
-        for side, text in (("gt", gt_out), ("wren", wren_out)):
+        for label, (text, _, _) in outputs.items():
+            side = label.lower()
             path = out / f"{qid}.{side}.csv"
             if ok:
                 path.write_text(text, encoding="utf-8")
@@ -268,7 +178,7 @@ def main():
                 path.unlink(missing_ok=True)
         results_log.append({"id": qid, "domain": q.get("domain", ""), "priority": q.get("priority", ""),
                             "question": q.get("question", ""), "result": "PASS" if ok else "FAIL",
-                            "msg": summary_msg})
+                            "msg": msg})
         print(f"{'✅' if ok else '❌'} {qid:>5} [{q.get('domain','')}|{q.get('priority','')}] {msg}")
 
     with open(out / "summary.csv", "w", newline="", encoding="utf-8") as f:

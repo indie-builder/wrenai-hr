@@ -2,7 +2,7 @@
 """Build the private MCP bundle from deterministic seeds, without touching the local DB.
 
 Run after uv sync --locked: uv run --no-sync python scripts/prepare_mcp.py
-Requires the locked runtime environment; no profile, Wren CLI or YAML parser.
+Requires the locked environment; builds MDL from YAML without a profile or Wren CLI.
 """
 from __future__ import annotations
 
@@ -11,7 +11,6 @@ import importlib.util
 from importlib.metadata import version
 import json
 from pathlib import Path
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -21,6 +20,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from hr_mcp.contracts import BUNDLE_FILES, BUNDLE_FORMAT_VERSION, SNAPSHOT_DATE, VERSION
 from hr_mcp.engine import AnalyticsEngine, file_digest
+from hr_query.semantic import build_mdl
+from scripts.mcp_context import public_context
 
 LEGACY_BUNDLE_FILES = (*BUNDLE_FILES, "sql_policy.py", "sql_worker.py")
 
@@ -34,9 +35,11 @@ def source_files(root):
     project = root / "hr-demo/wren-project"
     paths = [database / "build_duckdb.py", database / "schema_duckdb.sql",
              database / "seed/attendance_records.parquet", database / "seed/attendance_manifest.json",
-             project / "target/mdl.json", project / "wren_project.yml", project / "relationships.yml",
+             project / "wren_project.yml", project / "relationships.yml",
              root / "scripts/prepare_mcp.py", root / "pyproject.toml", root / "uv.lock",
              root / "vercel.json"]
+    paths.extend((root / "scripts").glob("mcp_*.py"))
+    paths.extend(database.glob("*.py"))
     # Include every runtime source, including new files in a local checkout. The
     # private bundle and interpreter caches are outputs, never source inputs.
     for package in ("hr_mcp", "hr_query"):
@@ -98,52 +101,6 @@ def validate_previous_bundle(output_dir):
             raise ValueError("已有 bundle 文件不完整或哈希不符；保留原目录。")
 
 
-def public_context(mdl, project):
-    """Project schema and business definitions only, never knowledge/sql or GT."""
-    import sqlglot
-
-    def description(item):
-        return item.get("properties", {}).get("description", "")
-
-    def members(items):
-        return [{"name": item["name"], "type": item.get("type"),
-                 "description": description(item),
-                 **({"expression": item["expression"]} if item.get("expression") else {})}
-                for item in items]
-
-    models = [{"name": model["name"], "kind": "model", "description": description(model),
-               "primary_key": model.get("primaryKey"), "columns": members(model.get("columns", []))}
-              for model in mdl.get("models", [])]
-    views = []
-    for view in mdl.get("views", []):
-        tree = sqlglot.parse_one(view["statement"], read="duckdb")
-        views.append({"name": view["name"], "kind": "view", "description": description(view),
-                      "columns": [{"name": item.alias_or_name} for item in tree.selects]})
-    cubes = [{"name": cube["name"], "description": description(cube), "base_object": cube["baseObject"],
-              "measures": members(cube.get("measures", [])),
-              "dimensions": members(cube.get("dimensions", [])),
-              "time_dimensions": members(cube.get("timeDimensions", []))}
-             for cube in mdl.get("cubes", [])]
-    context = {
-        "snapshot_date": SNAPSHOT_DATE, "company": "星辰科技（虚构演示公司）", "data_is_synthetic": True,
-        "instructions": "先读取业务规则与 schema；聚合优先使用 Cube。SQL 使用公开模型名称。"
-                        "当前日期固定为快照日；回答需说明结果、计算口径和时间范围。"
-                        "结果值为字符串或 null，以保留金额精度；执行失败不能解释为零。"
-                        "历史部门统计按当前档案部门，除非显式还原调岗历史。",
-        "models": models, "views": views, "cubes": cubes,
-        "relationships": mdl.get("relationships", []),
-        "cube_filters": {"fields": ["dimension", "operator", "value"],
-                         "operators": ["eq", "neq", "gt", "gte", "lt", "lte", "in", "not_in",
-                                       "contains", "starts_with", "is_null", "is_not_null"],
-                         "value": "比较使用标量；in/not_in 使用 1..50 个标量数组；is_null/is_not_null 不传 value。",
-                         "limits": "至少1个measure；measures、dimensions、filters各最多16项。时间维度可用于filters。"},
-    }
-    for category in ("rules", "glossary"):
-        context[category] = [{"name": path.name, "content": path.read_text(encoding="utf-8")}
-                             for path in sorted((project / "knowledge" / category).glob("*.md"))]
-    return context
-
-
 def build_database(root, destination):
     # Isolated module globals: the source builder retains all input paths; only
     # its output globals point to staging. Never call load_duckdb.sh/default build.
@@ -158,7 +115,7 @@ def build_database(root, destination):
     import duckdb
     with duckdb.connect(str(builder.DB_FILE), read_only=True) as connection:
         return {name: connection.execute(f'SELECT COUNT(*) FROM "{name}"').fetchone()[0]
-                for name in builder.ALL_TABLES}
+                for (name,) in connection.execute("SHOW TABLES").fetchall()}
 
 
 def build_bundle(output_dir: Path, *, root: Path = ROOT):
@@ -173,8 +130,8 @@ def build_bundle(output_dir: Path, *, root: Path = ROOT):
         staged = Path(temporary) / "bundle"
         staged.mkdir()
         table_rows = build_database(root, staged)
-        shutil.copyfile(project / "target/mdl.json", staged / "mdl.json")
-        mdl = json.loads((staged / "mdl.json").read_text(encoding="utf-8"))
+        mdl = build_mdl(project)
+        write_json(staged / "mdl.json", mdl)
         write_json(staged / "context.json", public_context(mdl, project))
         manifest = {
             "format_version": BUNDLE_FORMAT_VERSION, "snapshot_date": SNAPSHOT_DATE,

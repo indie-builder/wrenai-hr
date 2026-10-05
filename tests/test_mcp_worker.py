@@ -7,36 +7,15 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
-import unittest
 from unittest import mock
 
-from fixtures import ROOT, fixture
-from hr_mcp.contracts import MAX_INPUT_BYTES, MCPQueryError, SNAPSHOT_DATE, decode_worker_response
-from hr_mcp.engine import AnalyticsEngine
+from fixtures import BundleCase, worker_call
+from hr_mcp.contracts import MAX_INPUT_BYTES, SNAPSHOT_DATE, decode_worker_response
 
 
-class WorkerTests(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.temp = tempfile.TemporaryDirectory()
-        cls.data = Path(cls.temp.name) / "bundle"
-        fixture(cls.data)
-
-    @classmethod
-    def tearDownClass(cls):
-        cls.temp.cleanup()
-
+class WorkerTests(BundleCase):
     def call(self, request):
-        raw = request if isinstance(request, bytes) else json.dumps(request).encode()
-        completed = subprocess.run(
-            [sys.executable, "-I", "-B", str(ROOT / "hr_mcp/worker.py"), str(self.data)],
-            input=raw, capture_output=True, timeout=20,
-            env={"PATH": os.defpath, "LANG": "C.UTF-8"},
-        )
-        self.assertEqual(completed.returncode, 0)
-        self.assertEqual(completed.stderr, b"")
-        return json.loads(completed.stdout)
-
+        return worker_call(self.data, request)
     def test_plan_query_and_cube_return_complete_results(self):
         for request, rows in (
             ({"operation": "plan", "sql": "SELECT COUNT(*) FROM employees"}, []),
@@ -69,18 +48,11 @@ class WorkerTests(unittest.TestCase):
             payloads.append(json.dumps({"result": {**result, **change}}).encode())
         for raw in payloads:
             with self.subTest(raw=raw):
-                with self.assertRaises(MCPQueryError) as error:
-                    decode_worker_response(raw, "query")
-                self.assertEqual(error.exception.code, "INVALID_RESULT")
-        with self.assertRaises(MCPQueryError) as error:
-            decode_worker_response(b'{"error":{"code":"private-driver-error"}}', "query")
-        self.assertEqual(error.exception.code, "QUERY_FAILED")
-        with self.assertRaises(MCPQueryError) as error:
-            decode_worker_response(json.dumps({"result": result}).encode(), "plan")
-        self.assertEqual(error.exception.code, "INVALID_RESULT")
+                self.assert_code("INVALID_RESULT", decode_worker_response, raw, "query")
+        self.assert_code("QUERY_FAILED", decode_worker_response, b'{"error":{"code":"private-driver-error"}}', "query")
+        self.assert_code("INVALID_RESULT", decode_worker_response, json.dumps({"result": result}).encode(), "plan")
 
     def test_running_process_timeout_reaps_child_and_allows_next_query(self):
-        engine = AnalyticsEngine(self.data)
         real_run = subprocess.run
         with tempfile.TemporaryDirectory() as temporary:
             script = Path(temporary) / "busy.py"
@@ -94,14 +66,8 @@ class WorkerTests(unittest.TestCase):
                                 **{**kwargs, "timeout": 0.5})
 
             with mock.patch("hr_mcp.engine.subprocess.run", side_effect=run_busy):
-                with self.assertRaises(MCPQueryError) as error:
-                    engine.query_sql("SELECT 1")
-            self.assertEqual(error.exception.code, "QUERY_TIMEOUT")
+                self.assert_code("QUERY_TIMEOUT", self.engine.query_sql, "SELECT 1")
             self.assertTrue(pid_file.is_file(), "The child must start executing before timeout")
             with self.assertRaises(ProcessLookupError):
                 os.kill(int(pid_file.read_text()), 0)
-        self.assertEqual(engine.query_sql("SELECT 1")["rows"], [["1"]])
-
-
-if __name__ == "__main__":
-    unittest.main()
+        self.assertEqual(self.engine.query_sql("SELECT 1")["rows"], [["1"]])

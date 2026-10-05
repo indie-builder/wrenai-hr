@@ -52,7 +52,5 @@ python3 hr-demo/validation/v2/run_all.py                     # 全量
 ```
 
 - 每次运行覆盖 `summary.csv` 与 `results/qXX.*.csv`;共享口径改动后跑全量
-- 仪表盘预览:`python3 -m http.server 8317 --bind 127.0.0.1 \
-  --directory hr-demo/wren-project/apps/hr-overview`;数据库更新后必须
-  重新导出 parquet 快照并核对页面数字
+- 仪表盘新检出、数据或模型更新后，按 [快照流程](../../../hr-demo/README.md#仪表盘快照与本地预览) 先构建、导出并检查，再启动预览；核对页面数字。
 - 不为通过测试修改正确业务口径;报告通过率时区分历史记录与本次实际执行
