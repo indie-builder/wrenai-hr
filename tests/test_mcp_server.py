@@ -11,7 +11,7 @@ import anyio
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 
-from fixtures import ENV_KEYS, HEADERS, ROOT, TOKEN, ServerCase, fixture, rpc, sdk_session, touch_bundle
+from fixtures import ENV_KEYS, HEADERS, ROOT, SQL_ATTACK_CANARIES, TOKEN, ServerCase, fixture, rpc, sdk_session, touch_bundle
 from hr_mcp.contracts import BUNDLE_FILES, ERROR_MESSAGES, MCPQueryError, SNAPSHOT_DATE
 from hr_mcp.server import app, create_app
 
@@ -122,7 +122,8 @@ assert not {'hr_mcp.engine', 'hr_query', 'duckdb', 'wren_core', 'sqlglot'} & sys
                     for key, value in expected.items():
                         self.assertEqual(result.structured_content[key], value)
                 if real:
-                    for sql in ("DELETE FROM employees", "SELECT * FROM read_csv('/private-file')"):
+                    # SDK 层金丝雀（写入 + 文件外传）：完整攻击向量清单在 fixtures.SQL_ATTACK_VECTORS。
+                    for sql in SQL_ATTACK_CANARIES[:2]:
                         result = await session.call_tool("query_sql", {"sql": sql})
                         self.assertTrue(result.is_error)
                         self.assertEqual(result.structured_content["error"], {"code": "SQL_REJECTED", "message": ERROR_MESSAGES["SQL_REJECTED"]})

@@ -33,6 +33,55 @@ HEADERS = {**AUTH, "Accept": "application/json, text/event-stream", "MCP-Protoco
 ENV_KEYS = ("MCP_AUTH_TOKEN", "MCP_DATA_DIR", "MCP_ALLOWED_HOSTS", "MCP_ALLOWED_ORIGINS",
             "VERCEL_URL", "VERCEL_PROJECT_PRODUCTION_URL")
 
+# SQL 攻击向量（权威清单）：策略层（test_hr_query）断言全量；引擎/SDK 集成层只取
+# 显式金丝雀子集 SQL_ATTACK_CANARIES 验证接线，不重复枚举同一份清单。
+# CTE 遮蔽（WITH employees AS ...）的正反例在 test_hr_query 的专项用例中单独维护。
+SQL_ATTACK_VECTORS = (
+    "SELECT * FROM read_csv_auto('/etc/passwd')",
+    "SELECT * FROM read_parquet('https://example.com/data')",
+    "SELECT * FROM '/tmp/file.parquet'",
+    "SELECT * FROM glob('/tmp/*')",
+    "SELECT getenv('TOKEN')",
+    "SELECT query('SELECT * FROM employees')",
+    "SELECT * FROM sqlite_scan('/tmp/private.db', 'users')",
+    "SELECT * FROM duckdb_secrets()",
+    "SELECT nextval('s') FROM employees",
+    "SELECT private_macro()",
+    "SELECT * FROM employees; COPY employees TO '/tmp/stolen'",
+    "SELECT * INTO new_table FROM employees",
+    "WITH x AS (DELETE FROM employees RETURNING *) SELECT * FROM x",
+    "SELECT * FROM system.information_schema.tables",
+    "SELECT main.read_blob('/tmp/file')",
+    "PRAGMA version",
+    "INSTALL httpfs",
+    "ATTACH '/tmp/file' AS other",
+    "WITH RECURSIVE x AS (SELECT 1 UNION ALL SELECT 1 FROM x) SELECT * FROM x",
+    "DELETE FROM employees",
+    "SELECT 1; SELECT 2",
+    "SELECT * FROM read_csv('/secret')",
+    "SELECT * FROM '/secret.parquet'",
+    "SELECT * FROM duckdb_settings()",
+    "SELECT * FROM information_schema.tables",
+    "SELECT * FROM other.employees",
+    "COPY (SELECT * FROM employees) TO '/tmp/leak.csv'",
+)
+# 集成层金丝雀：写入 / 文件外传 / 多语句 / 扩展 / 跨 catalog，各取自上面的权威清单。
+SQL_ATTACK_CANARIES = (
+    "DELETE FROM employees",
+    "SELECT * FROM read_csv('/secret')",
+    "SELECT 1; SELECT 2",
+    "INSTALL httpfs",
+    "SELECT * FROM other.employees",
+)
+# Worker 守卫向量：不经 AST 策略，仅靠只读连接与外部访问禁用拦截（in-process query()）。
+# 子进程隔离的孪生回归在 hr-demo/validation/v2/tests/_support.py（跨套件不共享，venv 不同）。
+WORKER_GUARD_SQL = (
+    "DELETE FROM employees",
+    "SELECT * FROM read_csv_auto('/etc/passwd')",
+    "SELECT * FROM read_parquet('https://example.com/data')",
+    "SELECT 1; SELECT 2",
+)
+
 
 def load_module(path: Path, name: str):
     spec = importlib.util.spec_from_file_location(name, path)

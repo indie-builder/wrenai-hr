@@ -5,6 +5,7 @@ import unittest
 
 import duckdb
 
+from fixtures import SQL_ATTACK_VECTORS, WORKER_GUARD_SQL
 from hr_query.duckdb_worker import RowLimitExceeded, query
 from hr_query.sql_policy import MAX_AST_NODES, MAX_SQL_CHARS, PolicyError, validate_sql
 from hr_query.semantic import build_mdl
@@ -17,27 +18,8 @@ class SqlPolicyTests(unittest.TestCase):
         validate_sql("SELECT CAST('2026-08-31' AS DATE) - INTERVAL '90' DAY FROM employees", {"employees"})
 
     def test_file_network_write_and_unknown_function_inputs_are_blocked(self):
-        attacks = [
-            "SELECT * FROM read_csv_auto('/etc/passwd')",
-            "SELECT * FROM read_parquet('https://example.com/data')",
-            "SELECT * FROM '/tmp/file.parquet'",
-            "SELECT * FROM glob('/tmp/*')",
-            "SELECT getenv('TOKEN')",
-            "SELECT query('SELECT * FROM employees')",
-            "SELECT * FROM sqlite_scan('/tmp/private.db', 'users')",
-            "SELECT * FROM duckdb_secrets()",
-            "SELECT nextval('s') FROM employees",
-            "SELECT private_macro()",
-            "SELECT * FROM employees; COPY employees TO '/tmp/stolen'",
-            "SELECT * INTO new_table FROM employees",
-            "WITH x AS (DELETE FROM employees RETURNING *) SELECT * FROM x",
-            "WITH employees AS (SELECT * FROM secret) SELECT * FROM employees",
-            "SELECT * FROM system.information_schema.tables",
-            "SELECT main.read_blob('/tmp/file')",
-            "PRAGMA version", "INSTALL httpfs", "ATTACH '/tmp/file' AS other",
-            "WITH RECURSIVE x AS (SELECT 1 UNION ALL SELECT 1 FROM x) SELECT * FROM x",
-        ]
-        for sql in attacks:
+        # 权威攻击向量清单在 tests/fixtures.py；本用例是策略层的全量断言。
+        for sql in SQL_ATTACK_VECTORS:
             with self.subTest(sql=sql), self.assertRaises(PolicyError):
                 validate_sql(sql, {"employees"})
 
@@ -57,6 +39,8 @@ class SqlPolicyTests(unittest.TestCase):
 
 class DuckDBWorkerTests(unittest.TestCase):
     def setUp(self):
+        # 引号临时目录前缀：与 v2 套件的 hr-test-'、test_build_duckdb 的 hr-owner's-workspace-
+        # 是同一回归点的不同执行路径（in-process query()），各自保留。
         self.temp = tempfile.TemporaryDirectory(prefix="hr-query-'")
         self.addCleanup(self.temp.cleanup)
         self.database = Path(self.temp.name) / "public.duckdb"
@@ -81,8 +65,7 @@ class DuckDBWorkerTests(unittest.TestCase):
         self.assertTrue(result["complete"])
 
     def test_readonly_and_external_access_guards_work_without_ast_policy(self):
-        for sql in ("DELETE FROM employees", "SELECT * FROM read_csv_auto('/etc/passwd')",
-                    "SELECT * FROM read_parquet('https://example.com/data')", "SELECT 1; SELECT 2"):
+        for sql in WORKER_GUARD_SQL:
             with self.subTest(sql=sql), self.assertRaises((ValueError, duckdb.Error)):
                 query(str(self.database), sql)
         with duckdb.connect(str(self.database), read_only=True) as connection:

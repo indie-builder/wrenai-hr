@@ -1,10 +1,9 @@
 """Supported YAML edge cases agree with the installed official Wren compiler."""
+import _support
 from pathlib import Path
-import sys
 import tempfile
 import unittest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
 from hr_query.semantic import build_mdl
 from scripts.mcp_context import public_context
 from wren.context import build_json

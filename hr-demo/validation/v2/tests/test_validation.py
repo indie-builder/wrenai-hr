@@ -1,4 +1,5 @@
 """Result and query failure contracts; never touch the delivery DB/profile/results."""
+import _support
 import contextlib
 import io
 import json
@@ -8,7 +9,6 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import query_execution as execution
 import run_all as runner
 from result_contract import compare, compare_tables, parse_csv, rows_equal
@@ -137,14 +137,15 @@ class ExecutionTests(unittest.TestCase):
 class WorkerTests(unittest.TestCase):
     def test_readonly_database_handles_quote_in_path_and_disables_external_access(self):
         import duckdb
+        # 引号临时目录前缀：与 test_build_duckdb 的 hr-owner's-workspace-、根目录套件的
+        # hr-query-' 是同一回归点的不同执行路径（run_gt 子进程），各自保留。
         with tempfile.TemporaryDirectory(prefix="hr-test-'") as directory:
             database = Path(directory) / "public.duckdb"
-            with duckdb.connect(str(database)) as connection:
-                connection.execute("CREATE TABLE employees(id INTEGER); INSERT INTO employees VALUES (1), (2)")
+            _support.create_two_employee_database(database)
             result = execution.run_gt("SELECT count(*) AS n FROM employees", db_file=database, python=sys.executable)
             self.assertTrue(result.ok, result.trace())
             self.assertEqual(parse_csv(result.stdout), (["n"], [["2"]]))
-            for sql in ("DELETE FROM employees", "SELECT * FROM read_csv_auto('/etc/passwd')", "SELECT 1; SELECT 2"):
+            for sql in _support.WORKER_ATTACK_SQL:
                 with self.subTest(sql=sql):
                     self.assertFalse(execution.run_gt(sql, db_file=database, python=sys.executable).ok)
             limited = execution.run_gt("SELECT i FROM range(10001) t(i)", db_file=database, python=sys.executable)
