@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
-"""Offline NL→SQL evaluation: export an answer-free package, then score real JSONL.
+"""Export answer-free NL questions and score submitted JSONL with independent GT.
 
-Never calls a model or labels fixed SQL replay as NL generation. Required record
-fields: id, original question, generated_sql, context_refs; optional model and
-run_metadata. Raw SQL/results are retained; display precision affects comparison
-copies only. Missing generation, policy, planning, execution and answer failures
-remain separate outcomes. Provenance of submitted records belongs to the operator.
+Raw SQL/results and failure stages are retained. Display precision applies only
+inside comparison. This runner never generates SQL or measures live model accuracy.
 """
 import argparse
 from collections import Counter
@@ -18,22 +15,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from hr_query.sql_policy import PolicyError, mdl_tables, validate_sql
 from questions import QUESTIONS
-from query_execution import (DUCKDB_FILE, PROJECT, WREN, digest, positive_timeout, run_gt,
-                             run_process, write_json, write_results, write_summary)
-from result_contract import compare_tables, comparison_options, parse_csv
-from query_execution import regression_questions
-from eval_protocol import export_package, load_records, normalize_display, output_schema
-
-
-def compare_answer(gt, actual, question):
-    # Aliases are presentation; public column positions and precision are binding.
-    gh, gr = parse_csv(gt)
-    ah, ar = parse_csv(actual)
-    schema = output_schema(question)
-    if len(gh) != len(ah) or len(gh) != len(schema):
-        return False, "列数不符合公开output_schema", gh
-    return compare_tables(gh, normalize_display(gr, schema), gh, normalize_display(ar, schema),
-                          **comparison_options(question))
+from query_execution import (DUCKDB_FILE, PROJECT, WREN, digest, positive_timeout, regression_questions,
+                             run_gt, run_process, write_json, write_results, write_summary)
+from result_contract import compare, comparison_options
+from eval_protocol import export_package, load_records, output_schema
 
 
 def evaluate_question(question, record, error, *, manifest, project, mdl, database, timeout):
@@ -44,7 +29,7 @@ def evaluate_question(question, record, error, *, manifest, project, mdl, databa
              "generation_record": record}
     if error:
         return "INVALID_GENERATION", error, trace, {}
-    if not record or not record.get("generated_sql", "") or not record["generated_sql"].strip():
+    if not record or not (record["generated_sql"] or "").strip():
         return "NOT_GENERATED", "没有生成SQL", trace, {}
     semantic, physical = mdl_tables(manifest)
     try:
@@ -71,11 +56,10 @@ def evaluate_question(question, record, error, *, manifest, project, mdl, databa
     if not gt.ok:
         return "GT_FAILED", gt.message(), trace, outputs
     outputs["gt"] = gt.stdout
-    try:
-        ok, message, _ = compare_answer(gt.stdout, actual.stdout, question)
-    except ValueError as exc:
-        return "INVALID_OUTPUT", str(exc), trace, outputs
-    return ("PASS" if ok else "RESULT_DIFFERENCE"), message, trace, outputs
+    ok, message, columns = compare(gt.stdout, actual.stdout, output_schema=trace["comparison"]["output_schema"],
+                                   **comparison_options(question))
+    status = "INVALID_OUTPUT" if not columns else "PASS" if ok else "RESULT_DIFFERENCE"
+    return status, message, trace, outputs
 
 
 def run_evaluation(directory, questions, records_path, project, database, timeout):
@@ -107,7 +91,7 @@ def run_evaluation(directory, questions, records_path, project, database, timeou
         "generation_performed_by_this_runner": False,
         "note": "仅评价提交记录；NOT_GENERATED包含在总分母，不代表实时模型准确率。",
     })
-    return 0 if counts["PASS"] == len(questions) else 1
+    return int(counts["PASS"] != len(questions))
 
 
 def main(argv=None):

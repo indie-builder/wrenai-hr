@@ -56,7 +56,9 @@ def execute(data_dir: Path, request: dict):
         query = request.get("cube_query")
         if not isinstance(query, dict):
             fail("INVALID_ARGUMENT")
-        query = validate_cube_request(mdl, query.get("cube"), query.get("measures"),
+        cubes = {item["name"]: item for item in json.loads(
+            (data_dir / "context.json").read_text(encoding="utf-8"))["cubes"]}
+        query = validate_cube_request(cubes, query.get("cube"), query.get("measures"),
                                       query.get("dimensions"), query.get("filters"))
         sql = _attempt("PLAN_FAILED", cube_query_to_sql, json.dumps(query, ensure_ascii=False), json.dumps(mdl))
     else:

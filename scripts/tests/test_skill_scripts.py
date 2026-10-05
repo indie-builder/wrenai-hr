@@ -135,6 +135,15 @@ class RunnerExecutionTests(TemporaryScriptTests):
         self.assertEqual(rows[0]["msg"], message)
         self.assertNotIn(self.PRIVATE_ERROR, (self.results / "summary.csv").read_text(encoding="utf-8"))
 
+    def test_invalid_question_module_fails_without_traceback_or_reports(self):
+        for name, source in (("syntax_error", "QUESTIONS = ["), ("import_error", "import missing_question_fixture_module")):
+            with self.subTest(case=name):
+                self.write("questions.py", source)
+                result = self.run_runner()
+                self.assert_exit(result, 1, "题库或项目配置无效")
+                self.assertNotIn("Traceback", result.stderr)
+                self.assertFalse(self.results.exists())
+
     def test_subsets_write_runs_without_overwriting_full_summary(self):
         self.write_questions([self.question("q_one"), self.question("q_two", domain="sales")])
         self.assert_run(self.run_runner(), [("q_one", "PASS"), ("q_two", "PASS")])

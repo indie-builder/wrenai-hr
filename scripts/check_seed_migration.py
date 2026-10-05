@@ -1,21 +1,14 @@
 #!/usr/bin/env python3
 """Compare canonical seeds with the CSV-era database from a Git revision."""
 import argparse
-import importlib.util
 from pathlib import Path
+import runpy
 import subprocess
 import tempfile
 
 import duckdb
 
 ROOT = Path(__file__).resolve().parents[1]
-
-
-def load_builder(path, name):
-    spec = importlib.util.spec_from_file_location(name, path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
 
 
 def main():
@@ -31,9 +24,9 @@ def main():
             path = old / Path(name).relative_to("hr-demo/db")
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(subprocess.check_output(["git", "show", f"{args.baseline}:{name}"], cwd=ROOT))
-        load_builder(old / "build_duckdb.py", "baseline_builder").build()
+        runpy.run_path(str(old / "build_duckdb.py"))["build"]()
         current = Path(folder) / "current.duckdb"
-        load_builder(ROOT / "hr-demo/db/build_duckdb.py", "current_builder").build(current)
+        runpy.run_path(str(ROOT / "hr-demo/db/build_duckdb.py"))["build"](current)
         with duckdb.connect(str(current), read_only=True) as con:
             baseline_path = str(old / "duckdb/public.duckdb").replace("'", "''")
             con.execute(f"ATTACH '{baseline_path}' AS baseline (READ_ONLY)")

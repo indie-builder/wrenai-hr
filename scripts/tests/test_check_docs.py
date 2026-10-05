@@ -64,6 +64,9 @@ def fence(commands, language="bash", indent=""):
         "value = '[not-a-markdown-link](missing.md)'\nPY\n.venv/bin/python - <<-\"PY\"\n\tcd missing\n\tPY\npython scripts/check.py"), []),
     "heredoc_opening_command_still_checks_directory": (
         fence("python3 - --directory absent <<'PY'\nprint('body')\nPY"), ["README.md:2: 目录不存在: absent"]),
+    "continued_commands_keep_start_line_then_resume_after_heredoc": (
+        fence("python scripts/check.py \\\n --directory absent\npython - <<'PY'\ncd missing\nPY\npython missing.py"),
+        ["README.md:2: 目录不存在: absent", "README.md:7: 文件不存在: missing.py"]),
     "historical_range_skips_only_its_commands": ("<!-- docs:historical:start -->\n历史记录\n" + fence("./run_wren.sh") +
         "[old link](missing.md)\n<!-- docs:historical:end -->\n" + fence("python scripts/check.py\npython missing.py"),
         ["README.md:6: 本地链接目标不存在: missing.md", "README.md:10: 文件不存在: missing.py"]),

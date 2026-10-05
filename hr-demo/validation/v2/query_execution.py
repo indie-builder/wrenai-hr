@@ -15,7 +15,7 @@ import shutil
 import subprocess
 import sys
 
-from result_contract import compare, comparison_options, parse_csv, table_csv
+from result_contract import compare, comparison_options, parse_csv, table_csv, validate_table
 
 ROOT = Path(__file__).resolve().parents[2]
 PROJECT = ROOT / "wren-project"
@@ -109,14 +109,12 @@ def run_gt(sql, *, db_file=None, python=None, timeout=180):
         try:
             payload = json.loads(execution.stdout)
             columns, rows = payload["columns"], payload["rows"]
-            if (payload.get("complete") is not True or not isinstance(columns, list) or not columns
-                    or not all(isinstance(column, str) and column for column in columns)
+            if (payload.get("complete") is not True or not isinstance(columns, list)
                     or not isinstance(rows, list)
-                    or not all(isinstance(row, list) and len(row) == len(columns)
+                    or not all(isinstance(row, list)
                                and all(cell is None or isinstance(cell, str) for cell in row) for row in rows)):
                 raise ValueError("invalid envelope")
-            execution.stdout = table_csv(columns, rows)
-            parse_csv(execution.stdout)
+            execution.stdout = table_csv(*validate_table(columns, rows))
         except (ValueError, TypeError, AttributeError, KeyError):
             execution.status, execution.stdout = "invalid_output", ""
     return execution
@@ -139,10 +137,9 @@ def evaluate(question, gt, wren, tolerance=None):
     if not gt.ok or not wren.ok:
         return False, f"执行失败 GT={gt.message()} Wren={wren.message()}"
     try:
-        options = comparison_options(question)
         if tolerance is not None:
-            options["tolerance"] = tolerance
-        ok, message, _ = compare(gt.stdout, wren.stdout, **options)
+            question = {**question, "tolerance": tolerance}
+        ok, message, _ = compare(gt.stdout, wren.stdout, **comparison_options(question))
         return ok, message
     except ValueError as exc:
         return False, f"题库元数据错误: {exc}"

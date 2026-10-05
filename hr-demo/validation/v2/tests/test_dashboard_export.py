@@ -67,12 +67,15 @@ class DashboardPublicationTests(unittest.TestCase):
         self.assertFalse(list(self.app.parent.glob(".hr-overview-*")))
         self.assertFalse(list(self.reports.glob(".hr-overview-results-*")))
 
+    def assert_failed(self, destination=None, check=False):
+        self.assertEqual(self.run_cli(destination, check), 1)
+        self.assert_preserved()
+
     def assert_rejected(self, targets):
         for target in targets:
             for check in (False, True):
                 with self.subTest(target=target, check=check):
-                    self.assertEqual(self.run_cli(target, check), 1)
-                    self.assert_preserved()
+                    self.assert_failed(target, check)
         self.inputs.assert_not_called()
         self.connect.assert_not_called()
 
@@ -96,8 +99,7 @@ class DashboardPublicationTests(unittest.TestCase):
                 raise PermissionError("result directory is not writable")
             return original(*args, **kwargs)
         with patch.object(snapshot.tempfile, "TemporaryDirectory", side_effect=create):
-            self.assertEqual(self.run_cli(self.result), 1)
-        self.assert_preserved()
+            self.assert_failed(self.result)
 
     def test_partial_result_write_preserves_old_app_and_result(self):
         original = Path.write_bytes
@@ -107,8 +109,7 @@ class DashboardPublicationTests(unittest.TestCase):
                 raise OSError("result write failed")
             return original(path, data)
         with patch.object(Path, "write_bytes", write):
-            self.assertEqual(self.run_cli(self.result), 1)
-        self.assert_preserved()
+            self.assert_failed(self.result)
 
     def test_result_replace_failure_preserves_app_and_result_in_both_modes(self):
         original = Path.replace
@@ -119,8 +120,7 @@ class DashboardPublicationTests(unittest.TestCase):
                     raise PermissionError("result replacement denied")
                 return original(path, target)
             with self.subTest(check=check), patch.object(Path, "replace", replace):
-                self.assertEqual(self.run_cli(self.result, check), 1)
-            self.assert_preserved()
+                self.assert_failed(self.result, check)
 
     def test_app_install_failure_preserves_old_app_and_result(self):
         original = Path.rename
@@ -129,19 +129,16 @@ class DashboardPublicationTests(unittest.TestCase):
                 raise OSError("app installation failed")
             return original(path, target)
         with patch.object(Path, "rename", rename):
-            self.assertEqual(self.run_cli(self.result), 1)
-        self.assert_preserved()
+            self.assert_failed(self.result)
 
     def test_validation_failure_does_not_publish_result(self):
         for check, mocked in ((False, self.validate), (True, self.check)):
             with self.subTest(check=check), patch.object(mocked, "side_effect", ValueError("invalid snapshot")):
-                self.assertEqual(self.run_cli(self.result, check), 1)
-                self.assert_preserved()
+                self.assert_failed(self.result, check)
 
     def test_export_input_drift_does_not_publish_result(self):
         with patch.object(snapshot, "input_hashes", side_effect=[{}, {"changed": True}]):
-            self.assertEqual(self.run_cli(self.result), 1)
-        self.assert_preserved()
+            self.assert_failed(self.result)
 
     def test_success_publishes_app_and_atomically_replaces_result(self):
         original, replacements = Path.replace, []
@@ -201,6 +198,14 @@ class DashboardBoundaryTests(unittest.TestCase):
                     path.write_text("updated")
                     self.assertNotEqual(initial["exporter_sha256"], snapshot.input_hashes(*paths[:2])["exporter_sha256"])
                     path.write_text("initial")
+
+    def test_normalization_preserves_ties_and_places_nulls_last_in_both_directions(self):
+        rows = [{"a": a, "b": b, "id": i} for i, (a, b) in enumerate(
+            [(1, None), (None, 2), (1, 2), (1, 2), (2, 1), (2, None)])]
+        for direction, expected in (("asc", [2, 3, 0, 4, 5, 1]), ("desc", [4, 5, 2, 3, 0, 1])):
+            query = {"sort": [{"field": "a", "direction": direction}, {"field": "b", "direction": "desc"}]}
+            with self.subTest(direction=direction):
+                self.assertEqual([row["id"] for row in snapshot.normalize_rows(rows, query)], expected)
 
     def test_result_contract_rejects_empty_order_field_and_nonfinite_differences(self):
         snapshot.assert_rows([{"v": 1.011}], [{"v": 1}], "boundary")

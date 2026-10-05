@@ -11,7 +11,7 @@ import anyio
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 
-from fixtures import ENV_KEYS, HEADERS, ROOT, SQL_ATTACK_CANARIES, TOKEN, ServerCase, fixture, rpc, sdk_session, touch_bundle
+from fixtures import ENV_KEYS, HEADERS, ROOT, SQL_ATTACK_CANARIES, TOKEN, ServerCase, fixture, rpc, sdk_session, temporary_directory, touch_bundle
 from hr_mcp.contracts import BUNDLE_FILES, ERROR_MESSAGES, MCPQueryError, SNAPSHOT_DATE
 from hr_mcp.server import app, create_app
 
@@ -129,7 +129,6 @@ assert not {'hr_mcp.engine', 'hr_query', 'duckdb', 'wren_core', 'sqlglot'} & sys
                         self.assertEqual(result.structured_content["error"], {"code": "SQL_REJECTED", "message": ERROR_MESSAGES["SQL_REJECTED"]})
                         self.assertEqual(json.loads(result.content[0].text), result.structured_content)
         anyio.run(exercise, self.client().app, False)
-        with tempfile.TemporaryDirectory() as folder:
-            data = Path(folder) / "bundle"
-            fixture(data)
-            anyio.run(exercise, self.client(engine=None, data_dir=data).app, True)
+        data = temporary_directory(self) / "bundle"
+        fixture(data)
+        anyio.run(exercise, self.client(engine=None, data_dir=data).app, True)

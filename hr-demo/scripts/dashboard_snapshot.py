@@ -1,7 +1,6 @@
 """Read-only snapshot verification and atomic publication."""
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from decimal import Decimal, ROUND_HALF_UP
-from functools import cmp_to_key
 import hashlib
 import importlib.metadata
 import json
@@ -41,17 +40,12 @@ def normalize_rows(rows, query):
     result = [{alias: field_value(row, rule) for alias, rule in
                query.get("fields", {key: key for key in row}).items()} for row in rows]
 
-    def compare(a, b):
-        for rule in query.get("sort", []):
-            x, y = a[rule["field"]], b[rule["field"]]
-            if x is None or y is None:
-                difference = (x is None) - (y is None)
-            else:
-                difference = ((x > y) - (x < y)) * (-1 if rule.get("direction") == "desc" else 1)
-            if difference:
-                return difference
-        return 0
-    return sorted(result, key=cmp_to_key(compare))
+    for rule in reversed(query.get("sort", [])):
+        field = rule["field"]
+        values = [row for row in result if row[field] is not None]
+        missing = [row for row in result if row[field] is None]
+        result = sorted(values, key=lambda row: row[field], reverse=rule.get("direction") == "desc") + missing
+    return result
 
 
 def canonical(value):
@@ -204,17 +198,12 @@ def export(con, app, source, mdl, spec, plans, inputs, input_paths, results_path
         results = validate_results(con, staged, source, spec, plans)
         require_equal((inputs, before), (input_hashes(*input_paths), authored_hashes(app)), "导出期间源 MDL、查询配置或页面已变更；请重试")
         with staged_results(results_path, results) as result_file:
-            backup = root / "previous"
-            app.rename(backup)
-            installed = False
-            try:
+            with ExitStack() as rollback:
+                backup = app.rename(root / "previous")
+                rollback.callback(backup.rename, app)
                 staged.rename(app)
-                installed = True
+                rollback.callback(app.rename, staged)
                 if result_file is not None:
                     result_file.replace(results_path)
-            except BaseException:
-                if installed:
-                    app.rename(staged)
-                backup.rename(app)
-                raise
+                rollback.pop_all()
         return results

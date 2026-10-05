@@ -1,11 +1,9 @@
 """Shared SQL Interface tests with real temporary DuckDB databases."""
-from pathlib import Path
-import tempfile
 import unittest
 
 import duckdb
 
-from fixtures import SQL_ATTACK_VECTORS, WORKER_GUARD_SQL
+from fixtures import SQL_ATTACK_VECTORS, WORKER_GUARD_SQL, temporary_directory
 from hr_query.duckdb_worker import RowLimitExceeded, query
 from hr_query.sql_policy import MAX_AST_NODES, MAX_SQL_CHARS, PolicyError, validate_sql
 from hr_query.semantic import build_mdl
@@ -41,9 +39,7 @@ class DuckDBWorkerTests(unittest.TestCase):
     def setUp(self):
         # 引号临时目录前缀：与 v2 套件的 hr-test-'、test_build_duckdb 的 hr-owner's-workspace-
         # 是同一回归点的不同执行路径（in-process query()），各自保留。
-        self.temp = tempfile.TemporaryDirectory(prefix="hr-query-'")
-        self.addCleanup(self.temp.cleanup)
-        self.database = Path(self.temp.name) / "public.duckdb"
+        self.database = temporary_directory(self, prefix="hr-query-'") / "public.duckdb"
         with duckdb.connect(str(self.database)) as connection:
             connection.execute("CREATE TABLE employees(id INTEGER, amount DECIMAL(18,2), note VARCHAR)")
             connection.execute("INSERT INTO employees VALUES (1, 12345678901234.56, NULL), (2, 0.01, 'example')")
@@ -74,9 +70,7 @@ class DuckDBWorkerTests(unittest.TestCase):
 
 class SemanticBuildTests(unittest.TestCase):
     def setUp(self):
-        temporary = tempfile.TemporaryDirectory()
-        self.addCleanup(temporary.cleanup)
-        self.project = Path(temporary.name)
+        self.project = temporary_directory(self)
         self.write("wren_project.yml", "schema_version: 5\ndata_source: duckdb\n")
         self.write("relationships.yml", "relationships: []\n")
 

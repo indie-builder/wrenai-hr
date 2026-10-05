@@ -1,14 +1,13 @@
 """Event-coordinated admission, cancellation, failure and readiness contracts."""
 from contextlib import asynccontextmanager
 from pathlib import Path
-import tempfile
 import threading
 import unittest
 from unittest.mock import Mock, patch
 
 import anyio
 
-from fixtures import ErrorAssertions, TOKEN, touch_bundle
+from fixtures import ErrorAssertions, TOKEN, temporary_directory, touch_bundle
 from hr_mcp.contracts import ERROR_MESSAGES, MCPQueryError
 from hr_mcp.runtime import Runtime
 
@@ -183,45 +182,42 @@ class RuntimeTests(ErrorAssertions, unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.engine.maximum, 2)
 
     async def test_readiness_initialization_has_capacity_separate_from_queries(self):
-        with tempfile.TemporaryDirectory() as folder:
-            data = Path(folder)
-            touch_bundle(data)
-            factory = self.lazy_runtime(data)
-            async with anyio.create_task_group() as tasks:
-                tasks.start_soon(self.runtime.ready)
-                tasks.start_soon(self.runtime.ready)
-            factory.assert_called_once_with(data)
-            async with self.running() as tasks:
-                await self.start(tasks, "first")
-                await self.start(tasks, "second")
-                await self.metadata_available()
-                (data / "manifest.json").unlink()
-                self.assertFalse(await self.runtime.ready(check_files=True))
-                self.assertFalse(await self.runtime.ready())
-                (data / "manifest.json").touch()
-                self.assertTrue(await self.runtime.ready())
-            factory.assert_called_once_with(data)
+        data = temporary_directory(self)
+        touch_bundle(data)
+        factory = self.lazy_runtime(data)
+        async with anyio.create_task_group() as tasks:
+            tasks.start_soon(self.runtime.ready)
+            tasks.start_soon(self.runtime.ready)
+        factory.assert_called_once_with(data)
+        async with self.running() as tasks:
+            await self.start(tasks, "first")
+            await self.start(tasks, "second")
+            await self.metadata_available()
+            (data / "manifest.json").unlink()
+            self.assertFalse(await self.runtime.ready(check_files=True))
+            self.assertFalse(await self.runtime.ready())
+            (data / "manifest.json").touch()
+            self.assertTrue(await self.runtime.ready())
+        factory.assert_called_once_with(data)
 
     async def test_unready_invocation_is_safe_recoverable_and_cached(self):
-        with tempfile.TemporaryDirectory() as folder:
-            data = Path(folder)
-            factory = self.lazy_runtime(data)
-            with self.error("NOT_READY"):
-                await self.runtime.invoke("context")
-            factory.assert_not_called()
-            touch_bundle(data)
+        data = temporary_directory(self)
+        factory = self.lazy_runtime(data)
+        with self.error("NOT_READY"):
+            await self.runtime.invoke("context")
+        factory.assert_not_called()
+        touch_bundle(data)
+        self.assertEqual(await self.runtime.invoke("context"), {"available": True})
+        factory.assert_called_once_with(data)
+        with patch.object(Path, "is_file", side_effect=AssertionError("cached readiness scanned files")):
+            self.assertTrue(await self.runtime.ready())
             self.assertEqual(await self.runtime.invoke("context"), {"available": True})
-            factory.assert_called_once_with(data)
-            with patch.object(Path, "is_file", side_effect=AssertionError("cached readiness scanned files")):
-                self.assertTrue(await self.runtime.ready())
-                self.assertEqual(await self.runtime.invoke("context"), {"available": True})
 
     async def test_failed_initialization_is_safe_and_retried_after_recovery(self):
-        with tempfile.TemporaryDirectory() as folder:
-            data = Path(folder)
-            touch_bundle(data)
-            factory = self.lazy_runtime(data, side_effect=[RuntimeError("driver secret"), self.engine])
-            self.assertFalse(await self.runtime.ready())
-            self.assertTrue(await self.runtime.ready(check_files=True))
-            self.assertEqual(await self.runtime.invoke("context"), {"available": True})
-            self.assertEqual(factory.call_count, 2)
+        data = temporary_directory(self)
+        touch_bundle(data)
+        factory = self.lazy_runtime(data, side_effect=[RuntimeError("driver secret"), self.engine])
+        self.assertFalse(await self.runtime.ready())
+        self.assertTrue(await self.runtime.ready(check_files=True))
+        self.assertEqual(await self.runtime.invoke("context"), {"available": True})
+        self.assertEqual(factory.call_count, 2)

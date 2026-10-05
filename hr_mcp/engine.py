@@ -29,8 +29,21 @@ def file_digest(path: Path) -> str:
         return hashlib.file_digest(source, "sha256").hexdigest()
 
 
-def _read_json(path: Path):
-    return json.loads(path.read_text(encoding="utf-8"))
+def read_bundle_manifest(directory: Path, *, verify_database: bool = False) -> dict:
+    manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
+    files = manifest.get("files") if isinstance(manifest, dict) else None
+    if (not isinstance(files, dict) or set(files) != set(BUNDLE_FILES)
+            or manifest.get("format_version") != BUNDLE_FORMAT_VERSION
+            or manifest.get("snapshot_date") != SNAPSHOT_DATE):
+        raise ValueError("bundle version")
+    for name in BUNDLE_FILES:
+        path = directory / name
+        if not path.is_file() or path.is_symlink():
+            raise ValueError("bundle file")
+        # The DB is hashed during preparation; cold starts only hash metadata.
+        if (verify_database or name != "public.duckdb") and file_digest(path) != manifest["files"][name]:
+            raise ValueError("bundle digest")
+    return manifest
 
 
 def worker_command(data_dir, *, root=None, python=None):
@@ -46,21 +59,9 @@ class AnalyticsEngine:
     def __init__(self, data_dir: Path):
         self.data_dir = Path(data_dir).resolve()
         try:
-            manifest = _read_json(self.data_dir / "manifest.json")
-            if (manifest["format_version"] != BUNDLE_FORMAT_VERSION
-                    or manifest["snapshot_date"] != SNAPSHOT_DATE
-                    or set(manifest["files"]) != set(BUNDLE_FILES)):
-                raise ValueError("bundle version")
-            for name in BUNDLE_FILES:
-                path = self.data_dir / name
-                if not path.is_file() or path.is_symlink():
-                    raise ValueError("bundle file")
-                # The large DB is hashed during preparation. Metadata is small
-                # enough to verify on cold start before accepting requests.
-                if name != "public.duckdb" and file_digest(path) != manifest["files"][name]:
-                    raise ValueError("bundle digest")
-            self._mdl = _read_json(self.data_dir / "mdl.json")
-            self._context = _read_json(self.data_dir / "context.json")
+            read_bundle_manifest(self.data_dir)
+            json.loads((self.data_dir / "mdl.json").read_text(encoding="utf-8"))
+            self._context = json.loads((self.data_dir / "context.json").read_text(encoding="utf-8"))
             if self._context["snapshot_date"] != SNAPSHOT_DATE:
                 raise ValueError("snapshot")
             self._models = {item["name"]: item for item in self._context["models"] + self._context["views"]}
@@ -106,7 +107,7 @@ class AnalyticsEngine:
 
     def query_cube(self, cube: str, measures: list[str], dimensions: list[str],
                    filters: list[dict] | None = None) -> QueryResult:
-        request = validate_cube_request(self._mdl, cube, measures, dimensions, filters)
+        request = validate_cube_request(self._cubes, cube, measures, dimensions, filters)
         return self._run({"operation": "cube", "cube_query": request})
 
     def _run(self, request: WorkerRequest) -> QueryResult:
