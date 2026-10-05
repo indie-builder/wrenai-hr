@@ -22,12 +22,13 @@
 ```bash
 # 在已按交付说明完成环境、数据库和 profile 初始化后
 python3 hr-demo/validation/v2/run_all.py
+.venv/bin/python hr-demo/scripts/export_dashboard.py
 .venv/bin/python hr-demo/scripts/export_dashboard.py --check
 python3 -m http.server 8317 --bind 127.0.0.1 \
   --directory hr-demo/wren-project/apps/hr-overview
 ```
 
-打开 <http://127.0.0.1:8317>。另提供带 Bearer Token 的只读 MCP Streamable HTTP 服务：`hr_mcp/` 负责传输与语义规划，`hr_query/` 提供 MCP 和离线验证共用的 SQL 校验与只读执行，`scripts/prepare_mcp.py` 构建私有数据包。Vercel 构建配置与接入方法见上述服务文档，实际部署状态以部署记录为准。
+打开 <http://127.0.0.1:8317>。只读 MCP 的调用链为 `server → tools → runtime → engine → worker → hr_query`：传输、工具注册、容量调度、语义规划与执行各有明确职责。`scripts/prepare_mcp.py` 从规范 YAML 和确定性种子构建私有包，完整 MDL 由构建生成。回归、自然语言评测和页面导出共用 `validation/v2/result_contract.py`；仪表盘的启动、查询、错误处理与图表注册分别维护。Vercel 构建配置与接入方法见上述服务文档，实际部署状态以部署记录为准。
 
 全部数据均为仿真数据；本项目未实现真实 HR 系统接入、审批写入或按用户/部门授权。MCP Token 允许访问整份仿真数据，浏览器计算也不等于数据访问控制。外部 Agent 的联网方式由其运行环境决定。
 

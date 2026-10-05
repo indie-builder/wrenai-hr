@@ -6,12 +6,12 @@
 
 ## 组成
 
-- `hr_mcp/server.py`：FastAPI 入口与官方 MCP SDK 2.3.0 的装配；无状态 HTTP、JSON 响应、Token/Host/Origin 校验。
+- `hr_mcp/server.py`、`tools.py`：FastAPI 与官方 MCP SDK 2.3.0 的装配；工具注册表集中声明名称、参数和引擎方法，无状态 HTTP 返回 JSON。
 - `hr_mcp/contracts.py`：应用版本、快照日期、数据包格式与执行上限的统一定义。
 - `hr_mcp/runtime.py`、`transport.py`：查询容量、就绪检查与 HTTP 认证/请求防护。
 - `hr_mcp/engine.py`、`worker.py`、`cube.py`：分析 Interface、Wren 原生规划、Cube 请求校验和受限 DuckDB 查询，独立进程执行与超时控制。
-- `hr_query/sql_policy.py`、`duckdb_worker.py`：MCP 与离线验证共用的 SQL 白名单和只读执行代码；包导入不加载 MCP SDK 或 DuckDB。
-- `scripts/prepare_mcp.py`：构建时从确定性种子生成私有 `hr_mcp/data/`，不替换开发用数据库。
+- `hr_query/sql_policy.py`、`duckdb_worker.py`：MCP 与离线验证共用的 SQL 白名单和只读执行代码；`semantic.py` 仅在构建时严格读取 YAML。包导入不加载 MCP SDK、DuckDB 或 YAML。
+- `scripts/prepare_mcp.py`：构建时从确定性种子与 YAML 生成私有 `hr_mcp/data/`；`mcp_context.py` 裁剪公开 schema 与业务上下文，不替换开发用数据库。
 - `pyproject.toml`、`uv.lock`：独立的 Python 3.12 运行依赖，不携带 Wren CLI、embedding、Arrow 或浏览器仪表盘。
 - `vercel.json`：服务入口及执行时长，排除仅用于构建的源数据和测试；`hr_query/` 随函数源码打包。
 - `scripts/check_mcp.py`：使用官方客户端检验鉴权、工具发现、真实查询与写入拒绝。
@@ -21,7 +21,7 @@
 
 数据包格式 v2 只包含 `public.duckdb`、`mdl.json`、`context.json` 和 `manifest.json`；共享 Python 源码保留在 `hr_query/`，不再复制进 `data/`。清单记录各数据文件哈希、确定性种子、语义定义、运行源码、构建脚本及部署配置的来源哈希，并记录应用版本、可取得的 Git 提交（无 Git 元数据时为 null）、锁文件摘要和实际直接依赖版本。已有 v1 包仅在文件完整、哈希匹配且没有额外文件时升级；合法 v2 包同样检查后替换。构建经过 staging、真实 SQL/Cube 检查和源文件复核后才替换旧包，失败时保留旧包。
 
-MCP CI 在独立的 `.venv` 中安装语义验证工具，先执行 `check_semantics.py --build-check`，再用 `.venv-mcp` 构建并测试函数运行代码。Vercel 构建使用已提交的 `target/mdl.json`；轻量构建只核对来源在构建期间未变化，不能独立证明 YAML 与 MDL 一致。发布前需确认部署提交通过语义一致性检查。下方记录不证明分支保护或自动部署已等待全部检查。
+MCP 与 Vercel 构建通过 `hr_query/semantic.py` 直接从规范 YAML 生成 MDL，不依赖已提交或本地缓存的 `target/mdl.json`。`check_semantics.py --build-check` 在隔离环境逐项比较轻量编译与 Wren 官方构建，存在本地 target 时也核对缓存。CI 的 `.venv` 安装官方语义工具，`.venv-mcp` 构建并测试查询运行代码；发布前需确认部署提交通过该检查。下方记录不证明分支保护或自动部署已等待全部检查。
 
 ## 验收记录（按提交）
 

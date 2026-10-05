@@ -131,22 +131,19 @@ def main():
         sys.exit(f"目标已存在: {base}")
 
     print(f"生成 {domain} 域骨架 → {base}")
-    write(base / "db" / "seed" / f"gen_{domain}_data.py",
-          f'"""TODO: {domain} 造数脚本 (固定随机种子, 快照日显式常量)"""\n')
-    write(base / "db" / "duckdb" / ".gitkeep", "")
-    write(base / "semantic" / "wren_project.yml",
-          WREN_PROJECT_TEMPLATE.format(domain=domain))
-    write(base / "semantic" / "models" / first_table / "metadata.yml",
-          MODEL_TEMPLATE.format(first_table=first_table, domain=domain))
-    write(base / "semantic" / "relationships.yml", RELATIONSHIPS_TEMPLATE)
-    write(base / "semantic" / "knowledge" / "rules" / "general.md",
-          RULES_TEMPLATE.format(domain=domain))
-    write(base / "semantic" / "knowledge" / "glossary" / ".gitkeep", "")
-    write(base / "semantic" / "knowledge" / "sql" / ".gitkeep", "")
-    write(base / "semantic" / ".env", "")  # wren runner 要求该文件存在, 可为空
-    write(base / "validation" / "questions.py", QUESTIONS_TEMPLATE.format(domain=domain))
-    write(base / "validation" / "results" / ".gitkeep", "")
-    write(base / "README.md", README_TEMPLATE.format(domain=domain))
+    templates = {
+        f"db/seed/gen_{domain}_data.py": '"""TODO: {domain} 造数脚本 (固定随机种子, 快照日显式常量)"""\n',
+        "db/duckdb/.gitkeep": "", "semantic/.env": "",
+        "semantic/wren_project.yml": WREN_PROJECT_TEMPLATE,
+        f"semantic/models/{first_table}/metadata.yml": MODEL_TEMPLATE,
+        "semantic/relationships.yml": RELATIONSHIPS_TEMPLATE,
+        "semantic/knowledge/rules/general.md": RULES_TEMPLATE,
+        "semantic/knowledge/glossary/.gitkeep": "", "semantic/knowledge/sql/.gitkeep": "",
+        "validation/questions.py": QUESTIONS_TEMPLATE, "validation/results/.gitkeep": "",
+        "README.md": README_TEMPLATE,
+    }
+    for name, template in templates.items():
+        write(base / name, template.format(domain=domain, first_table=first_table))
     print("完成: 按 README 的 1-5 步填充, 验证通过后此域即可被问数")
 
 if __name__ == "__main__":

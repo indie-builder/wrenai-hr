@@ -34,6 +34,14 @@ def apply_limits():
         resource.setrlimit(resource.RLIMIT_AS, (2 * 1024**3, 2 * 1024**3))
 
 
+def _attempt(code, call, *args, errors=(Exception,), **kwargs):
+    """Translate one stage's private failure without disclosing driver details."""
+    try:
+        return call(*args, **kwargs)
+    except errors:
+        fail(code)
+
+
 def execute(data_dir: Path, request: dict):
     operation = request.get("operation")
     if operation not in {"plan", "query", "cube"}:
@@ -50,25 +58,15 @@ def execute(data_dir: Path, request: dict):
             fail("INVALID_ARGUMENT")
         query = validate_cube_request(mdl, query.get("cube"), query.get("measures"),
                                       query.get("dimensions"), query.get("filters"))
-        try:
-            sql = cube_query_to_sql(json.dumps(query, ensure_ascii=False), json.dumps(mdl))
-        except Exception:
-            fail("PLAN_FAILED")
+        sql = _attempt("PLAN_FAILED", cube_query_to_sql, json.dumps(query, ensure_ascii=False), json.dumps(mdl))
     else:
         sql = request.get("sql")
-    try:
-        semantic_sql = policy.validate_sql(sql, semantic)
-    except (policy.PolicyError, RecursionError):
-        fail("SQL_REJECTED")
-    try:
-        planner = SessionContext(base64.b64encode(json.dumps(mdl).encode()).decode())
-        planned_sql = planner.transform_sql(semantic_sql)
-    except Exception:
-        fail("PLAN_FAILED")
-    try:
-        planned_sql = policy.validate_sql(planned_sql, physical, physical=True)
-    except (policy.PolicyError, RecursionError):
-        fail("PLAN_REJECTED")
+    policy_errors = (policy.PolicyError, RecursionError)
+    semantic_sql = _attempt("SQL_REJECTED", policy.validate_sql, sql, semantic, errors=policy_errors)
+    planner = _attempt("PLAN_FAILED", SessionContext, base64.b64encode(json.dumps(mdl).encode()).decode())
+    planned_sql = _attempt("PLAN_FAILED", planner.transform_sql, semantic_sql)
+    planned_sql = _attempt("PLAN_REJECTED", policy.validate_sql, planned_sql, physical,
+                           physical=True, errors=policy_errors)
     if operation == "plan":
         return {"snapshot_date": SNAPSHOT_DATE, "semantic_sql": semantic_sql,
                 "planned_sql": planned_sql, "executed": False,

@@ -6,7 +6,7 @@
 
 - 验证日期: 2026-09-07
 - 数据快照: 2026-08-31（随机种子 42，可完全复现）
-- **A 路径 (标准答案)**: 直连 PostgreSQL 物理表 (`validation/groundtruth.sql`)
+- **A 路径 (标准答案)**: 当时直连 PostgreSQL 物理表。旧 `groundtruth.sql` 已由 [当前题库](v2/questions.py) 取代；原脚本可在 Git 历史中查看。
 - **B 路径 (被测路径)**: NL 问题 → agent 基于 MDL/规则/记忆编写 SQL → `wren dry-plan` 语义校验 → `wren query` 经语义层执行 (`validation/run_wren.sh`)
 - 判定: 双路径结果逐值一致 = PASS
 

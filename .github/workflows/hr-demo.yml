@@ -46,7 +46,7 @@ jobs:
         run: .venv/bin/python -m unittest discover -s hr-demo/validation/v2/tests -v
       - name: Skill script regression tests
         run: .venv/bin/python -m unittest discover -s scripts/tests -p 'test_skill_scripts.py' -v
-      - name: Semantic sources and checked-in target agree
+      - name: YAML compiler agrees with isolated Wren build
         run: .venv/bin/python hr-demo/validation/v2/check_semantics.py --build-check
       - name: Build demo database from committed deterministic seeds
         run: .venv/bin/python hr-demo/db/build_duckdb.py --attendance parquet
@@ -68,8 +68,10 @@ jobs:
           ../../.venv/bin/wren context build
       - name: Fixed SQL regression
         run: .venv/bin/python hr-demo/validation/v2/run_all.py --output-dir .ci/regression
-      - name: Dashboard snapshot and query consistency
-        run: .venv/bin/python hr-demo/scripts/export_dashboard.py --check
+      - name: Build dashboard and verify snapshot query consistency
+        run: |
+          .venv/bin/python hr-demo/scripts/export_dashboard.py
+          .venv/bin/python hr-demo/scripts/export_dashboard.py --check
       - name: Export answer-free NL question package
         run: .venv/bin/python hr-demo/validation/v2/eval/nl_eval.py export --output-dir .ci/nl-package
       - name: Upload verification outputs
@@ -81,3 +83,9 @@ jobs:
             .ci/regression
             .ci/nl-package
           if-no-files-found: ignore
+      - name: Upload complete generated dashboard
+        uses: actions/upload-artifact@v4
+        with:
+          name: hr-dashboard
+          path: hr-demo/wren-project/apps/hr-overview
+          if-no-files-found: error

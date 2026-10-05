@@ -1,19 +1,28 @@
-"""Small deterministic analytics bundles shared by query and protocol tests."""
+"""Deterministic bundles, public error assertions and isolated process probes."""
 from __future__ import annotations
 
 import importlib.util
 import json
+import os
 from pathlib import Path
 import shutil
+import subprocess
+import sys
+import tempfile
+import unittest
+from contextlib import contextmanager
 
 import duckdb
 
-from hr_mcp.contracts import BUNDLE_FILES, BUNDLE_FORMAT_VERSION, SNAPSHOT_DATE
-from hr_mcp.engine import file_digest
+from hr_mcp.contracts import BUNDLE_FILES, BUNDLE_FORMAT_VERSION, MCPQueryError, SNAPSHOT_DATE
+from hr_mcp.engine import AnalyticsEngine, file_digest
+from hr_query.semantic import build_mdl
 from scripts.prepare_mcp import public_context, write_json
 
 ROOT = Path(__file__).resolve().parents[1]
 PROJECT = ROOT / "hr-demo/wren-project"
+TOKEN = "unit-test-key-that-is-at-least-32-characters"
+AUTH = {"Authorization": f"Bearer {TOKEN}"}
 
 
 def load_module(path: Path, name: str):
@@ -25,8 +34,8 @@ def load_module(path: Path, name: str):
 
 def fixture(directory: Path):
     directory.mkdir()
-    shutil.copyfile(PROJECT / "target/mdl.json", directory / "mdl.json")
-    mdl = json.loads((directory / "mdl.json").read_text(encoding="utf-8"))
+    mdl = build_mdl(PROJECT)
+    write_json(directory / "mdl.json", mdl)
     write_json(directory / "context.json", public_context(mdl, PROJECT))
     builder = load_module(ROOT / "hr-demo/db/build_duckdb.py", "_test_seed_builder")
     with duckdb.connect(str(directory / "public.duckdb")) as connection:
@@ -61,3 +70,43 @@ def copy_deployment(destination: Path):
         package.mkdir(parents=True)
         for source in (ROOT / name).glob("*.py"):
             shutil.copyfile(source, package / source.name)
+
+
+def worker_call(data, request, *, root=ROOT, python=sys.executable, **options):
+    raw = request if isinstance(request, bytes) else json.dumps(request).encode()
+    result = subprocess.run(
+        [str(python), "-I", "-B", str(root / "hr_mcp/worker.py"), str(data)],
+        input=raw, capture_output=True, timeout=20,
+        **{"env": {"PATH": os.defpath, "LANG": "C.UTF-8"}, **options},
+    )
+    assert result.returncode == 0 and not result.stderr, result.stderr
+    return json.loads(result.stdout)
+
+
+def touch_bundle(data):
+    for name in (*BUNDLE_FILES, "manifest.json"):
+        (data / name).touch()
+
+
+class ErrorAssertions:
+    @contextmanager
+    def error(self, code):
+        with self.assertRaises(MCPQueryError) as caught:
+            yield caught
+        self.assertEqual(caught.exception.code, code)
+        self.assertNotIn("secret", str(caught.exception))
+        self.assertNotIn("/private", str(caught.exception))
+
+    def assert_code(self, code, call, *args, **kwargs):
+        with self.error(code):
+            call(*args, **kwargs)
+
+
+class BundleCase(ErrorAssertions, unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        temporary = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(temporary.cleanup)
+        cls.data = Path(temporary.name) / "bundle"
+        fixture(cls.data)
+        cls.engine = AnalyticsEngine(cls.data)

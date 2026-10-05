@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""检查语义YAML重复键、已知快照规则；--build-check隔离构建比较target。
+"""检查语义YAML与快照规则；--build-check核对轻量编译、Wren与本地target。
 
 .venv/bin/python hr-demo/validation/v2/check_semantics.py --build-check
 不会修改源/target，不读取用户profile、不建库、不做memory index。
@@ -14,35 +14,12 @@ import tempfile
 
 import yaml
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+from hr_query.semantic import UniqueKeyLoader, build_mdl
 from run_all import PROJECT, WREN, run_process
 
 SNAPSHOT = "2026-08-31"
 CLOCK = re.compile(r"\b(current_date|current_timestamp|current_time|localtimestamp|now\s*\(|today\s*\()", re.I)
-
-
-class UniqueKeyLoader(yaml.SafeLoader):
-    pass
-
-
-def unique_mapping(loader, node, deep=False):
-    seen = set()
-    # Check explicit keys before SafeLoader merges aliases: explicit overrides
-    # of a YAML merge are legal; two explicit identical keys are not.
-    for key_node, _ in node.value:
-        if key_node.tag == "tag:yaml.org,2002:merge":
-            continue
-        key = loader.construct_object(key_node, deep=deep)
-        try:
-            duplicate = key in seen
-            seen.add(key)
-        except TypeError as exc:
-            raise ValueError(f"YAML键无效，行{key_node.start_mark.line + 1}") from exc
-        if duplicate:
-            raise ValueError(f"YAML重复键，行{key_node.start_mark.line + 1}")
-    return yaml.SafeLoader.construct_mapping(loader, node, deep=deep)
-
-
-UniqueKeyLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, unique_mapping)
 
 
 def yaml_sources(project):
@@ -118,8 +95,6 @@ def check_project(project):
 
 def check_build(project, wren=WREN):
     target = project / "target/mdl.json"
-    if not target.is_file():
-        return ["target/mdl.json: 缺失"]
     # Copy only compiler inputs; no .env, profile, apps, DB or memory cache.
     with tempfile.TemporaryDirectory(prefix="hr-semantic-check-") as temporary:
         isolated = Path(temporary) / "project"
@@ -136,11 +111,14 @@ def check_build(project, wren=WREN):
         if not execution.ok:
             return [f"隔离构建失败: {execution.message()}（CLI诊断内容不输出）"]
         try:
-            expected = json.loads(target.read_text(encoding="utf-8"))
             actual = json.loads((isolated / "target/mdl.json").read_text(encoding="utf-8"))
-        except (ValueError, OSError):
-            return ["隔离构建/target产物无效"]
+            expected = build_mdl(project)
+            cached = json.loads(target.read_text(encoding="utf-8")) if target.exists() else actual
+        except (ValueError, OSError, KeyError, yaml.YAMLError):
+            return ["隔离构建/轻量编译/target产物无效"]
         if expected != actual:
+            return ["轻量编译与 Wren 源构建不一致；请同步编译器"]
+        if cached != actual:
             return ["target/mdl.json与源构建不一致；请执行wren context build后同步应用MDL"]
     return []
 

@@ -9,6 +9,7 @@ description: 在语义层(WrenAI MDL)上构建并验证业务分析交付的领�
 
 - wren CLI(`pip install 'wrenai[memory]==0.13.4'`,内含 DuckDB 1.5)
 - Python `duckdb` 模块(A 路径直连物理表用):`pip install duckdb`
+- 独立复制 runner 时同时复制 `scripts/result_contract.py` 的实际内容（仓库内为规范模块链接），保持同目录；两者仅依赖标准库与 GT 用的 DuckDB。
 - 仿真数据一律固定随机种子,交付物必须完全可复现
 
 ## 工作流(7 阶段)
@@ -68,7 +69,7 @@ WREN_BIN=<wren路径> python3 <本技能>/scripts/run_all.py \
 
 ### ⑦ 仪表盘(可选)
 
-- 单文件 HTML:加载 mdl.json + 各表 parquet 快照,wren-core-wasm 浏览器内执行语义 SQL,ECharts 渲染
+- HTML 入口加载 MDL 与 Parquet；查询、加载错误和图表注册按职责分模块，Wren WASM 在浏览器执行语义 SQL，ECharts 渲染。
 - 数据更新后必须重新导出快照并核对页面数字
 
 ## Agent 问数纪律(回答业务问题时)
@@ -84,4 +85,4 @@ context instructions → memory fetch/recall → dry-plan → query → 验证�
 ## 可替换点
 
 - 语义引擎当前耦合 wren CLI(profile/memory/dry-plan)。换引擎时替换 ④⑥⑦ 三步的工具调用,管道形状(造数→库→语义→双路径验证)不变
-- `scripts/run_all.py` 的比对核心已与参考实现对齐(Decimal 数值容差、布尔/空值归一、无序题多重集匹配、题级 ordered/allow_empty/tolerance),与执行引擎无关;gt 侧换成其他执行器只需改 `run_gt`
+- `scripts/run_all.py` 与 HR 验证共用 `result_contract.py`：完整 CSV、Decimal 容差、布尔/空值归一、有序或多重集比较。缺失或截断输出失败；合法空结果需保留表头并声明 `allow_empty=True`。更换 GT 执行器修改 `run_gt_duckdb`。

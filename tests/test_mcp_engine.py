@@ -2,38 +2,17 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import signal
 import subprocess
-import tempfile
-import unittest
 from unittest import mock
 
-from fixtures import fixture
+from fixtures import BundleCase
 from hr_mcp import engine as engine_module
-from hr_mcp.contracts import MCPQueryError, SNAPSHOT_DATE
-from hr_mcp.engine import AnalyticsEngine
+from hr_mcp.contracts import SNAPSHOT_DATE
 from hr_mcp.worker import execute
 
 
-class EngineTests(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.temp = tempfile.TemporaryDirectory()
-        cls.data = Path(cls.temp.name) / "bundle"
-        fixture(cls.data)
-        cls.engine = AnalyticsEngine(cls.data)
-
-    @classmethod
-    def tearDownClass(cls):
-        cls.temp.cleanup()
-
-    def assert_code(self, expected, callable_, *args):
-        with self.assertRaises(MCPQueryError) as error:
-            callable_(*args)
-        self.assertEqual(error.exception.code, expected)
-        self.assertNotIn(str(self.data), error.exception.message)
-
+class EngineTests(BundleCase):
     def test_context_excludes_answers_and_physical_paths_and_is_detached(self):
         context = self.engine.context()
         self.assertEqual(context["snapshot_date"], SNAPSHOT_DATE)
@@ -148,7 +127,3 @@ class EngineTests(unittest.TestCase):
         with mock.patch.dict("os.environ", {"MCP_AUTH_TOKEN": "private-token"}), \
                 mock.patch("hr_mcp.engine.subprocess.run", side_effect=malformed):
             self.assert_code("INVALID_RESULT", self.engine.query_sql, "SELECT 1")
-
-
-if __name__ == "__main__":
-    unittest.main()

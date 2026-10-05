@@ -1,4 +1,27 @@
 // Shared query inputs live in query-spec.json; no metric SQL in the chart layer.
+async function fetchAsset(path, binary = false) {
+  let response;
+  try {
+    response = await fetch(path, { cache: "no-cache" });
+  } catch {
+    throw new Error(`无法读取快照文件 ${path}，请检查本地服务和网络后刷新；数据更新后请重新导出快照。`);
+  }
+  if (!response.ok) throw new Error(`快照文件加载失败: ${path} (${response.status})，请重新导出快照后刷新。`);
+  return binary ? response.arrayBuffer() : response.json();
+}
+
+export async function loadDashboard() {
+  const [mdl, spec, manifest] = await Promise.all(
+    ["mdl.json", "query-spec.json", "snapshot-manifest.json"].map((path) => fetchAsset(`./${path}`)));
+  if (manifest.snapshot_date !== spec.snapshot_date) throw new Error("查询配置与数据快照日期不一致，请重新导出快照");
+  const { WrenEngine } = await import(`https://unpkg.com/@wrenai/wren-core-wasm@${spec.sdk_version}/dist/index.js`);
+  if (typeof WrenEngine.prototype.cubeQuery !== "function") throw new Error("语义引擎版本缺少 Cube 查询接口");
+  const engine = await WrenEngine.init();
+  for (const table of manifest.tables) await engine.registerParquet(table.name, await fetchAsset(table.file, true));
+  await engine.loadMDL(mdl, { source: "./data/" });
+  return { engine, client: createQueryClient(engine, spec), spec, manifest };
+}
+
 export function normalizeRows(rows, query) {
   const result = rows.map((row) => query.fields
     ? Object.fromEntries(Object.entries(query.fields).map(([alias, rule]) => {

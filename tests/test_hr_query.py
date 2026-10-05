@@ -7,6 +7,7 @@ import duckdb
 
 from hr_query.duckdb_worker import RowLimitExceeded, query
 from hr_query.sql_policy import MAX_AST_NODES, MAX_SQL_CHARS, PolicyError, validate_sql
+from hr_query.semantic import build_mdl
 
 
 class SqlPolicyTests(unittest.TestCase):
@@ -88,5 +89,47 @@ class DuckDBWorkerTests(unittest.TestCase):
             self.assertEqual(connection.execute("SELECT count(*) FROM employees").fetchone(), (2,))
 
 
-if __name__ == "__main__":
-    unittest.main()
+class SemanticBuildTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.project = Path(temporary.name)
+        self.write("wren_project.yml", "schema_version: 5\ndata_source: duckdb\n")
+        self.write("relationships.yml", "relationships: []\n")
+
+    def write(self, name, text):
+        path = self.project / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text)
+
+    def test_canonical_yaml_compiles_without_target_and_explicit_merge_overrides_are_valid(self):
+        self.write("models/employees/metadata.yml", """name: employees
+columns:
+- &base {name: amount, type: decimal, is_calculated: false, properties: {_field_label: title}}
+- {<<: *base, name: doubled, is_calculated: true, expression: amount * 2}
+""")
+        self.write("models/employees/ref_sql.sql", "  SELECT amount FROM source  \n")
+        self.write("views/active/metadata.yml", "name: active\n")
+        self.write("views/active/sql.yml", "statement: SELECT * FROM employees\n")
+        self.write("target/mdl.json", '{"models": "stale, must not be read"}')
+        self.assertEqual(build_mdl(self.project), {
+            "catalog": "wren", "schema": "public", "dataSource": "duckdb", "layoutVersion": 3,
+            "models": [{"name": "employees", "refSql": "SELECT amount FROM source", "columns": [
+                {"name": "amount", "type": "decimal", "isCalculated": False, "properties": {"_fieldLabel": "title"}},
+                {"name": "doubled", "type": "decimal", "isCalculated": True, "expression": "amount * 2", "properties": {"_fieldLabel": "title"}}]}],
+            "views": [{"name": "active", "statement": "SELECT * FROM employees"}], "cubes": [], "relationships": [],
+        })
+        (self.project / "target/mdl.json").unlink()
+        self.assertEqual(build_mdl(self.project)["models"][0]["name"], "employees")
+
+    def test_duplicate_keys_and_unsupported_schema_are_rejected(self):
+        for content in ("schema_version: 4\ndata_source: duckdb\n",
+                        "schema_version: 5\nschema_version: 5\ndata_source: duckdb\n"):
+            with self.subTest(content=content):
+                self.write("wren_project.yml", content)
+                with self.assertRaises(ValueError):
+                    build_mdl(self.project)
+        self.write("wren_project.yml", "schema_version: 5\ndata_source: duckdb\n")
+        self.write("models/employees/metadata.yml", "name: employees\ncolumns: [{name: amount, name: duplicated}]\n")
+        with self.assertRaises(ValueError):
+            build_mdl(self.project)
