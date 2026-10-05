@@ -12,20 +12,20 @@ description: wrenai-hr 仓库的 HR 业务领域包——星辰科技演示数�
 ## 内容地图
 
 ```text
-hr-delivery/
-├── db/                          # 造数脚本 + 种子 CSV + 物理库与重建入口(见 AGENTS.md)
+hr-demo/
+├── db/                          # 造数脚本 + 确定性种子 + DuckDB 重建入口(见 AGENTS.md)
 ├── wren-project/
 │   ├── models/*/metadata.yml    # 25 模型, 列描述是 NL2SQL 功能输入
 │   ├── relationships.yml        # 32 条关系
 │   ├── views/ + cubes/          # 复用投影与聚合 (6 视图 + 6 cube)
 │   ├── knowledge/rules/general.md   # ★ 业务口径唯一权威, 先读这个
-│   └── apps/hr-overview/        # 仪表盘 (mdl.json + 25 parquet 快照)
+│   └── apps/hr-overview/        # 仪表盘 (裁剪 MDL + 12 表 Parquet 快照)
 └── validation/v2/               # 41 题双路径回归: questions.py + run_all.py
 ```
 
 ## 问数操作序列
 
-在语义项目目录(`hr-delivery/wren-project`)的**子 Shell** 中执行(避免改变
+在语义项目目录(`hr-demo/wren-project`)的**子 Shell** 中执行(避免改变
 后续命令工作目录),六步:`context instructions`(每会话首次)→
 `memory fetch` → `memory recall --limit 3` → `dry-plan` → `query -o csv -q` →
 结果确认后 `memory store` 并验证能召回。
@@ -46,13 +46,13 @@ hr-delivery/
 
 ```bash
 # 仓库根目录
-python3 hr-delivery/validation/v2/run_all.py --only q03          # 单题
-python3 hr-delivery/validation/v2/run_all.py --domain 人效分析    # 单域
-python3 hr-delivery/validation/v2/run_all.py                     # 全量
+python3 hr-demo/validation/v2/run_all.py --only q03          # 单题
+python3 hr-demo/validation/v2/run_all.py --domain 人效分析    # 单域
+python3 hr-demo/validation/v2/run_all.py                     # 全量
 ```
 
 - 每次运行覆盖 `summary.csv` 与 `results/qXX.*.csv`;共享口径改动后跑全量
 - 仪表盘预览:`python3 -m http.server 8317 --bind 127.0.0.1 \
-  --directory hr-delivery/wren-project/apps/hr-overview`;数据库更新后必须
+  --directory hr-demo/wren-project/apps/hr-overview`;数据库更新后必须
   重新导出 parquet 快照并核对页面数字
 - 不为通过测试修改正确业务口径;报告通过率时区分历史记录与本次实际执行
