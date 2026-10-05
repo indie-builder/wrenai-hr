@@ -1,53 +1,64 @@
-# AGENTS.md
+# Wren 语义项目工作流
 
-This project uses [Wren Engine](https://github.com/Canner/WrenAI) as the semantic layer for data querying. Queries are written against MDL model names, not raw database tables.
+本目录使用 Wren Engine 规划查询；SQL 使用 MDL 模型名。业务口径以 [general.md](knowledge/rules/general.md) 为准。环境与 `hr_demo_duck` profile 初始化见 [演示 README](../README.md#环境与首次初始化)。
 
-## Answering data questions
+下面的 Wren 命令在本目录运行，使用根目录分析环境 `../../.venv/bin/wren`；从仓库根调用时用子 Shell 切换目录。首次使用按已安装版本读取 `wren skills get usage`，需要其他子命令时查对应 `--help`。
 
-When the user asks about data, metrics, reports, or business questions, follow this workflow:
+## 回答业务数据问题
 
-1. First query: read `wren skills get usage` and `wren context instructions`; reload rules after changes.
-2. `wren memory fetch -q "<question>"` — get relevant schema context.
-3. `wren memory recall -q "<question>" --limit 3` — find similar past queries; verify dates, filters and ranking before reuse.
-4. For aggregations, run `wren cube list` and `wren cube describe <name>`. Prefer `wren cube query` when the declared measures and dimensions cover the question; inspect `--sql-only` first. Use modeled SQL for other questions.
-5. `wren dry-plan --sql "<sql>"`, then `wren query --sql "<sql>"` — validate and execute through the semantic layer.
-6. Store a confirmed SQL answer with `wren memory store --nl "<question>" --sql "<sql>"`; inspect the written file and recall it again. For a Cube answer, obtain its SQL with `--sql-only`, verify that SQL, then store it.
+1. 每个查询会话首次读取工具约定与业务规则；规则修改后重新读取：
 
-Report the actual result, calculation, period and limitations. Execution errors are not zero or empty results. This delivery uses **2026-08-31** as its fixed snapshot date; do not substitute the runtime date. Historical departmental metrics use the current employee department unless the query explicitly reconstructs transfers.
+   ```bash
+   ../../.venv/bin/wren skills get usage
+   ../../.venv/bin/wren context instructions
+   ```
 
-## Modifying the data model
+2. 分别获取 schema 和已确认示例，核对日期、过滤条件、粒度与排序后复用：
 
-When the user wants to add models, change schema, or onboard a new table:
+   ```bash
+   ../../.venv/bin/wren memory fetch -q "用户问题"
+   ../../.venv/bin/wren memory recall -q "用户问题" --limit 3
+   ```
 
-1. Edit YAML files in `models/`, `views/`, or `relationships.yml`
-2. `wren context validate` — check structure
-3. `wren context build` — compile to `target/mdl.json`
-4. `wren memory index` — re-index schema for search
+   若 schema 输出过大，将**完整结果**保存到仓库外临时文件，再按模型或节分段读取；保留读取状态直至所需模型、关联与字段已确认。instructions、fetch、recall 分开调用，便于识别截断和执行失败。Wren 0.13.4 的 fetch 可能选择 full 策略，此时 `--model`、`--type` 不会缩小输出；它们只作用于 search 策略。使用搜索策略前核对 `memory fetch --help`、可选 memory 依赖与索引状态。
 
-## Capturing business context
+3. 聚合问题先检查 `cube list` 和 `cube describe <name>`；已有指标及维度覆盖时优先 `cube query`，用 `--sql-only` 检查 SQL。其他问题编写 MDL SQL，依次验证并执行：
 
-Rules the schema can't express — canonical tables, default filters, units, enum meanings — go in `knowledge/rules/*.md` (read by `wren context instructions`). Confirmed NL→SQL examples are saved with `wren memory store` (step 5 above), which writes them to `knowledge/sql/`. Both live in the project and are committed with it.
+   ```bash
+   ../../.venv/bin/wren dry-plan --sql "根据上下文编写的 SQL"
+   ../../.venv/bin/wren query --sql "根据上下文编写的 SQL" -o csv -q
+   ```
 
-## Prerequisites
+   直接查询物理表仅用于标准答案核对或明确的数据诊断。`wren ask` 只生成 Agent 提示词，不会调用模型给出答案。
 
-This project requires the `wren` CLI. The DuckDB data source ships in wrenai core, so the base install is enough for this project:
+4. 回答包含实际结果、计算口径、数据时间范围与限制。执行失败应说明失败阶段，不能解释为零或无数据。缺少数据或定义时说明具体缺口。
+5. 确认答案后保存 SQL，检查实际文件内容、是否覆盖了已有示例，并再次召回：
 
-```bash
-pip install -r ../../requirements-demo.txt
-pip install 'wrenai[memory]==0.13.4'
-```
+   ```bash
+   ../../.venv/bin/wren memory store --nl "用户问题" --sql "已验证的 SQL"
+   ../../.venv/bin/wren memory recall -q "用户问题" --limit 3
+   ```
 
-The project binds profile `hr_demo_duck` (datasource `duckdb`, directory `../db/duckdb/` relative to this project). For other data sources install the matching connector extra. The optional `memory` extra enables embedding retrieval; its derived index is not committed. Keep credentials in local profiles, outside the repository.
+   Cube 答案先取得 `--sql-only` 的 SQL 并验证后存储。历史曾出现中文文件名异常，调用成功不能代替文件核对。知识改名后执行 `memory check`；若存在无源文件的历史索引，按 [演示 README 的索引恢复流程](../README.md#构建问数与更新) 备份缓存后 reset/index/check，保留知识源文件。
 
-See https://docs.getwren.ai/oss/get_started/installation for full setup. Match CLI workflow guides to the installed version with `wren skills get <name>`.
+## 修改模型、规则与知识
 
-## Quick reference
+1. 修改 `models/`、`views/`、`cubes/`、`relationships.yml` 的 YAML，或 `knowledge/rules/` 的业务规则；确认的 NL→SQL 示例写入 `knowledge/sql/`。`target/mdl.json` 由构建生成。
+2. 在本目录依次执行；失败先修正再使用构建结果：
 
-| Task | Command |
-|------|---------|
-| Run a query | `wren --sql "SELECT ..."` |
-| Preview planned SQL | `wren dry-plan --sql "SELECT ..."` |
-| Show available models | `wren context show` |
-| Check connection | `wren profile debug` |
-| Check memory index | `wren memory status` |
-| Rebuild after changes | `wren context build && wren memory index` |
+   ```bash
+   ../../.venv/bin/wren context validate
+   ../../.venv/bin/wren context build
+   ../../.venv/bin/wren memory index
+   ```
+
+3. 按 [验证入口](../validation/v2/README.md) 回归受影响问题；共享模型、关系或指标口径变更执行全量回归。仪表盘受影响时按 [快照流程](../README.md#仪表盘快照与本地预览) 同步 MDL、数据和查询并核对数字。MCP 发布前核对同一部署提交的语义构建一致性检查。
+
+## 已知限制
+
+结合当前版本实际重现后处理，不将历史绕行直接推广到其他业务：
+
+- 部分 DECIMAL 规划退化在本项目以 DOUBLE 绕行；精确金额场景须另行验证。
+- `gen_models_v2.py` 校验规范 YAML，显式 `--output-dir` 可导出定义；规范源是权威来源，保留现有类型和计算列修正。
+- 现有视图主要执行关联投影，算术放在查询或 Cube 层，避开已记录的规划问题。
+- 所有“当前”与派生日期使用快照 **2026-08-31**。历史部门指标按当前员工档案部门归属，未还原调岗历史时在答案中说明。

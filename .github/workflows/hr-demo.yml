@@ -10,6 +10,19 @@ permissions:
   contents: read
 
 jobs:
+  docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Documentation checker tests
+        run: python -m unittest discover -s scripts/tests -p 'test_check_docs.py' -v
+      - name: Current documentation links and command paths
+        run: python scripts/check_docs.py
+
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 20
