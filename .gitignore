@@ -16,6 +16,7 @@ __pycache__/
 hr-demo/wren-project/target/
 hr-demo/wren-project/apps/hr-overview/mdl.json
 hr-demo/wren-project/apps/hr-overview/snapshot-manifest.json
+hr-demo/wren-project/apps/hr-overview/data/
 **/.wren/memory/
 
 # Rebuildable local DuckDB database files (db/load_duckdb.sh 重建)
