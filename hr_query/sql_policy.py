@@ -1,13 +1,15 @@
-"""Fail-closed SQL policy for offline NL submissions (sqlglot 30.18.0).
+"""Fail-closed SQL policy shared by MCP and offline evaluation (sqlglot 30.18.0).
 
-Only explicitly supported relational syntax/functions are accepted. The second
-check after Wren expansion uses physical tables, then sql_worker adds DuckDB's
-read-only mount, external-access prohibition and resource limits. This is a local
-benchmark guard, not an operating-system sandbox for hostile multi-tenant use.
+Only explicitly supported relational syntax/functions are accepted. Validate
+semantic SQL before planning and physical SQL after expansion, then execute with
+the read-only DuckDB worker. This guard is not an operating-system sandbox.
 """
 import sqlglot
 from sqlglot import exp
 from sqlglot.optimizer.scope import Scope, traverse_scope
+
+MAX_SQL_CHARS = 50000
+MAX_AST_NODES = 5000
 
 # Do not replace with a denylist: unknown extension functions must remain blocked.
 SAFE_NODES = frozenset("""
@@ -18,12 +20,13 @@ add sub mul div intdiv mod neg pow eq neq gt gte lt lte and or not is in between
 like ilike escape case if cast trycast datatype datatypeparam interval var
 count sum avg min max round abs ceil floor coalesce nullif greatest least
 extract datediff dateadd datesub datetrunc timestamptrunc tsordstodate
-strtodate timetostr year month day lastday lower upper length trim ltrim rtrim
+strtodate timetostr year month day lastday datefromparts lower upper length trim ltrim rtrim
 substring concat concatws replace splitpart rownumber rank denserank lag lead
 firstvalue lastvalue percentrank cumedist ntile stddev stddevpop variance
 anonymous
 """.split())
-# sqlglot keeps some ordinary built-ins anonymous. Do not allow caller-defined macros.
+# SQLGlot represents the confirmed DuckDB MAKE_DATE constructor as DateFromParts.
+# Some ordinary built-ins remain anonymous; caller-defined macros stay blocked.
 SAFE_ANONYMOUS = frozenset({"DATE_PART"})
 SAFE_TYPES = frozenset({"BOOLEAN", "TINYINT", "SMALLINT", "INT", "BIGINT", "HUGEINT",
                         "UTINYINT", "USMALLINT", "UINT", "UBIGINT", "FLOAT", "DOUBLE",
@@ -36,8 +39,8 @@ class PolicyError(ValueError):
 
 
 def validate_sql(sql, allowed_tables, *, physical=False):
-    if not isinstance(sql, str) or not sql.strip() or len(sql) > 50000:
-        raise PolicyError("SQL必须为非空字符串且不超过50000字符")
+    if not isinstance(sql, str) or not sql.strip() or len(sql) > MAX_SQL_CHARS:
+        raise PolicyError(f"SQL必须为非空字符串且不超过{MAX_SQL_CHARS}字符")
     try:
         statements = sqlglot.parse(sql, read="duckdb", error_level=sqlglot.ErrorLevel.RAISE)
     except (sqlglot.errors.SqlglotError, RecursionError) as exc:
@@ -46,7 +49,7 @@ def validate_sql(sql, allowed_tables, *, physical=False):
         raise PolicyError("仅允许一条SELECT查询（可含CTE/集合查询）")
     tree = statements[0]
     nodes = list(tree.walk())
-    if len(nodes) > 5000:
+    if len(nodes) > MAX_AST_NODES:
         raise PolicyError("SQL语法树超过限制")
     for node in nodes:
         if node.key not in SAFE_NODES:

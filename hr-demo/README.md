@@ -1,6 +1,8 @@
-# WrenAI HR 分析与验证交付
+# WrenAI HR 分析演示工作区
 
 基于 WrenAI 当前 Agent 驱动的 GenBI 架构，演示 HR 数据建模、业务问数、固定 SQL 回归和浏览器仪表盘。公司“星辰科技”与全部人员数据均为虚构，数据快照日固定为 **2026-08-31**。
+
+`hr-demo/` 集中维护演示的数据源、语义定义、仪表盘、验证程序和文档，包含规范源与可重建交付产物。根目录 `hr_mcp/`、`hr_query/` 维护查询运行代码；MCP 构建使用本工作区，线上函数不打包整个目录。
 
 [迁移到新业务的操作指南](docs/replication/README.md) · [业务规则](wren-project/knowledge/rules/general.md) · [验证记录](validation/v2/matrix_v2.md) · [历史目标](GOAL.md)
 
@@ -44,7 +46,7 @@ python3.12 -m venv .venv
 首次创建或明确需要重建演示库时执行：
 
 ```bash
-(cd hr-delivery/db && ./load_duckdb.sh)
+(cd hr-demo/db && ./load_duckdb.sh)
 ```
 
 该命令在临时库装载成功后**替换** `db/duckdb/public.duckdb`，不要对含有需保留人工修改的库执行。默认考勤种子缺失或校验不符会失败，不自动随机回退。`--attendance generate` 明确生成另一批考勤，执行后必须重新回归、导出快照，不能沿用既有验证数字。库名固定为 `public.duckdb`，因为 Wren 按文件名挂载物理 catalog。
@@ -61,7 +63,7 @@ root = Path.cwd()
 config = {
     'datasource': 'duckdb',
     'properties': {
-        'url': str(root / 'hr-delivery/db/duckdb'),
+        'url': str(root / 'hr-demo/db/duckdb'),
         'format': 'duckdb',
     },
 }
@@ -72,13 +74,13 @@ with tempfile.TemporaryDirectory() as folder:
                     'hr_demo_duck', '--from-file', str(path)], check=True)
 PY
 (
-  cd hr-delivery/wren-project
+  cd hr-demo/wren-project
   ../../.venv/bin/wren context set-profile hr_demo_duck
   ../../.venv/bin/wren profile debug
 )
 ```
 
-已有正确 profile 时跳过创建。CI 使用独立 `WREN_HOME`，不覆盖用户配置。`.env` 仅在连接需要环境变量时提供，不是本地 DuckDB 回归的必需文件。
+已有正确 profile 时跳过创建。移动或重命名工作区后，重新执行上述 profile 配置，更新 `hr_demo_duck` 的数据库目录，并用 `wren profile debug` 确认连接；现有数据库随目录移动，无需重新建库。CI 使用独立 `WREN_HOME`，不覆盖用户配置。`.env` 仅在连接需要环境变量时提供，不是本地 DuckDB 回归的必需文件。
 
 ## 构建、问数与更新
 
@@ -86,7 +88,7 @@ PY
 
 ```bash
 (
-  cd hr-delivery/wren-project
+  cd hr-demo/wren-project
   ../../.venv/bin/wren context validate
   ../../.venv/bin/wren context build
   ../../.venv/bin/wren memory index
@@ -99,7 +101,7 @@ Agent 首次使用读取 `wren skills get usage` 与 `wren context instructions`
 
 ```bash
 (
-  cd hr-delivery/wren-project
+  cd hr-demo/wren-project
   ../../.venv/bin/wren cube query --cube total_cost \
     --measures total_cost,person_months --dimensions pay_period \
     --filter 'pay_period:gte:2026-01' --filter 'pay_period:lte:2026-06'
@@ -112,13 +114,13 @@ Cube 返回结果不承诺顺序；展示趋势时显式按月份排序。`gen_m
 
 ```bash
 # 固定 SQL 回归：41 题
-python3 hr-delivery/validation/v2/run_all.py
+python3 hr-demo/validation/v2/run_all.py
 # 只跑子集，报告与完整汇总分开
-python3 hr-delivery/validation/v2/run_all.py --only q03 q18
-python3 hr-delivery/validation/v2/run_all.py --domain 人效分析
+python3 hr-demo/validation/v2/run_all.py --only q03 q18
+python3 hr-demo/validation/v2/run_all.py --domain 人效分析
 # 验证程序单元测试与源文件/构建产物一致性
-.venv/bin/python -m unittest discover -s hr-delivery/validation/v2/tests
-.venv/bin/python hr-delivery/validation/v2/check_semantics.py --build-check
+.venv/bin/python -m unittest discover -s hr-demo/validation/v2/tests
+.venv/bin/python hr-demo/validation/v2/check_semantics.py --build-check
 ```
 
 完整回归结果写入 `validation/v2/summary.csv` 和 `results/`。以当次退出码、汇总与明细判断是否通过。排名及趋势题声明顺序要求；数值比较默认绝对容差 0.011，按题可另设精度与合法空结果策略。这个精度不是所有财务场景的通用要求。
@@ -127,12 +129,12 @@ python3 hr-delivery/validation/v2/run_all.py --domain 人效分析
 
 ```bash
 # 输出目录须为新目录；可选 --only q03 q18 筛选题目
-.venv/bin/python hr-delivery/validation/v2/eval/nl_eval.py export \
+.venv/bin/python hr-demo/validation/v2/eval/nl_eval.py export \
   --output-dir /tmp/hr-nl-package
 # 让独立 Agent 只读题目包，按 protocol.json 写真实生成记录
-.venv/bin/python hr-delivery/validation/v2/eval/nl_eval.py run \
+.venv/bin/python hr-demo/validation/v2/eval/nl_eval.py run \
   --records /tmp/hr-generated.jsonl \
-  --output-dir hr-delivery/validation/v2/runs/nl-first
+  --output-dir hr-demo/validation/v2/runs/nl-first
 ```
 
 JSONL 必填 `id`、原始 `question`、`generated_sql`、`context_refs`；可选 `model`、`run_metadata`。输出保留 `trace/`、原始 `results/`、`summary.csv`、`run.json`；未生成、规划失败、执行失败和结果差异分别计数。比较列位置并按公开精度规范副本，不篡改原始结果。评测器不调用付费模型；使用者负责记录真实生成来源。
@@ -144,15 +146,15 @@ CI 配置见 [hr-demo.yml](../.github/workflows/hr-demo.yml)：在新工作区�
 模型构建和数据库准备好后：
 
 ```bash
-.venv/bin/python hr-delivery/scripts/export_dashboard.py
+.venv/bin/python hr-demo/scripts/export_dashboard.py
 # 不写产物，检查 MDL、数据和页面快照是否一致
-.venv/bin/python hr-delivery/scripts/export_dashboard.py --check
+.venv/bin/python hr-demo/scripts/export_dashboard.py --check
 (
-  cd hr-delivery/wren-project
+  cd hr-demo/wren-project
   ../../.venv/bin/wren genbi verify hr-overview
 )
 python3 -m http.server 8317 --bind 127.0.0.1 \
-  --directory hr-delivery/wren-project/apps/hr-overview
+  --directory hr-demo/wren-project/apps/hr-overview
 ```
 
 打开 <http://127.0.0.1:8317>。如果已有服务占用该端口，检查并复用，不重复启动。文件预检不能替代浏览器图表、错误状态及数字核对。
@@ -176,7 +178,7 @@ python3 -m http.server 8317 --bind 127.0.0.1 \
 ## 目录
 
 ```text
-hr-delivery/
+hr-demo/
   db/                  schema、CSV/考勤种子、DuckDB 构建器
   wren-project/
     models/ views/ cubes/ relationships.yml

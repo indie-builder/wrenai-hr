@@ -306,17 +306,17 @@ source .venv/bin/activate
 | 参考   |                                                                                           |
 |        | [终端] 在 wrenai-hr 仓库根目录：                                                          |
 |        | cd <wrenai-hr 克隆路径>                                                                   |
-|        | python3 hr-delivery/validation/v2/run_all.py                                              |
+|        | python3 hr-demo/validation/v2/run_all.py                                              |
 |        |                                                                                           |
 |        | 当前环境：Python 3.12 + requirements-demo.txt，DuckDB public.duckdb 和项目 profile。      |
-|        | 初始化数据库与 profile 的具体步骤见 hr-delivery/README.md；无需 Docker。                 |
+|        | 初始化数据库与 profile 的具体步骤见 hr-demo/README.md；无需 Docker。                 |
 |        | 运行结果以当次退出码、汇总及明细为准；已有 PASS 记录不替代本次执行。                      |
 |        |                                                                                           |
 |        | 当前仪表盘地址：http://127.0.0.1:8317                                                     |
 |        | 如果预览服务未运行，可在另一个终端执行：                                                  |
 |        | cd <wrenai-hr 克隆路径>                                                                   |
 |        | python3 -m http.server 8317 --bind 127.0.0.1 \                                            |
-|        | --directory hr-delivery/wren-project/apps/hr-overview                                     |
+|        | --directory hr-demo/wren-project/apps/hr-overview                                     |
 |        |                                                                                           |
 |        | 已有服务占用 8317 时不重复启动。                                                          |
 +--------+-------------------------------------------------------------------------------------------+

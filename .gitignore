@@ -16,11 +16,11 @@ __pycache__/
 **/.wren/memory/
 
 # Rebuildable local DuckDB database files (db/load_duckdb.sh 重建)
-hr-delivery/db/duckdb/
+hr-demo/db/duckdb/
 
 # Per-run query traces and isolated CI profiles
-hr-delivery/validation/v2/runs/
-hr-delivery/validation/v2/results/*.execution.json
+hr-demo/validation/v2/runs/
+hr-demo/validation/v2/results/*.execution.json
 .ci/
 
 # Unmodified upstream reference clone; install Wren separately

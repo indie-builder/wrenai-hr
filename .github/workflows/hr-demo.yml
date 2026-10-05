@@ -30,33 +30,33 @@ jobs:
           .venv/bin/python -m pip install -r requirements-demo.txt
           .venv/bin/wren --version
       - name: Offline unit and temporary database tests
-        run: .venv/bin/python -m unittest discover -s hr-delivery/validation/v2/tests -v
+        run: .venv/bin/python -m unittest discover -s hr-demo/validation/v2/tests -v
       - name: Semantic sources and checked-in target agree
-        run: .venv/bin/python hr-delivery/validation/v2/check_semantics.py --build-check
+        run: .venv/bin/python hr-demo/validation/v2/check_semantics.py --build-check
       - name: Build demo database from committed deterministic seeds
-        run: .venv/bin/python hr-delivery/db/build_duckdb.py --attendance parquet
+        run: .venv/bin/python hr-demo/db/build_duckdb.py --attendance parquet
       - name: Configure checkout-local profile
         run: |
           .venv/bin/python - <<'PY'
           import json
           from pathlib import Path
           profile = {"datasource": "duckdb", "properties": {
-              "url": str(Path("hr-delivery/db/duckdb").resolve()), "format": "duckdb"}}
+              "url": str(Path("hr-demo/db/duckdb").resolve()), "format": "duckdb"}}
           Path(".ci").mkdir(exist_ok=True)
           Path(".ci/profile.json").write_text(json.dumps(profile))
           PY
           .venv/bin/wren profile add hr_demo_duck --from-file .ci/profile.json
       - name: Validate and build semantic project
-        working-directory: hr-delivery/wren-project
+        working-directory: hr-demo/wren-project
         run: |
           ../../.venv/bin/wren context validate
           ../../.venv/bin/wren context build
       - name: Fixed SQL regression
-        run: .venv/bin/python hr-delivery/validation/v2/run_all.py --output-dir .ci/regression
+        run: .venv/bin/python hr-demo/validation/v2/run_all.py --output-dir .ci/regression
       - name: Dashboard snapshot and query consistency
-        run: .venv/bin/python hr-delivery/scripts/export_dashboard.py --check
+        run: .venv/bin/python hr-demo/scripts/export_dashboard.py --check
       - name: Export answer-free NL question package
-        run: .venv/bin/python hr-delivery/validation/v2/eval/nl_eval.py export --output-dir .ci/nl-package
+        run: .venv/bin/python hr-demo/validation/v2/eval/nl_eval.py export --output-dir .ci/nl-package
       - name: Upload verification outputs
         if: always()
         uses: actions/upload-artifact@v4

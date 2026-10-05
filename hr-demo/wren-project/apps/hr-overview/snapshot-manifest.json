@@ -3,7 +3,7 @@
   "snapshot_date": "2026-08-31",
   "source_mdl_sha256": "90c2fc42a5a54965666e7d107dfc2353708bba2a2be4a99b6e1dd47ce6607cf6",
   "query_spec_sha256": "3750600a8c4fbfa240f674ffdb22f1de84e63800ce67286a0b3b9ddb3c64fd63",
-  "exporter_sha256": "2fc0a8467a3370fd5bba954cd6de114cd28e967226e5bd9f21b7c1a2613005c3",
+  "exporter_sha256": "3481a6452ca242763b8b1ca77df6402df10bf358905784b2219dfb060e3054c6",
   "mdl_sha256": "b9c1bbd7646bdc76575c1b09658369e92c3dd89b90a35b80550aae6ac6ac9b7d",
   "duckdb_version": "1.5.5",
   "wren_core_version": "0.7.6",

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """检查语义YAML重复键、已知快照规则；--build-check隔离构建比较target。
 
-.venv/bin/python hr-delivery/validation/v2/check_semantics.py --build-check
+.venv/bin/python hr-demo/validation/v2/check_semantics.py --build-check
 不会修改源/target，不读取用户profile、不建库、不做memory index。
 """
 import argparse

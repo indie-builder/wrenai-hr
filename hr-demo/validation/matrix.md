@@ -46,7 +46,7 @@
 ## 复现方式
 
 ```bash
-cd hr-delivery/db && ./load.sh                 # 重建数据
+cd hr-demo/db && ./load.sh                 # 重建数据
 psql < validation/groundtruth.sql              # A 路径
 cd ../wren-project && ../validation/run_wren.sh # B 路径
 # 比对 validation/groundtruth_output.txt 与 validation/wren_output/q*.txt

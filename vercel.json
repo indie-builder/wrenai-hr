@@ -4,7 +4,7 @@
   "functions": {
     "hr_mcp/server.py": {
       "maxDuration": 60,
-      "excludeFiles": "{.git/**,.github/**,.agents/**,.claude/**,.venv/**,.venv-mcp/**,vendor/**,tests/**,scripts/**,hr-delivery/**,**/__pycache__/**,**/*.pyc}"
+      "excludeFiles": "{.git/**,.github/**,.agents/**,.claude/**,.venv/**,.venv-mcp/**,vendor/**,tests/**,scripts/**,hr-demo/**,**/__pycache__/**,**/*.pyc}"
     }
   }
 }

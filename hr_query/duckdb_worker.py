@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
-"""Internal JSON stdin/stdout protocol. No command strings or shell execution.
+"""Read-only DuckDB execution and an internal JSON stdin/stdout entry point.
 
-Used for trusted GT SQL and policy-validated, Wren-planned NL SQL. Database is
+Used for trusted GT SQL and policy-validated, planned SQL. The database is
 mounted READ_ONLY before external access is disabled and configuration locked.
+DuckDB is imported only when querying, so runners need no DuckDB dependency.
+Results are complete or an exception is raised; cell values are strings or None.
 """
 import json
 import sys
+
+
+class RowLimitExceeded(ValueError):
+    """The query exceeds the caller's row limit; no partial result is returned."""
 
 
 def query(database, sql, max_rows=10000):
@@ -28,7 +34,7 @@ def query(database, sql, max_rows=10000):
         columns = [item[0] for item in cursor.description]
         rows = cursor.fetchmany(max_rows + 1)
         if len(rows) > max_rows:
-            raise ValueError("row limit exceeded; query not scored")
+            raise RowLimitExceeded("query exceeds row limit")
         return {"complete": True, "columns": columns,
                 "rows": [[None if value is None else str(value) for value in row] for row in rows]}
     finally:
