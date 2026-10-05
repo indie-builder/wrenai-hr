@@ -16,7 +16,7 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 from hr_query.semantic import UniqueKeyLoader, build_mdl
-from run_all import PROJECT, WREN, run_process
+from query_execution import PROJECT, WREN, run_process
 
 SNAPSHOT = "2026-08-31"
 CLOCK = re.compile(r"\b(current_date|current_timestamp|current_time|localtimestamp|now\s*\(|today\s*\()", re.I)

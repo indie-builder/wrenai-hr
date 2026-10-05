@@ -1,5 +1,5 @@
 """Public schema and business context assembled at bundle build time."""
-from hr_mcp.contracts import SNAPSHOT_DATE
+from hr_mcp.contracts import CUBE_OPERATORS, MAX_FILTER_VALUES, MAX_MEMBERS, SNAPSHOT_DATE
 
 
 def public_context(mdl, project):
@@ -33,10 +33,11 @@ def public_context(mdl, project):
                         "历史部门统计按当前档案部门，除非显式还原调岗历史。",
         "models": models, "views": views, "cubes": cubes, "relationships": mdl.get("relationships", []),
         "cube_filters": {"fields": ["dimension", "operator", "value"],
-                         "operators": ["eq", "neq", "gt", "gte", "lt", "lte", "in", "not_in",
-                                       "contains", "starts_with", "is_null", "is_not_null"],
-                         "value": "比较使用标量；in/not_in 使用 1..50 个标量数组；is_null/is_not_null 不传 value。",
-                         "limits": "至少1个measure；measures、dimensions、filters各最多16项。时间维度可用于filters。"},
+                         "operators": list(CUBE_OPERATORS),
+                         "value": f"比较使用标量；in/not_in 使用 1..{MAX_FILTER_VALUES} 个标量数组；"
+                                  "is_null/is_not_null 不传 value。",
+                         "limits": f"至少1个measure；measures、dimensions、filters各最多{MAX_MEMBERS}项。"
+                                  "时间维度可用于filters。"},
         **{category: [{"name": path.name, "content": path.read_text(encoding="utf-8")}
                       for path in sorted((project / "knowledge" / category).glob("*.md"))]
            for category in ("rules", "glossary")},

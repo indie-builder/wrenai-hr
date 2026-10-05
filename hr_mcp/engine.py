@@ -36,6 +36,15 @@ def _read_json(path: Path):
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def worker_command(data_dir, *, root=None, python=None):
+    """The private worker argv plus a scrubbed environment without credentials."""
+    directory = Path(__file__).resolve().parent if root is None else Path(root) / "hr_mcp"
+    command = [str(python or sys.executable), "-I", "-B", str(directory / "worker.py"), str(data_dir)]
+    environment = {"PATH": os.defpath, "LANG": "C.UTF-8", "RAYON_NUM_THREADS": "2",
+                   "TOKIO_WORKER_THREADS": "2", "OPENBLAS_NUM_THREADS": "1", "MALLOC_ARENA_MAX": "2"}
+    return command, environment
+
+
 class AnalyticsEngine:
     def __init__(self, data_dir: Path):
         self.data_dir = Path(data_dir).resolve()
@@ -71,20 +80,18 @@ class AnalyticsEngine:
         return result
 
     def list_models(self) -> list:
-        return self._summaries(self._models, ("name", "kind", "description"))
+        return [{field: item[field] for field in ("name", "kind", "description")}
+                for item in self._models.values()]
 
     def describe_model(self, name: str) -> dict:
         return self._describe(self._models, name, "MODEL_NOT_FOUND")
 
     def list_cubes(self) -> list:
-        return self._summaries(self._cubes, ("name", "description"))
+        return [{field: item[field] for field in ("name", "description")}
+                for item in self._cubes.values()]
 
     def describe_cube(self, name: str) -> dict:
         return self._describe(self._cubes, name, "CUBE_NOT_FOUND")
-
-    @staticmethod
-    def _summaries(items, fields):
-        return [{field: item[field] for field in fields} for item in items.values()]
 
     @staticmethod
     def _describe(items, name, error):
@@ -92,16 +99,13 @@ class AnalyticsEngine:
             fail(error)
         return copy.deepcopy(items[name])
 
+    # SQL length/type checks live in hr_query.sql_policy; the worker rejects
+    # malformed SQL before planning, so the HTTP layer only relays it.
     def plan_sql(self, sql: str) -> QueryResult:
-        return self._sql("plan", sql)
+        return self._run({"operation": "plan", "sql": sql})
 
     def query_sql(self, sql: str) -> QueryResult:
-        return self._sql("query", sql)
-
-    def _sql(self, operation, sql):
-        if not isinstance(sql, str) or not sql.strip() or len(sql) > MAX_SQL_CHARS:
-            fail("SQL_REJECTED")
-        return self._run({"operation": operation, "sql": sql})
+        return self._run({"operation": "query", "sql": sql})
 
     def query_cube(self, cube: str, measures: list[str], dimensions: list[str],
                    filters: list[dict] | None = None) -> QueryResult:
@@ -109,10 +113,7 @@ class AnalyticsEngine:
         return self._run({"operation": "cube", "cube_query": request})
 
     def _run(self, request: WorkerRequest) -> QueryResult:
-        command = [sys.executable, "-I", "-B", str(Path(__file__).with_name("worker.py")), str(self.data_dir)]
-        # Do not forward the HTTP module's bearer token or other credentials.
-        environment = {"PATH": os.defpath, "LANG": "C.UTF-8", "RAYON_NUM_THREADS": "2",
-                       "TOKIO_WORKER_THREADS": "2", "OPENBLAS_NUM_THREADS": "1", "MALLOC_ARENA_MAX": "2"}
+        command, environment = worker_command(self.data_dir)
         encoded = json.dumps(request, ensure_ascii=False, allow_nan=False).encode()
         if len(encoded) > MAX_INPUT_BYTES:
             fail("INVALID_ARGUMENT")

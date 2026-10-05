@@ -1,6 +1,4 @@
 """NL evaluation contract and real planner tests; only isolated data/project paths."""
-import contextlib
-import io
 import json
 from pathlib import Path
 import sys
@@ -11,7 +9,8 @@ from unittest.mock import patch
 BASE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BASE))
 sys.path.insert(0, str(BASE / "eval"))
-import run_all as runner
+import query_execution as execution
+from questions import QUESTIONS
 import nl_eval
 
 
@@ -45,11 +44,11 @@ class NLEvaluationTests(unittest.TestCase):
                 self.assertNotIn(answer, text)
 
     def test_public_schema_exposes_labels_and_precision_only(self):
-        offer = next(q for q in runner.QUESTIONS if q["id"] == "q28")
+        offer = next(q for q in QUESTIONS if q["id"] == "q28")
         self.assertEqual(nl_eval.output_schema(offer), [
             {"name": "已接受", "round_digits": None}, {"name": "已拒绝", "round_digits": None},
             {"name": "接受率", "round_digits": 1}])
-        cost = next(q for q in runner.QUESTIONS if q["id"] == "q40")
+        cost = next(q for q in QUESTIONS if q["id"] == "q40")
         self.assertEqual(nl_eval.output_schema(cost), [
             {"name": "部门", "round_digits": None}, {"name": "人均月成本", "round_digits": 0}])
         nested = {"gt": "WITH x AS (SELECT round(secret_value, 3) AS n FROM hidden_source) SELECT round(n, 1) AS 指标, round(n, 2) * 100 AS 未约定精度 FROM x"}
@@ -59,12 +58,12 @@ class NLEvaluationTests(unittest.TestCase):
             self.assertNotIn(hidden, json.dumps(schema))
 
     def test_declared_display_precision_handles_unrounded_values_without_relaxing_other_columns(self):
-        offer = next(q for q in runner.QUESTIONS if q["id"] == "q28")
+        offer = next(q for q in QUESTIONS if q["id"] == "q28")
         gt = "已接受,已拒绝,接受率\n49,8,86.0\n"
         self.assertTrue(nl_eval.compare_answer(gt, "accepted,rejected,rate\n49,8,85.96491228070175\n", offer)[0])
         self.assertFalse(nl_eval.compare_answer(gt, "accepted,replied,rate\n49,57,85.96491228070175\n", offer)[0])
         self.assertFalse(nl_eval.compare_answer(gt, "accepted,rejected,rate\n49.02,8,85.96491228070175\n", offer)[0])
-        cost = next(q for q in runner.QUESTIONS if q["id"] == "q40")
+        cost = next(q for q in QUESTIONS if q["id"] == "q40")
         raw = "department,cost\n研发,12345.49\n"
         self.assertTrue(nl_eval.compare_answer("部门,人均月成本\n研发,12345\n", raw, cost)[0])
         self.assertEqual(raw, "department,cost\n研发,12345.49\n")
@@ -74,7 +73,7 @@ class NLEvaluationTests(unittest.TestCase):
         self.assertEqual(nl_eval.normalize_display([["-1.25"]], [{"name": "v", "round_digits": 1}]), [["-1.3"]])
 
     def test_no_generation_and_rejected_sql_do_not_start_processes(self):
-        with patch.object(runner, "run_process") as process:
+        with patch.object(nl_eval, "run_process") as process:
             self.assertEqual(self.evaluate(None)[0], "NOT_GENERATED")
             self.assertEqual(self.evaluate(self.record(None))[0], "NOT_GENERATED")
             self.assertEqual(self.evaluate(self.record("DELETE FROM employees"))[0], "SQL_REJECTED")
@@ -82,12 +81,12 @@ class NLEvaluationTests(unittest.TestCase):
             process.assert_not_called()
 
     def test_execution_failure_and_answer_difference_are_separate(self):
-        with patch.object(runner, "run_process", return_value=runner.Execution("SELECT count(*) FROM employees\n", 0)):
-            with patch.object(runner, "run_gt", return_value=runner.Execution(status="timeout")):
+        with patch.object(nl_eval, "run_process", return_value=execution.Execution("SELECT count(*) FROM employees\n", 0)):
+            with patch.object(nl_eval, "run_gt", return_value=execution.Execution(status="timeout")):
                 self.assertEqual(self.evaluate(self.record())[0], "EXECUTION_FAILED")
-            with patch.object(runner, "run_gt", side_effect=[runner.Execution("n\n2\n", 0), runner.Execution("在职人数\n3\n", 0)]):
+            with patch.object(nl_eval, "run_gt", side_effect=[execution.Execution("n\n2\n", 0), execution.Execution("在职人数\n3\n", 0)]):
                 self.assertEqual(self.evaluate(self.record())[0], "RESULT_DIFFERENCE")
-            with patch.object(runner, "run_gt", side_effect=[runner.Execution("n\n3\n", 0), runner.Execution("在职人数\n3\n", 0)]):
+            with patch.object(nl_eval, "run_gt", side_effect=[execution.Execution("n\n3\n", 0), execution.Execution("在职人数\n3\n", 0)]):
                 self.assertEqual(self.evaluate(self.record())[0], "PASS")
 
     def test_generated_records_cannot_choose_shell_commands(self):
@@ -107,17 +106,17 @@ class NLEvaluationTests(unittest.TestCase):
 
     def test_every_failed_stage_retains_safe_trace_and_successful_raw_output(self):
         stages = [
-            (runner.Execution(status="timeout"), [], "PLAN_FAILED", {}),
-            (runner.Execution("DELETE FROM employees\n", 0), [], "PLAN_REJECTED", {}),
-            (runner.Execution("SELECT count(*) FROM employees\n", 0),
-             [runner.Execution("n\n1.0\n", 0), runner.Execution(status="timeout")], "GT_FAILED", {"generated": "n\n1.0\n"}),
-            (runner.Execution("SELECT count(*) FROM employees\n", 0),
-             [runner.Execution("n\n1", 0), runner.Execution("在职人数\n1\n", 0)], "INVALID_OUTPUT",
+            (execution.Execution(status="timeout"), [], "PLAN_FAILED", {}),
+            (execution.Execution("DELETE FROM employees\n", 0), [], "PLAN_REJECTED", {}),
+            (execution.Execution("SELECT count(*) FROM employees\n", 0),
+             [execution.Execution("n\n1.0\n", 0), execution.Execution(status="timeout")], "GT_FAILED", {"generated": "n\n1.0\n"}),
+            (execution.Execution("SELECT count(*) FROM employees\n", 0),
+             [execution.Execution("n\n1", 0), execution.Execution("在职人数\n1\n", 0)], "INVALID_OUTPUT",
              {"generated": "n\n1", "gt": "在职人数\n1\n"}),
         ]
         for plan, queries, expected, outputs in stages:
-            with self.subTest(status=expected), patch.object(runner, "run_process", return_value=plan), \
-                    patch.object(runner, "run_gt", side_effect=queries) as query:
+            with self.subTest(status=expected), patch.object(nl_eval, "run_process", return_value=plan), \
+                    patch.object(nl_eval, "run_gt", side_effect=queries) as query:
                 status, _, trace, actual = self.evaluate(self.record())
                 self.assertEqual(status, expected)
                 self.assertEqual(actual, outputs)

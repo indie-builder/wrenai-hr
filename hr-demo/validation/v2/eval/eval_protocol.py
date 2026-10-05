@@ -2,7 +2,7 @@
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP, localcontext
 import json
 
-from reports import digest, write_json
+from query_execution import digest, write_json
 
 
 def output_schema(question):

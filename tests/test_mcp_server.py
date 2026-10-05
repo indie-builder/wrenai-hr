@@ -11,10 +11,9 @@ import anyio
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 
-from fixtures import TOKEN, ROOT, fixture, touch_bundle
+from fixtures import ENV_KEYS, HEADERS, ROOT, TOKEN, ServerCase, fixture, rpc, sdk_session, touch_bundle
 from hr_mcp.contracts import BUNDLE_FILES, ERROR_MESSAGES, MCPQueryError, SNAPSHOT_DATE
 from hr_mcp.server import app, create_app
-from mcp_fixtures import ENV_KEYS, HEADERS, ServerCase, rpc, sdk_session
 
 TOOL_CALLS = {
     "get_context": {}, "list_models": {}, "describe_model": {"name": "employees"},

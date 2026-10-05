@@ -5,9 +5,8 @@ from unittest.mock import patch
 
 import anyio
 
-from fixtures import AUTH, TOKEN
+from fixtures import AUTH, HEADERS, TOKEN, ServerCase, initialize, rpc
 from hr_mcp.contracts import MAX_BODY_BYTES, SNAPSHOT_DATE
-from mcp_fixtures import HEADERS, ServerCase, initialize, rpc
 
 METHODS = ("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD", "TRACE", "CONNECT")
 

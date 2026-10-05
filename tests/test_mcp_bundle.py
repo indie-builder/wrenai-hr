@@ -1,5 +1,4 @@
 """Bundle replacement, fixed-SQL replay and isolated deployment adapters."""
-import json
 from pathlib import Path
 import shutil
 import subprocess
@@ -12,7 +11,7 @@ from unittest import mock
 from fixtures import ErrorAssertions, ROOT, copy_deployment, fixture, load_module, worker_call
 from hr_mcp.contracts import BUNDLE_FILES, BUNDLE_FORMAT_VERSION
 from hr_mcp.engine import AnalyticsEngine, file_digest
-from scripts.prepare_mcp import build_bundle, write_json
+from scripts.prepare_mcp import build_bundle
 
 
 class BundleTests(ErrorAssertions, unittest.TestCase):
@@ -56,16 +55,9 @@ class BundleTests(ErrorAssertions, unittest.TestCase):
             if path == kept:
                 path.unlink()
 
-    def test_real_v1_upgrade_builds_without_target_and_replays_all_fixed_queries(self):
+    def test_real_build_skips_target_and_replays_all_fixed_queries(self):
         from hr_query.duckdb_worker import query
 
-        fixture(self.data)
-        previous = json.loads((self.data / "manifest.json").read_text())
-        previous["format_version"] = 1
-        for source, name in (("sql_policy.py", "sql_policy.py"), ("duckdb_worker.py", "sql_worker.py")):
-            shutil.copyfile(ROOT / "hr_query" / source, self.data / name)
-            previous["files"][name] = file_digest(self.data / name)
-        write_json(self.data / "manifest.json", previous)
         original_read = Path.read_text
         def without_target(path, *args, **kwargs):
             self.assertFalse("target" in path.parts, "bundle build read a generated cache")

@@ -47,7 +47,7 @@ class DatabaseBuildTests(unittest.TestCase):
 
     def test_single_quote_workspace_loads_csv_and_parquet(self):
         with contextlib.redirect_stdout(io.StringIO()):
-            self.assertEqual(builder.build("parquet"), 0)
+            self.assertEqual(builder.build(), 0)
         with duckdb.connect(str(self.database), read_only=True) as con:
             self.assertEqual(con.execute("SELECT * FROM departments").fetchall(), [(1, "技术部")])
             self.assertEqual(con.execute("SELECT pay_id, emp_id, amount::VARCHAR FROM salary_payments").fetchall(),
@@ -84,7 +84,7 @@ class DatabaseBuildTests(unittest.TestCase):
                     restore = lambda: path.write_bytes(contents)
                 try:
                     with self.assertRaises(SystemExit), contextlib.redirect_stdout(io.StringIO()):
-                        builder.build("parquet")
+                        builder.build()
                     self.assertEqual(self.database.read_bytes(), original)
                     self.assertEqual(list(self.database.parent.glob(".build-*")), [])
                 finally:
@@ -94,11 +94,11 @@ class DatabaseBuildTests(unittest.TestCase):
         original = self.preserve_database()
         (self.seeds / "salary_payments.csv").write_text("wrong_header\n1\n")
         with contextlib.redirect_stdout(io.StringIO()):
-            self.assertEqual(builder.build("parquet"), 1)
+            self.assertEqual(builder.build(), 1)
         self.assertEqual(self.database.read_bytes(), original)
         builder.ATT_PARQUET.unlink()
         with self.assertRaises(SystemExit):
-            builder.build("parquet")
+            builder.build()
         self.assertEqual(self.database.read_bytes(), original)
         self.assertEqual(list(self.database.parent.glob(".build-*")), [])
 

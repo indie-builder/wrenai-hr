@@ -2,10 +2,9 @@
 """Build public.duckdb in staging; publish only after every seed loads successfully.
 
 CSV headers name their business columns. The schema defines table columns and
-primary keys; missing keys are generated in file order. Attendance requires its
-verified snapshot unless --attendance generate is explicitly requested.
+primary keys; missing keys are generated in file order. Attendance comes from
+its SHA-256 verified parquet snapshot.
 """
-import argparse
 import csv
 import hashlib
 import json
@@ -32,15 +31,12 @@ def split_statements(sql_text):
     return [statement.strip() for statement in sql_text.split(";") if statement.strip()]
 
 
-def resolve_attendance(requested):
-    if requested == "generate":
-        return requested
+def resolve_attendance():
     if not ATT_PARQUET.is_file() or not ATT_MANIFEST.is_file():
         raise SystemExit("错误: 缺少 seed/attendance_records.parquet 或其来源清单；未修改现有数据库。")
     expected = json.loads(ATT_MANIFEST.read_text(encoding="utf-8"))["sha256"]
     if hashlib.sha256(ATT_PARQUET.read_bytes()).hexdigest() != expected:
         raise SystemExit("错误: 考勤种子 SHA-256 与来源清单不一致；未修改现有数据库。")
-    return "parquet"
 
 
 def load_csv(con, path):
@@ -65,10 +61,8 @@ def load_csv(con, path):
     print(f"  {table} OK")
 
 
-def build(attendance):
-    attendance = resolve_attendance(attendance)
-    if attendance == "generate":
-        print("警告: 显式重生成考勤会改变模拟数据，需重新验证并导出仪表盘快照。")
+def build():
+    resolve_attendance()
     if DB_FILE.with_suffix(".duckdb.wal").exists():
         raise SystemExit("错误: 存在数据库 WAL，请先正常关闭所有连接；未修改现有数据库。")
     DB_DIR.mkdir(parents=True, exist_ok=True)
@@ -94,15 +88,11 @@ def build(attendance):
                 except (ValueError, StopIteration) as exc:
                     print(f"错误: {paths[0].name} 列头无效 ({type(exc).__name__})")
                     return 1
-            if attendance == "parquet":
-                # Preserve original att_id instead of re-numbering parallel Parquet scans.
-                columns = "att_id,emp_id,att_date,status,work_hours,overtime_hours"
-                con.execute(f"INSERT INTO attendance_records ({columns}) "
-                            f"SELECT {columns} FROM read_parquet(?) ORDER BY att_id", [str(ATT_PARQUET)])
-                print(f"  attendance_records OK (parquet 快照: {ATT_PARQUET.name})")
-            else:
-                print("== 考勤: 用 gen_attendance_duckdb.sql 显式重新生成")
-                con.execute((HERE / "gen_attendance_duckdb.sql").read_text(encoding="utf-8"))
+            # Preserve original att_id instead of re-numbering parallel Parquet scans.
+            columns = "att_id,emp_id,att_date,status,work_hours,overtime_hours"
+            con.execute(f"INSERT INTO attendance_records ({columns}) "
+                        f"SELECT {columns} FROM read_parquet(?) ORDER BY att_id", [str(ATT_PARQUET)])
+            print(f"  attendance_records OK (parquet 快照: {ATT_PARQUET.name})")
             counts = [(table, con.execute(f"SELECT count(*) FROM {table}").fetchone()[0]) for table in tables]
             print("== 行数统计 ==")
             for table, count in counts:
@@ -115,7 +105,4 @@ def build(attendance):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--attendance", choices=["auto", "parquet", "generate"], default="auto",
-                        help="auto/parquet 均要求确定性种子；generate 显式重生成")
-    sys.exit(build(parser.parse_args().attendance))
+    sys.exit(build())
