@@ -5,14 +5,12 @@ import hashlib
 from pathlib import Path
 import sys
 
-# Keep existing imports working for semantic checks, bundle tests and offline tools.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from questions import QUESTIONS
-from result_contract import (NUM_TOL, cell_key, compare, compare_tables, comparison_options,
-                             norm_cell, numeric_tolerance, parse_csv, rows_equal, table_csv)
-from query_execution import (DUCKDB_FILE, PROJECT, VENV_PY, WREN, Execution,
-                             load_env, positive_timeout, run_gt, run_process, run_wren)
-from reports import write_json, write_results, write_summary
+from query_execution import (evaluate, load_env, positive_timeout, run_gt, run_wren,
+                             write_json, write_results, write_summary)
+# 根级 tests/test_mcp_bundle.py 按文件路径加载本模块，依赖契约名从 run_all 可导入。
+from result_contract import compare, comparison_options, table_csv
 
 HERE = Path(__file__).resolve().parent
 
@@ -40,16 +38,6 @@ def output_directory(questions, *, subset=False, output=None):
     ids = "-".join(question["id"] for question in questions)
     key = ids if len(ids) < 80 else hashlib.sha256(ids.encode()).hexdigest()[:16]
     return HERE / "runs" / key
-
-
-def evaluate(question, gt, wren):
-    if not gt.ok or not wren.ok:
-        return False, f"执行失败 GT={gt.message()} Wren={wren.message()}"
-    try:
-        ok, message, _ = compare(gt.stdout, wren.stdout, **comparison_options(question))
-        return ok, message
-    except ValueError as exc:
-        return False, f"题库元数据错误: {exc}"
 
 
 def main(argv=None):

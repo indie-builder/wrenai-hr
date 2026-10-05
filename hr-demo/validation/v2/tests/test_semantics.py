@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import check_semantics as semantics
-import run_all as runner
+import query_execution as execution
 
 
 class SemanticCheckTests(unittest.TestCase):
@@ -45,7 +45,7 @@ class SemanticCheckTests(unittest.TestCase):
                 self.assertNotEqual(env["WREN_HOME"], str(Path.home() / ".wren"))
                 (cwd / "target").mkdir()
                 (cwd / "target/mdl.json").write_text(json.dumps(expected))
-                return runner.Execution("Built\n", 0)
+                return execution.Execution("Built\n", 0)
 
             with patch.object(semantics, "run_process", side_effect=build), \
                     patch.object(semantics, "build_mdl", return_value=expected):

@@ -16,28 +16,30 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-import run_all as regression
 from hr_query.sql_policy import PolicyError, mdl_tables, validate_sql
-from reports import digest, write_json, write_results, write_summary
-from result_contract import compare_tables
+from questions import QUESTIONS
+from query_execution import (DUCKDB_FILE, PROJECT, WREN, digest, positive_timeout, run_gt,
+                             run_process, write_json, write_results, write_summary)
+from result_contract import compare_tables, comparison_options, parse_csv
+from run_all import select_questions
 from eval_protocol import export_package, load_records, normalize_display, output_schema
 
 
 def compare_answer(gt, actual, question):
     # Aliases are presentation; public column positions and precision are binding.
-    gh, gr = regression.parse_csv(gt)
-    ah, ar = regression.parse_csv(actual)
+    gh, gr = parse_csv(gt)
+    ah, ar = parse_csv(actual)
     schema = output_schema(question)
     if len(gh) != len(ah) or len(gh) != len(schema):
         return False, "列数不符合公开output_schema", gh
     return compare_tables(gh, normalize_display(gr, schema), gh, normalize_display(ar, schema),
-                          **regression.comparison_options(question))
+                          **comparison_options(question))
 
 
 def evaluate_question(question, record, error, *, manifest, project, mdl, database, timeout):
     trace = {"id": question["id"], "question": question["question"],
              "execution_path": "wren dry-plan -> AST policy -> restricted read-only DuckDB query",
-             "comparison": {**regression.comparison_options(question), "column_aliases": "ignored_by_position",
+             "comparison": {**comparison_options(question), "column_aliases": "ignored_by_position",
                             "output_schema": output_schema(question), "rounding": "ROUND_HALF_UP"},
              "generation_record": record}
     if error:
@@ -49,8 +51,8 @@ def evaluate_question(question, record, error, *, manifest, project, mdl, databa
         sql = validate_sql(record["generated_sql"], semantic)
     except PolicyError as exc:
         return "SQL_REJECTED", str(exc), trace, {}
-    plan = regression.run_process([regression.WREN, "dry-plan", "--sql", sql,
-                                   "--datasource", "duckdb", "--mdl", mdl], cwd=project, timeout=timeout)
+    plan = run_process([WREN, "dry-plan", "--sql", sql,
+                        "--datasource", "duckdb", "--mdl", mdl], cwd=project, timeout=timeout)
     trace["dry_plan"] = plan.trace()
     if not plan.ok:
         return "PLAN_FAILED", plan.message(), trace, {}
@@ -59,11 +61,11 @@ def evaluate_question(question, record, error, *, manifest, project, mdl, databa
     except PolicyError as exc:
         return "PLAN_REJECTED", str(exc), trace, {}
     trace["planned_sql"] = planned_sql
-    actual = regression.run_gt(planned_sql, db_file=database, timeout=timeout)
+    actual = run_gt(planned_sql, db_file=database, timeout=timeout)
     trace["query"] = actual.trace()
     if not actual.ok:
         return "EXECUTION_FAILED", actual.message(), trace, {}
-    gt = regression.run_gt(question["gt"], db_file=database, timeout=timeout)
+    gt = run_gt(question["gt"], db_file=database, timeout=timeout)
     trace["ground_truth"] = gt.trace()
     outputs = {"generated": actual.stdout}
     if not gt.ok:
@@ -114,16 +116,16 @@ def main(argv=None):
     for name in ("export", "run"):
         command = sub.add_parser(name)
         command.add_argument("--output-dir", type=Path, required=True, help="必须为新目录")
-        command.add_argument("--project", type=Path, default=regression.PROJECT)
+        command.add_argument("--project", type=Path, default=PROJECT)
         command.add_argument("--only", nargs="+")
         command.add_argument("--domain")
         if name == "run":
             command.add_argument("--records", type=Path, required=True)
-            command.add_argument("--database", type=Path, default=regression.DUCKDB_FILE)
-            command.add_argument("--timeout", type=regression.positive_timeout, default=180)
+            command.add_argument("--database", type=Path, default=DUCKDB_FILE)
+            command.add_argument("--timeout", type=positive_timeout, default=180)
     args = parser.parse_args(argv)
     try:
-        questions = regression.select_questions(regression.QUESTIONS, args.only, args.domain)
+        questions = select_questions(QUESTIONS, args.only, args.domain)
         if args.command == "export":
             export_package(args.output_dir, questions, args.project.resolve())
             print(f"已导出{len(questions)}题；未生成SQL。")
