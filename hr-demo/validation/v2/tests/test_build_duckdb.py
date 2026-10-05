@@ -1,6 +1,6 @@
+import _support
 import contextlib
 import hashlib
-import importlib.util
 import io
 import json
 from pathlib import Path
@@ -10,11 +10,7 @@ from unittest.mock import patch
 
 import duckdb
 
-
-SOURCE = Path(__file__).resolve().parents[3] / "db" / "build_duckdb.py"
-spec = importlib.util.spec_from_file_location("build_duckdb", SOURCE)
-builder = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(builder)
+builder = _support.load_module(_support.HR_DEMO / "db" / "build_duckdb.py", "build_duckdb")
 
 
 class DatabaseBuildTests(unittest.TestCase):

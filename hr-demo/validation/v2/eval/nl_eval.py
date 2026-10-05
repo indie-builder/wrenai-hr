@@ -133,7 +133,7 @@ def main(argv=None):
         return run_evaluation(args.output_dir, questions, args.records, args.project.resolve(),
                               args.database.resolve(), args.timeout)
     except (OSError, ValueError) as exc:
-        print(f"评测输入/配置错误: {type(exc).__name__}；请检查路径、JSONL协议和目录是否已存在。", file=sys.stderr)
+        print(f"评测输入/配置错误: {exc}；请检查路径、JSONL协议和目录是否已存在。", file=sys.stderr)
         return 1
 
 

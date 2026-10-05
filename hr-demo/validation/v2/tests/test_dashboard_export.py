@@ -1,23 +1,18 @@
 """Snapshot boundary and atomic publication tests use isolated temporary assets."""
+import _support
 import contextlib
 import copy
-import importlib.util
 import io
 import json
 from pathlib import Path
-import sys
 import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
 
 import duckdb
 
-SCRIPT = Path(__file__).resolve().parents[3] / "scripts/export_dashboard.py"
-sys.path.insert(0, str(SCRIPT.parents[2]))
 from hr_query.semantic import build_mdl
-MODULE_SPEC = importlib.util.spec_from_file_location("dashboard_export_under_test", SCRIPT)
-exporter = importlib.util.module_from_spec(MODULE_SPEC)
-MODULE_SPEC.loader.exec_module(exporter)
+exporter = _support.load_module(_support.HR_DEMO / "scripts" / "export_dashboard.py", "dashboard_export_under_test")
 
 
 class DashboardPublicationTests(unittest.TestCase):

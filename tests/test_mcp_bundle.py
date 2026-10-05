@@ -79,6 +79,8 @@ class BundleTests(ErrorAssertions, unittest.TestCase):
         self.assertEqual(analytics.query_sql("SELECT COUNT(*) AS n FROM employees")["rows"], [["786"]])
         sys.path.insert(0, str(ROOT / "hr-demo/validation/v2"))
         try:
+            from result_contract import compare, comparison_options, table_csv
+
             regression = load_module(ROOT / "hr-demo/validation/v2/run_all.py", "_mcp_regression")
         finally:
             sys.path.pop(0)
@@ -87,9 +89,9 @@ class BundleTests(ErrorAssertions, unittest.TestCase):
             with self.subTest(question=question["id"]):
                 actual = analytics.query_sql(question["wren"])
                 expected = query(str(self.data / "public.duckdb"), question["gt"])
-                ok, message, _ = regression.compare(
-                    regression.table_csv(expected["columns"], expected["rows"]),
-                    regression.table_csv(actual["columns"], actual["rows"]), **regression.comparison_options(question))
+                ok, message, _ = compare(
+                    table_csv(expected["columns"], expected["rows"]),
+                    table_csv(actual["columns"], actual["rows"]), **comparison_options(question))
                 self.assertTrue(ok, f"{question['id']}: {message}")
         deployed = self.directory / "isolated"
         copy_deployment(deployed)

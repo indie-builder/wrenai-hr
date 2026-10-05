@@ -5,12 +5,9 @@ import hashlib
 from pathlib import Path
 import sys
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 from questions import QUESTIONS
 from query_execution import (evaluate, load_env, positive_timeout, run_gt, run_wren,
                              write_json, write_results, write_summary)
-# 根级 tests/test_mcp_bundle.py 按文件路径加载本模块，依赖契约名从 run_all 可导入。
-from result_contract import compare, comparison_options, table_csv
 
 HERE = Path(__file__).resolve().parent
 

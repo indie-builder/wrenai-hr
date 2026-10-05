@@ -1,14 +1,18 @@
-"""Real Core/DuckDB integration through the bounded analytics interface."""
+"""Real Core/DuckDB integration plus the isolated stdin/stdout worker seam."""
 from __future__ import annotations
 
 import json
+import os
+from pathlib import Path
 import signal
 import subprocess
+import sys
+import tempfile
 from unittest import mock
 
-from fixtures import BundleCase
+from fixtures import BundleCase, SQL_ATTACK_CANARIES, worker_call
 from hr_mcp import engine as engine_module
-from hr_mcp.contracts import SNAPSHOT_DATE
+from hr_mcp.contracts import MAX_INPUT_BYTES, SNAPSHOT_DATE, decode_worker_response
 from hr_mcp.worker import execute
 
 
@@ -80,16 +84,8 @@ class EngineTests(BundleCase):
             run.assert_not_called()
 
     def test_sql_policy_blocks_writes_files_extensions_and_catalogs(self):
-        unsafe = [
-            "DELETE FROM employees", "SELECT 1; SELECT 2", "SELECT * FROM read_csv('/secret')",
-            "SELECT * FROM '/secret.parquet'", "SELECT getenv('MCP_AUTH_TOKEN')",
-            "SELECT private_macro()", "SELECT * FROM duckdb_settings()",
-            "SELECT * FROM information_schema.tables", "SELECT * FROM other.employees",
-            "WITH RECURSIVE x AS (SELECT 1 UNION ALL SELECT * FROM x) SELECT * FROM x",
-            "COPY (SELECT * FROM employees) TO '/tmp/leak.csv'",
-            "ATTACH '/secret' AS secret", "INSTALL httpfs", "PRAGMA version",
-        ]
-        for sql in unsafe:
+        # 金丝雀子集来自 fixtures.SQL_ATTACK_VECTORS；策略层的全量断言在 test_hr_query。
+        for sql in SQL_ATTACK_CANARIES:
             with self.subTest(sql=sql):
                 self.assert_code("SQL_REJECTED", self.engine.query_sql, sql)
         self.assertEqual(self.engine.query_sql("SELECT COUNT(*) AS n FROM employees")["rows"], [["3"]])
@@ -127,3 +123,64 @@ class EngineTests(BundleCase):
         with mock.patch.dict("os.environ", {"MCP_AUTH_TOKEN": "private-token"}), \
                 mock.patch("hr_mcp.engine.subprocess.run", side_effect=malformed):
             self.assert_code("INVALID_RESULT", self.engine.query_sql, "SELECT 1")
+
+
+class WorkerTests(BundleCase):
+    def call(self, request):
+        return worker_call(self.data, request)
+
+    def test_plan_query_and_cube_return_complete_results(self):
+        for request, rows in (
+            ({"operation": "plan", "sql": "SELECT COUNT(*) FROM employees"}, []),
+            ({"operation": "query", "sql": "SELECT COUNT(*) FROM employees"}, [["3"]]),
+            ({"operation": "cube", "cube_query": {"cube": "workforce", "measures": ["headcount"], "dimensions": []}}, [["2"]]),
+        ):
+            with self.subTest(operation=request["operation"]):
+                result = decode_worker_response(json.dumps(self.call(request)).encode(), request["operation"])
+                self.assertEqual(result["rows"], rows)
+                self.assertTrue(result["complete"])
+                self.assertEqual(result["snapshot_date"], SNAPSHOT_DATE)
+                if request["operation"] == "plan":
+                    self.assertFalse(result["executed"])
+                    self.assertIn("employees", result["planned_sql"])
+
+    def test_invalid_inputs_have_safe_error_envelopes(self):
+        for request in (b"{", b"[]", b"x" * (MAX_INPUT_BYTES + 1), {},
+                        {"operation": "delete"}, {"operation": "cube", "cube_query": []}):
+            with self.subTest(kind=type(request).__name__):
+                self.assertEqual(self.call(request), {"error": {"code": "INVALID_ARGUMENT"}})
+        self.assertEqual(self.call({"operation": "query", "sql": "DELETE FROM employees"}),
+                         {"error": {"code": "SQL_REJECTED"}})
+
+    def test_decoder_rejects_truncated_incomplete_and_mismatched_results(self):
+        result = {"snapshot_date": SNAPSHOT_DATE, "columns": ["n"], "rows": [["1"]],
+                  "row_count": 1, "complete": True}
+        payloads = [b"{", b"[]", b'{"result":null}', b'{"error":[],"result":{}}']
+        for change in ({"complete": False}, {"snapshot_date": "2026-09-01"},
+                       {"rows": [[1]]}, {"rows": [[]]}, {"row_count": True}, {"row_count": 2}):
+            payloads.append(json.dumps({"result": {**result, **change}}).encode())
+        for raw in payloads:
+            with self.subTest(raw=raw):
+                self.assert_code("INVALID_RESULT", decode_worker_response, raw, "query")
+        self.assert_code("QUERY_FAILED", decode_worker_response, b'{"error":{"code":"private-driver-error"}}', "query")
+        self.assert_code("INVALID_RESULT", decode_worker_response, json.dumps({"result": result}).encode(), "plan")
+
+    def test_running_process_timeout_reaps_child_and_allows_next_query(self):
+        real_run = subprocess.run
+        with tempfile.TemporaryDirectory() as temporary:
+            script = Path(temporary) / "busy.py"
+            pid_file = Path(temporary) / "pid"
+            script.write_text("import os, sys\nfrom pathlib import Path\n"
+                              "Path(sys.argv[1]).write_text(str(os.getpid()))\n"
+                              "while True:\n    pass\n")
+
+            def run_busy(command, **kwargs):
+                return real_run([sys.executable, "-I", "-B", str(script), str(pid_file)],
+                                **{**kwargs, "timeout": 0.5})
+
+            with mock.patch("hr_mcp.engine.subprocess.run", side_effect=run_busy):
+                self.assert_code("QUERY_TIMEOUT", self.engine.query_sql, "SELECT 1")
+            self.assertTrue(pid_file.is_file(), "The child must start executing before timeout")
+            with self.assertRaises(ProcessLookupError):
+                os.kill(int(pid_file.read_text()), 0)
+        self.assertEqual(self.engine.query_sql("SELECT 1")["rows"], [["1"]])

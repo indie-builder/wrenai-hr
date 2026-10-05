@@ -120,9 +120,7 @@ SELECT p.n AS 晋升人数, hc.n AS 期初在职, round(p.n * 100.0 / hc.n, 2) A
 _case(id="q17", domain="员工生命周期", priority="P1", question="各晋升后职级的平均调薪幅度？",
 gt="""SELECT to_level AS 晋升后职级, count(*) AS 人次,
 round(avg((salary_after - salary_before) * 100.0 / salary_before), 2) AS 平均调薪幅度
-FROM promotions GROUP BY to_level""",
-wren="""SELECT to_level AS 晋升后职级, count(*) AS 人次,
-round(avg((salary_after - salary_before) * 100.0 / salary_before), 2) AS 平均调薪幅度 FROM promotions GROUP BY to_level"""),
+FROM promotions GROUP BY to_level"""),
 # 晋升幅度在查询中用前后工资计算，模型保留原始工资与原因字段。
 
 _case(id="q18", domain="员工生命周期", priority="P1", question="截至2026-08-31，未来90天内到期的履行中合同数与无固定期限在履约合同数（含快照日与第90天）？",

@@ -1,14 +1,11 @@
 """NL evaluation contract and real planner tests; only isolated data/project paths."""
+import _support
 import json
 from pathlib import Path
-import sys
 import tempfile
 import unittest
 from unittest.mock import patch
 
-BASE = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(BASE))
-sys.path.insert(0, str(BASE / "eval"))
 import query_execution as execution
 from questions import QUESTIONS
 import nl_eval
@@ -126,12 +123,10 @@ class NLEvaluationTests(unittest.TestCase):
 
 class WrenIntegrationTests(unittest.TestCase):
     def test_real_planner_and_restricted_worker_with_temporary_database(self):
-        import duckdb
         with tempfile.TemporaryDirectory() as directory:
             project = Path(directory)
             db = project / "public.duckdb"
-            with duckdb.connect(str(db)) as connection:
-                connection.execute("CREATE TABLE employees(id INTEGER); INSERT INTO employees VALUES (1), (2)")
+            _support.create_two_employee_database(db)
             manifest = {"catalog": "wren", "schema": "public", "dataSource": "duckdb",
                         "models": [{"name": "employees", "tableReference": {"schema": "public", "table": "employees"},
                                     "columns": [{"name": "id", "type": "INTEGER"}]}], "relationships": [], "views": []}

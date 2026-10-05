@@ -64,25 +64,14 @@ class LoadDatabaseTests(TemporaryScriptTests):
         self.assertEqual(self.snapshot(), before_tables)
 
 
-@cases("check_comparisons", {
-    "multiset_permutation_passes_unordered_and_fails_ordered": tuple(
-        ("v\n2\n1\n2\n", "v\n2\n2\n1\n", not ordered, {"ordered": ordered, "tolerance": 0}) for ordered in (False, True)),
-    "zero_tolerance_rejects_approximate_values": (
-        ("v\n1.000\n", "v\n1.005\n", True, {}), ("v\n1.000\n", "v\n1.005\n", False, {"tolerance": 0})),
-    "boolean_case_and_short_forms_are_normalized": tuple(
-        ("flag\nTrue\nFalse\n", right, True, {}) for right in ("flag\ntrue\nfalse\n", "flag\nt\nf\n")),
-    "non_finite_numbers_fail_even_when_identical": (("v\nNaN\n", "v\nNaN\n", False, {}),),
-    "empty_results_require_explicit_permission": tuple(
-        (text, text, allowed and bool(text), {"allow_empty": allowed}) for text in ("v\n", "") for allowed in (False, True)),
-    "truncated_csv_is_rejected": (("v\n1\n", "v\n1", False, {}),),
-})
 class CompareTests(unittest.TestCase):
-    # 冒烟集：完整比对契约矩阵在 hr-demo/validation/v2/tests/test_validation.py 维护。
-    def check_comparisons(self, *rows):
-        for gt, wren, expected, options in rows:
-            with self.subTest(gt=gt, wren=wren, options=options):
-                ok, message = CONTRACT.compare(gt, wren, **options)[:2]
-                self.assertEqual(ok, expected, message)
+    # 冒烟：仅验证技能 runner 的实际调用形态 CONTRACT.compare(...)[:2]；被测
+    # result_contract.py 是指向 hr-demo/validation/v2/result_contract.py 的符号链接，
+    # 完整比对契约矩阵的权威用例在 hr-demo/validation/v2/tests/test_validation.py 维护。
+    def test_compare_tuple_slice_call_shape(self):
+        ok, message = CONTRACT.compare("v\n2\n1\n2\n", "v\n2\n2\n1\n", ordered=False, tolerance=0)[:2]
+        self.assertTrue(ok, message)
+        self.assertFalse(CONTRACT.compare("v\n1.000\n", "v\n1.005\n", tolerance=0)[0])
 
 
 @unittest.skipUnless(HAS_DUCKDB, "duckdb 未安装：跳过 runner 双路径回归")

@@ -33,9 +33,9 @@ SOURCE_MDL = ROOT / "hr-demo/wren-project/target/mdl.json"
 DATABASE = ROOT / "hr-demo/db/duckdb/public.duckdb"
 SPEC = APP / "query-spec.json"
 
-# result_contract stays in the validation tree; the bootstrap keeps it importable.
 sys.path.insert(0, str(ROOT / "hr-demo/validation/v2"))
 import result_contract
+from query_execution import digest
 
 GENERATED = ("data", "mdl.json", "snapshot-manifest.json")
 EXPORT_SOURCES = (Path(__file__).resolve(), Path(result_contract.__file__).resolve())
@@ -164,6 +164,9 @@ def plan_queries(mdl, spec):
                 raise ValueError(f"MDL 依赖超出明确表列清单: {name}") from exc
     return plans
 
+
+# --- Snapshot verification: manifest hashes and snapshot-vs-source query results ---
+
 def field_value(row, rule):
     if isinstance(rule, str):
         value = row[rule]
@@ -195,18 +198,12 @@ def normalize_rows(rows, query):
     return sorted(result, key=cmp_to_key(compare))
 
 
-# --- Snapshot verification: manifest hashes and snapshot-vs-source query results ---
-
 def canonical(value):
     return (json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False) + "\n").encode()
 
-def file_sha(path):
-    with path.open("rb") as handle:
-        return hashlib.file_digest(handle, "sha256").hexdigest()
-
 def input_hashes(source, spec):
-    return {"source_mdl_sha256": file_sha(source), "query_spec_sha256": file_sha(spec),
-            "exporter_sha256": hashlib.sha256(canonical({str(p.relative_to(ROOT)): file_sha(p)
+    return {"source_mdl_sha256": digest(source), "query_spec_sha256": digest(spec),
+            "exporter_sha256": hashlib.sha256(canonical({str(p.relative_to(ROOT)): digest(p)
                                                         for p in EXPORT_SOURCES})).hexdigest()}
 
 def sql_string(value):
@@ -250,12 +247,12 @@ def manifest_for(con, directory, mdl, spec, inputs):
         require_equal(table_digest(con, parquet, columns),
                       table_digest(con, f"({projection(model, columns)})", columns),
                       f"快照内容与源数据不一致: {name}")
-        count, digest = table_digest(con, quote(name), columns)
+        count, source_digest = table_digest(con, quote(name), columns)
         entries.append({"name": name, "file": f"data/{name}.parquet", "columns": columns,
-                        "rows": count, "sha256": file_sha(path), "bytes": path.stat().st_size,
-                        "source_content_sha256": digest})
+                        "rows": count, "sha256": digest(path), "bytes": path.stat().st_size,
+                        "source_content_sha256": source_digest})
     return {"version": 1, "snapshot_date": spec["snapshot_date"], **inputs,
-            "mdl_sha256": file_sha(directory / "mdl.json"),
+            "mdl_sha256": digest(directory / "mdl.json"),
             "duckdb_version": importlib.metadata.version("duckdb"),
             "wren_core_version": importlib.metadata.version("wren-core-py"),
             "row_policy": "all_rows_no_time_filter", "tables": entries}
@@ -285,7 +282,8 @@ def validate_results(con, directory, source, spec, plans):
                 con.execute(f'CREATE OR REPLACE TEMP VIEW {quote(view["name"])} AS {view["statement"]}')
             except Exception:
                 rest.append(view)
-        require_equal(len(rest) == len(pending), False, "源 MDL 视图无法在只读 DuckDB 会话解析")
+        if rest == pending:
+            raise ValueError("源 MDL 视图无法在只读 DuckDB 会话解析")
         pending = rest
     results = {}
     with duckdb.connect(":memory:") as snapshot:
@@ -310,8 +308,7 @@ def check_assets(con, directory, source, mdl, spec, plans, inputs):
 
 # --- Atomic publication: staged export with rollback and results-json safety ---
 
-def results_destination(path, app, protected):
-    destination, app = path.resolve(), app.resolve()
+def results_destination(destination, app, protected):
     if destination == app or destination.is_relative_to(app) or destination in app.parents:
         raise ValueError("结果文件不能位于 APP 内或覆盖 APP 的上级目录")
     if destination in {p.resolve() for p in protected + list(EXPORT_SOURCES)}:
@@ -333,7 +330,7 @@ def staged_results(destination, results):
             yield staged
 
 def authored_hashes(app):
-    return {str(p.relative_to(app)): file_sha(p) for p in app.rglob("*")
+    return {str(p.relative_to(app)): digest(p) for p in app.rglob("*")
             if p.is_file() and p.relative_to(app).parts[0] not in GENERATED}
 
 def export(con, app, source, mdl, spec, plans, inputs, fresh_inputs, results_path=None):
@@ -386,10 +383,13 @@ def main(argv=None):
     lock = None
     try:
         export_lock = APP.parent / ".hr-overview-export.lock"
-        results_path = results_destination(args.results_json, APP,
+        results_path = results_destination(args.results_json.resolve(), APP,
             [SOURCE_MDL, SPEC, DATABASE, export_lock]) if args.results_json else None
         source, spec = read_inputs()
-        fresh_inputs = lambda: input_hashes(SOURCE_MDL, SPEC)
+
+        def fresh_inputs():
+            return input_hashes(SOURCE_MDL, SPEC)
+
         inputs = fresh_inputs()
         mdl = prune_mdl(source, spec)
         plans = plan_queries(mdl, spec)

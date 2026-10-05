@@ -4,15 +4,9 @@
 
 `hr-demo/` 集中维护演示的数据源、语义定义、仪表盘、验证程序和文档，包含规范源与可重建交付产物。根目录 `hr_mcp/`、`hr_query/` 维护查询运行代码；MCP 构建使用本工作区，线上函数不打包整个目录。
 
-| 当前任务 | 阅读入口 |
-| --- | --- |
-| 首次初始化或修复环境、profile | [环境与首次初始化](#环境与首次初始化) |
-| 业务问数、修改语义定义 | [语义工作流](wren-project/AGENTS.md) 与 [业务规则](wren-project/knowledge/rules/general.md) |
-| 固定 SQL 回归或自然语言评测 | [当前验证入口](validation/v2/README.md) |
-| 修改页面或同步快照 | [仪表盘快照与本地预览](#仪表盘快照与本地预览) |
-| 修改或部署 MCP | [MCP 文档](docs/mcp-vercel.md) |
-| 迁移到新的业务项目 | [复刻指南](docs/replication/README.md)，使用新业务模板 |
-| 追溯历史验收 | [日期化验证记录](validation/v2/matrix_v2.md) 与 [历史目标](GOAL.md) |
+- 完整的按任务路由见根 [AGENTS.md](../AGENTS.md#按任务读取)。
+- 本页章节：[环境与首次初始化](#环境与首次初始化)、[构建、问数与更新](#构建问数与更新)、[验证](#验证)、[文档检查](#文档检查)、[仪表盘快照与本地预览](#仪表盘快照与本地预览)。
+- 语义工作流见 [语义项目 AGENTS](wren-project/AGENTS.md)；固定 SQL 回归与自然语言评测见 [验证入口](validation/v2/README.md)。
 
 ## 交付范围
 
@@ -92,18 +86,7 @@ PY
 
 ## 构建、问数与更新
 
-模型 YAML 是唯一业务定义来源；修改模型或规则后：
-
-```bash
-(
-  cd hr-demo/wren-project
-  ../../.venv/bin/wren context validate
-  ../../.venv/bin/wren context build
-  ../../.venv/bin/wren memory index
-)
-```
-
-问数按 [语义项目工作流](wren-project/AGENTS.md#回答业务数据问题) 获取规则、schema 和查询示例，优先复用已有 Cube，验证 SQL 后执行并存储确认结果。该入口也说明 fetch 完整输出过大时的分段读取，以及搜索过滤参数的适用范围。
+模型 YAML 是唯一业务定义来源；修改模型或规则后的 validate/build/index 命令以 [语义项目工作流](wren-project/AGENTS.md#修改模型规则与知识) 为准。问数按其中的 [回答业务数据问题](wren-project/AGENTS.md#回答业务数据问题) 流程获取规则、schema 和查询示例，优先复用已有 Cube，验证 SQL 后执行并存储确认结果；该入口也说明 fetch 完整输出过大时的分段读取，以及搜索过滤参数的适用范围。
 
 执行 `wren memory check` 检查文件与索引漂移；若改名后旧查询仍被召回，先备份 `.wren/memory/`，再执行 `wren memory reset --force`、`wren memory index`、`wren memory check`。reset 只清理衍生索引，保留 `knowledge/sql/*.md`；不要删除知识源文件来掩盖索引问题。
 
@@ -122,7 +105,7 @@ Cube 返回结果不承诺顺序；展示趋势时显式按月份排序。模型
 
 ## 验证
 
-[当前验证入口](validation/v2/README.md) 维护固定 SQL 全量/子集回归、比较规则、工具测试、语义构建检查与独立自然语言评测的命令。根据改动选择检查，使用当次退出码和报告判断结果；历史记录仅用于追溯。
+[当前验证入口](validation/v2/README.md) 维护固定 SQL 全量/子集回归、比较规则、工具测试、语义构建检查与独立自然语言评测的命令；回归、自然语言评测与仪表盘导出共用 [result_contract.py](validation/v2/result_contract.py) 的比较与输出约定。根据改动选择检查，使用当次退出码和报告判断结果；历史记录仅用于追溯。
 
 CI 配置见 [hr-demo.yml](../.github/workflows/hr-demo.yml)：文档检查独立运行；分析检查在新工作区安装依赖、建库、配置隔离 profile、运行回归和快照检查。云端 CI 是否通过以 GitHub 实际运行记录为准。
 
@@ -157,7 +140,7 @@ python3 -m http.server 8317 --bind 127.0.0.1 \
 
 打开 <http://127.0.0.1:8317>。如果已有服务占用该端口，检查并复用，不重复启动。文件预检不能替代浏览器图表、错误状态及数字核对。`wren genbi build` 只返回构建指令，完整应用由 Agent 按指令实现。
 
-导出只读取 DuckDB，按 `query-spec.json` 明确的表列需求生成快照和来源清单。页面 `mdl.json`、`snapshot-manifest.json` 与完整 `target/mdl.json` 均为 Git 忽略的生成产物；新检出先构建模型并导出，再预览。CI 同样从源构建、检查，上传完整 `hr-dashboard` 静态应用供下载预览。23 项查询中 11 项调用 Cube；导出 12 表、53 列，Parquet 共 281,959 字节，比原 25 表快照减少 86.8%（不计 WASM/CDN）。清单记录来源、列清单和内容哈希，`--check` 检查源数据与页面查询结果；数据、模型或导出程序变化后重新导出。
+导出只读取 DuckDB，按 `query-spec.json` 明确的表列需求生成快照和来源清单。页面 `mdl.json`、`snapshot-manifest.json` 与完整 `target/mdl.json` 均为 Git 忽略的生成产物；新检出先构建模型并导出，再预览。CI 同样从源构建、检查，上传完整 `hr-dashboard` 静态应用供下载预览。23 项查询中 11 项调用 Cube，导出 12 表、53 列；裁剪前后的完整体积与比例审计见 [验证记录](validation/v2/matrix_v2.md)。清单记录来源、列清单和内容哈希，`--check` 检查源数据与页面查询结果；数据、模型或导出程序变化后重新导出。
 
 页面保留必要分析字段，避免把姓名、生日、邮箱和手机号等不用于图表的字段默认下发。即便经过裁剪，仿真快照仍不等于可直接用于真实 HR 数据的权限方案。
 
