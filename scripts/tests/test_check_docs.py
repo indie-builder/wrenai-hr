@@ -35,6 +35,12 @@ def fence(commands, language="bash", indent=""):
         "wren context build", "npx vercel@latest deploy --prod", 'python -c "print(\'scripts/missing.py\')"',
         "python scripts/check.py > missing/generated.txt", ". ./.env.mcp",
     ])), []),
+    "interpreter_options_consume_values_and_double_dash_marks_script": (fence(
+        "python -W ignore -X dev -B scripts/check.py\npython -- scripts/check.py\n"
+        "python -W\npython -X\npython --\npython -\npython -m missing\n"
+        "python scripts/check.py 2>&1 > missing.txt\npython scripts/check.py < missing.txt"), []),
+    "double_dash_checks_even_option_shaped_script": (fence("python -- -B"),
+        ["README.md:2: 文件不存在: -B"]),
     "missing_script_and_requirements": (fence(
         "python3 scripts/removed.py\nsh scripts/removed.sh\n./scripts/removed.sh\npip install -r missing-requirements.txt", "sh"),
         [f"README.md:{line}: 文件不存在: {target}" for line, target in

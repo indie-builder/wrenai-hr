@@ -22,12 +22,12 @@ def placeholder(value: str) -> bool:
 def command_args(tokens: list[str]) -> list[str]:
     """Remove assignments, known wrappers and redirections, never reading outputs."""
     args = []
-    skip = False
+    tokens = iter(tokens)
     for token in tokens:
-        if skip:
-            skip = False
-        elif token in {">", ">>", "<", "2>", "2>>", "2>&1"}:
-            skip = token != "2>&1"
+        if token in {">", ">>", "<", "2>", "2>>"}:
+            next(tokens, None)
+        elif token == "2>&1":
+            continue
         elif re.match(r"^(?:\d*>>?|<)[^<>]", token) and not placeholder(token):
             continue
         else:
@@ -73,25 +73,20 @@ class ShellChecks:
             self.target(document, line, cwd, args[1])
         python = bool(PYTHON.fullmatch(program))
         if python or program in {"bash", "sh"}:
-            position = 1
-            while position < len(args):
-                value = args[position]
-                if value in {"-m", "-c"}:
+            arguments = iter(args[1:])
+            for value in arguments:
+                if value in {"-m", "-c", "-"}:
                     if value == "-c" and not python:
                         self.error(document, line, "不支持 shell -c；请展开为明确命令")
                     break
                 if value in {"-W", "-X"}:
-                    position += 2
+                    next(arguments, None)
                     continue
-                if value == "-":
-                    break
                 if value == "--":
-                    position += 1
-                    if position == len(args):
+                    value = next(arguments, None)
+                    if value is None:
                         break
-                    value = args[position]
                 elif value.startswith("-"):
-                    position += 1
                     continue
                 self.target(document, line, cwd, value)
                 break

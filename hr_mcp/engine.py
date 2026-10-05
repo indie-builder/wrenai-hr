@@ -25,11 +25,8 @@ from hr_query.sql_policy import MAX_SQL_CHARS
 
 
 def file_digest(path: Path) -> str:
-    digest = hashlib.sha256()
     with path.open("rb") as source:
-        for block in iter(lambda: source.read(1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
+        return hashlib.file_digest(source, "sha256").hexdigest()
 
 
 def _read_json(path: Path):

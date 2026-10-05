@@ -96,7 +96,7 @@ class RuntimeTests(ErrorAssertions, unittest.IsolatedAsyncioTestCase):
 
     async def metadata_available(self):
         with anyio.fail_after(1):
-            self.assertTrue(await self.runtime.health())
+            self.assertTrue(await self.runtime.ready(check_files=True))
             self.assertEqual(await self.runtime.invoke("context"), {"available": True})
             self.assertEqual(await self.runtime.invoke("list_models"), [{"name": "employees"}])
 
@@ -196,7 +196,7 @@ class RuntimeTests(ErrorAssertions, unittest.IsolatedAsyncioTestCase):
                 await self.start(tasks, "second")
                 await self.metadata_available()
                 (data / "manifest.json").unlink()
-                self.assertFalse(await self.runtime.health())
+                self.assertFalse(await self.runtime.ready(check_files=True))
                 self.assertFalse(await self.runtime.ready())
                 (data / "manifest.json").touch()
                 self.assertTrue(await self.runtime.ready())
@@ -222,6 +222,6 @@ class RuntimeTests(ErrorAssertions, unittest.IsolatedAsyncioTestCase):
             touch_bundle(data)
             factory = self.lazy_runtime(data, side_effect=[RuntimeError("driver secret"), self.engine])
             self.assertFalse(await self.runtime.ready())
-            self.assertTrue(await self.runtime.health())
+            self.assertTrue(await self.runtime.ready(check_files=True))
             self.assertEqual(await self.runtime.invoke("context"), {"available": True})
             self.assertEqual(factory.call_count, 2)
