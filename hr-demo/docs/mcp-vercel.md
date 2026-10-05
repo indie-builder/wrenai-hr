@@ -21,28 +21,31 @@
 
 数据包格式 v2 只包含 `public.duckdb`、`mdl.json`、`context.json` 和 `manifest.json`；共享 Python 源码保留在 `hr_query/`，不再复制进 `data/`。清单记录各数据文件哈希、确定性种子、语义定义、运行源码、构建脚本及部署配置的来源哈希，并记录应用版本、可取得的 Git 提交（无 Git 元数据时为 null）、锁文件摘要和实际直接依赖版本。已有 v1 包仅在文件完整、哈希匹配且没有额外文件时升级；合法 v2 包同样检查后替换。构建经过 staging、真实 SQL/Cube 检查和源文件复核后才替换旧包，失败时保留旧包。
 
-MCP CI 在独立的 `.venv` 中安装语义验证工具，先执行 `check_semantics.py --build-check`，再用 `.venv-mcp` 构建并测试函数运行代码。Vercel 构建使用已提交的 `target/mdl.json`；轻量构建只核对来源在构建期间未变化，不能独立证明 YAML 与 MDL 一致。发布前需确认部署提交通过语义一致性检查；CI 必需状态、主分支保护和 Vercel 自动部署是否等待这些检查，本次重构未验证或更改。
+MCP CI 在独立的 `.venv` 中安装语义验证工具，先执行 `check_semantics.py --build-check`，再用 `.venv-mcp` 构建并测试函数运行代码。Vercel 构建使用已提交的 `target/mdl.json`；轻量构建只核对来源在构建期间未变化，不能独立证明 YAML 与 MDL 一致。发布前需确认部署提交通过语义一致性检查。下方记录不证明分支保护或自动部署已等待全部检查。
 
-## 本次重构验证
+## 验收记录（按提交）
 
-2026-10-05 本地执行通过：根目录 MCP/共享查询测试 51 项（其中一个测试回放全部 41 道固定 SQL）、离线验证测试 36 项、独立 Wren CLI 双路径回归 41/41，以及语义静态检查与隔离构建一致性检查。实际 HTTP 官方客户端完成认证、8 个工具、SQL/Cube 在职人数 528、写入拒绝及数据路径 404 验证。私有 v2 包包含 25 表、273,515 行；查询期间使用固定快照 2026-08-31。这些记录不代表自然语言生成准确率，也不代表 Linux CI 或本次 Vercel 公网部署已验证。
+<!-- docs:historical:start -->
 
-```bash
-.venv-mcp/bin/python scripts/prepare_mcp.py
-.venv-mcp/bin/python scripts/smoke_mcp.py
-```
+记录日期为 **2026-10-05**，数据快照为 **2026-08-31**。这些是指定版本的证据，不随主分支或部署别名自动更新；当前操作见下方本地运行和部署步骤。新增记录须注明提交、日期、验证层次及证据，分别记录部署成功与公网查询验收。
 
-## 历史部署验收
+| 提交与层次 | 已确认结果 | 证据或未验证范围 |
+| --- | --- | --- |
+| `0d788da`，本地 macOS | MCP/共享查询测试 51 项、演示工具链测试 36 项、Wren 固定 SQL 双路径 41/41、语义构建一致性、仪表盘 23 项查询检查通过；真实 HTTP 完成认证、8 工具、SQL/Cube、写入拒绝和数据路径 404 | [PR #8](https://github.com/indie-builder/wrenai-hr/pull/8)；未在该轮重新执行浏览器渲染或公网 MCP 查询 |
+| `0d788da`，Linux CI 与预览构建 | HR、MCP 两条 CI 及 Vercel 预览构建成功 | [HR CI](https://github.com/indie-builder/wrenai-hr/actions/runs/37246927912)、[MCP CI](https://github.com/indie-builder/wrenai-hr/actions/runs/37246927823)、[预览部署](https://vercel.com/lovemyrmbb-3480s-projects/wrenai-hr-mcp/5TQMKiwwcPXhzZvGxb3TBkSCzJia) |
+| 合并提交 `8857c60`，Vercel 部署 | GitHub 的 Vercel commit status 为 success | [合并后的部署](https://vercel.com/lovemyrmbb-3480s-projects/wrenai-hr-mcp/FarfDV5LTYkH7VPDr2YGHRR949sr)；该版本的公网官方 SDK 调用与 41 题回归未重新验收 |
 
-以下记录对应重构前提交，不替代本次代码的 CI 和公网验收；本次重构未部署到 Vercel。
+上述本地私有 v2 包包含 25 表、273,515 行，SQL 与 Cube 的快照日在职人数均为 528。固定 SQL 对照不代表自然语言生成准确率。
 
-- [PR #5 的 Linux MCP CI](https://github.com/indie-builder/wrenai-hr/actions/runs/37227865181) 已通过：完整 25 表数据包构建、32 项认证/协议/引擎测试，其中包含 41 题原生语义查询与独立标准 SQL 对照，以及 Vercel 隔离依赖加载回归。
-- 首版 Linux 实际安装依赖加私有服务数据包共 **302,967,160 字节**，小于项目 450 MB 预检阈值。Vercel 已成功完成实际构建；平台对依赖进行外置优化，因此 CI 安装目录体积不能直接当作最终函数体积。
-- 本地官方 SDK 经真实 HTTP 完成工具发现、认证查询及写入拒绝。测试确认缺失/错误 Token 为 401，正确 Token 返回在职人数 528（快照 2026-08-31）。
-- 2026-10-05 已通过 Vercel 控制台导入 GitHub 主分支并部署，生产地址为 `https://wrenai-hr-mcp.vercel.app/mcp`。生产 Token 以敏感环境变量保存；预览环境不复用生产 Token。
-- [生产部署 67LwAqwAWUbq1Qcr5vtoKy4Rerda](https://vercel.com/lovemyrmbb-3480s-projects/wrenai-hr-mcp/67LwAqwAWUbq1Qcr5vtoKy4Rerda) 对应提交 `3a1205f`，已完成公网官方 SDK 验证：`/health` 200、缺失/错误 Token 401、8 个工具发现、SQL 与 Cube 均返回在职人数 528、DELETE 返回 `SQL_REJECTED`、数据库静态路径返回 404。
-- 公网 MCP 固定 SQL 回归 **41/41 通过**：逐题经 HTTPS `query_sql` 查询，并与本地只读数据库标准 SQL 比对。本地证据为 `hr-demo/validation/v2/runs/mcp-production-20261005/regression.json`（不提交）。这是固定 SQL 执行对照，不代表实时自然语言生成准确率。
-- 首次部署发现隔离查询进程未加载平台依赖目录，已在 [PR #5](https://github.com/indie-builder/wrenai-hr/pull/5) 修复：显式加入部署包 `_vendor` 和平台外置依赖 `/tmp/_vc_deps/lib/python3.12/site-packages`，保留 `-I` 与严格环境变量隔离。不能只用部署 Ready、健康检查或工具发现代替真实查询验收。
+### 较早版本的公网与部署记录
+
+- [PR #5 的 Linux MCP CI](https://github.com/indie-builder/wrenai-hr/actions/runs/37227865181) 完成 25 表数据包构建、32 项认证/协议/引擎测试，包含 41 题语义查询与独立标准 SQL 对照，以及 Vercel 隔离依赖加载回归。
+- 首版 Linux 安装依赖与私有数据包共 **302,967,160 字节**，小于项目 450 MB 预检阈值；平台依赖外置优化后的函数体积需以实际部署为准。
+- 生产部署 [67LwAqwAWUbq1Qcr5vtoKy4Rerda](https://vercel.com/lovemyrmbb-3480s-projects/wrenai-hr-mcp/67LwAqwAWUbq1Qcr5vtoKy4Rerda) 对应提交 `3a1205f`，当时完成公网官方 SDK 验证：`/health` 200、缺失/错误 Token 401、8 工具、SQL/Cube 在职人数 528、DELETE 返回 `SQL_REJECTED`、数据库路径 404。
+- 同一旧部署公网固定 SQL 回归 **41/41 通过**。本地证据为 `hr-demo/validation/v2/runs/mcp-production-20261005/regression.json`（Git 忽略，需单独归档）；不作为后续提交的公网验收。
+- 首次部署的隔离 worker 依赖加载问题已在 [PR #5](https://github.com/indie-builder/wrenai-hr/pull/5) 修复：加入 `_vendor` 与平台外置依赖目录，保留 `-I` 和环境变量隔离。部署 Ready、健康检查或工具发现不能代替真实查询验证。
+
+<!-- docs:historical:end -->
 
 ## 本地运行
 

@@ -4,11 +4,14 @@
 
 `hr-demo/` 是 HR 分析演示工作区，集中维护数据种子、Wren 语义定义、仪表盘、回归题库和复现文档。MCP 构建从这里读取数据与业务定义，运行时使用 `hr_mcp/data/` 中的私有数据包。
 
-- [演示说明与复现命令](hr-demo/README.md)
-- [迁移到新业务的操作指南](hr-demo/docs/replication/README.md)
-- [Agent 工作约定](AGENTS.md)
-- [验证与问题处理记录](hr-demo/validation/v2/matrix_v2.md)
-- [Vercel MCP 服务与 Token 接入](hr-demo/docs/mcp-vercel.md)
+| 要做的事 | 入口 |
+| --- | --- |
+| 初始化环境、复现 HR 演示或查看仪表盘 | [演示说明与复现命令](hr-demo/README.md) |
+| 让 Agent 定位任务所需文件 | [按任务阅读的工作约定](AGENTS.md) |
+| 修改 MCP、运行服务或接入客户端 | [Vercel MCP 服务与 Token 接入](hr-demo/docs/mcp-vercel.md) |
+| 运行固定 SQL 回归或自然语言评测 | [当前验证入口](hr-demo/validation/v2/README.md) |
+| 将方法迁移到新的业务项目 | [新业务操作指南](hr-demo/docs/replication/README.md) |
+| 追溯历史验收与问题处理 | [日期化验证记录](hr-demo/validation/v2/matrix_v2.md) |
 
 数据层为 DuckDB 单文件，25 张表、273,515 行仿真数据，覆盖八类 HR 业务。语义层包括 25 个模型、32 条关系、6 个视图、6 个 Cube，以及业务规则和查询示例。
 

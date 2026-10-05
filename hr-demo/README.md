@@ -4,7 +4,15 @@
 
 `hr-demo/` 集中维护演示的数据源、语义定义、仪表盘、验证程序和文档，包含规范源与可重建交付产物。根目录 `hr_mcp/`、`hr_query/` 维护查询运行代码；MCP 构建使用本工作区，线上函数不打包整个目录。
 
-[迁移到新业务的操作指南](docs/replication/README.md) · [业务规则](wren-project/knowledge/rules/general.md) · [验证记录](validation/v2/matrix_v2.md) · [历史目标](GOAL.md)
+| 当前任务 | 阅读入口 |
+| --- | --- |
+| 首次初始化或修复环境、profile | [环境与首次初始化](#环境与首次初始化) |
+| 业务问数、修改语义定义 | [语义工作流](wren-project/AGENTS.md) 与 [业务规则](wren-project/knowledge/rules/general.md) |
+| 固定 SQL 回归或自然语言评测 | [当前验证入口](validation/v2/README.md) |
+| 修改页面或同步快照 | [仪表盘快照与本地预览](#仪表盘快照与本地预览) |
+| 修改或部署 MCP | [MCP 文档](docs/mcp-vercel.md) |
+| 迁移到新的业务项目 | [复刻指南](docs/replication/README.md)，使用新业务模板 |
+| 追溯历史验收 | [日期化验证记录](validation/v2/matrix_v2.md) 与 [历史目标](GOAL.md) |
 
 ## 交付范围
 
@@ -95,7 +103,9 @@ PY
 )
 ```
 
-Agent 首次使用读取 `wren skills get usage` 与 `wren context instructions`，随后按问题 `memory fetch`、`memory recall`。聚合问题先检查 `cube list` / `cube describe`，匹配已有指标时优先 Cube，其余问题使用 MDL SQL，先 dry-plan 再 query。确认答案后存入查询记忆，并检查写入文件及召回结果。执行 `wren memory check` 检查文件与索引漂移；若改名后旧查询仍被召回，先备份 `.wren/memory/`，再执行 `wren memory reset --force`、`wren memory index`、`wren memory check`。reset 只清理衍生索引，保留 `knowledge/sql/*.md`；不要删除知识源文件来掩盖索引问题。
+问数按 [语义项目工作流](wren-project/AGENTS.md#回答业务数据问题) 获取规则、schema 和查询示例，优先复用已有 Cube，验证 SQL 后执行并存储确认结果。该入口也说明 fetch 完整输出过大时的分段读取，以及搜索过滤参数的适用范围。
+
+执行 `wren memory check` 检查文件与索引漂移；若改名后旧查询仍被召回，先备份 `.wren/memory/`，再执行 `wren memory reset --force`、`wren memory index`、`wren memory check`。reset 只清理衍生索引，保留 `knowledge/sql/*.md`；不要删除知识源文件来掩盖索引问题。
 
 例如检查并查询 2026H1 各月总成本和发薪人次：
 
@@ -112,34 +122,22 @@ Cube 返回结果不承诺顺序；展示趋势时显式按月份排序。`gen_m
 
 ## 验证
 
-```bash
-# 固定 SQL 回归：41 题
-python3 hr-demo/validation/v2/run_all.py
-# 只跑子集，报告与完整汇总分开
-python3 hr-demo/validation/v2/run_all.py --only q03 q18
-python3 hr-demo/validation/v2/run_all.py --domain 人效分析
-# 验证程序单元测试与源文件/构建产物一致性
-.venv/bin/python -m unittest discover -s hr-demo/validation/v2/tests
-.venv/bin/python hr-demo/validation/v2/check_semantics.py --build-check
-```
+[当前验证入口](validation/v2/README.md) 维护固定 SQL 全量/子集回归、比较规则、工具测试、语义构建检查与独立自然语言评测的命令。根据改动选择检查，使用当次退出码和报告判断结果；历史记录仅用于追溯。
 
-完整回归结果写入 `validation/v2/summary.csv` 和 `results/`。以当次退出码、汇总与明细判断是否通过。排名及趋势题声明顺序要求；数值比较默认绝对容差 0.011，按题可另设精度与合法空结果策略。这个精度不是所有财务场景的通用要求。
+CI 配置见 [hr-demo.yml](../.github/workflows/hr-demo.yml)：文档检查独立运行；分析检查在新工作区安装依赖、建库、配置隔离 profile、运行回归和快照检查。云端 CI 是否通过以 GitHub 实际运行记录为准。
 
-自然语言评测与固定 SQL 回归分开：评测入口导出问题、公开输出列/展示精度和必要业务上下文，生成端不读取标准答案 SQL 或结果；实际 Agent 提交生成 SQL 和上下文记录后，再执行 Wren 规划、受限只读 DuckDB 查询并与标准答案比较。没有生成记录的题目不会被算作正确。本项目的 SQL 回归结果**不能称为自然语言问数准确率**。
+## 文档检查
+
+从仓库根运行以下只读检查，仅使用 Python 标准库与 Git，无需创建数据库或虚拟环境：
 
 ```bash
-# 输出目录须为新目录；可选 --only q03 q18 筛选题目
-.venv/bin/python hr-demo/validation/v2/eval/nl_eval.py export \
-  --output-dir /tmp/hr-nl-package
-# 让独立 Agent 只读题目包，按 protocol.json 写真实生成记录
-.venv/bin/python hr-demo/validation/v2/eval/nl_eval.py run \
-  --records /tmp/hr-generated.jsonl \
-  --output-dir hr-demo/validation/v2/runs/nl-first
+python3 -m unittest discover -s scripts/tests -p 'test_check_docs.py' -v
+python3 scripts/check_docs.py
 ```
 
-JSONL 必填 `id`、原始 `question`、`generated_sql`、`context_refs`；可选 `model`、`run_metadata`。输出保留 `trace/`、原始 `results/`、`summary.csv`、`run.json`；未生成、规划失败、执行失败和结果差异分别计数。比较列位置并按公开精度规范副本，不篡改原始结果。评测器不调用付费模型；使用者负责记录真实生成来源。
+检查范围为仓库自身的 README、AGENTS、`hr-demo/docs/` 和验证说明；查询知识源及外部技能不在该检查范围内。检查本地 Markdown 链接目标，以及当前 bash/sh 命令中的脚本、依赖文件、工作目录和静态目录路径。源码路径以 Git 跟踪文件及未忽略的待添加文件为依据，忽略的本地数据库或环境不能让路径检查通过。外部链接、CLI 参数兼容性、页面渲染与命令执行结果需各自验证；该检查不执行文档命令，也不验证标题锚点。
 
-CI 配置见 [hr-demo.yml](../.github/workflows/hr-demo.yml)：在新工作区安装依赖、建库、配置隔离 profile、运行回归和快照检查。云端 CI 是否通过以 GitHub 实际运行记录为准。
+保留历史或新业务模板时，在文件顶部放对应标记，并紧随说明其身份与当前入口：`<!-- docs:historical -->` 标记整份历史记录，`<!-- docs:examples -->` 标记新业务模板。混合文件可用 `<!-- docs:historical:start -->` 与 `<!-- docs:historical:end -->` 包住历史段。标记跳过命令路径检查，本地 Markdown 链接仍检查。当前操作入口保持独立，不能用这些标记掩盖失效命令。
 
 ## 仪表盘快照与本地预览
 
@@ -157,7 +155,7 @@ python3 -m http.server 8317 --bind 127.0.0.1 \
   --directory hr-demo/wren-project/apps/hr-overview
 ```
 
-打开 <http://127.0.0.1:8317>。如果已有服务占用该端口，检查并复用，不重复启动。文件预检不能替代浏览器图表、错误状态及数字核对。
+打开 <http://127.0.0.1:8317>。如果已有服务占用该端口，检查并复用，不重复启动。文件预检不能替代浏览器图表、错误状态及数字核对。`wren genbi build` 只返回构建指令，完整应用由 Agent 按指令实现。
 
 导出只读取 DuckDB，按页面明确的表列需求生成快照，同时生成可检查的来源清单；不是整库复制。当前共享配置为 `query-spec.json`，23 项查询中 11 项调用 Cube；导出 12 表、53 列，Parquet 共 281,959 字节，比原 25 表快照减少 86.8%（不计 WASM/CDN）。`snapshot-manifest.json` 记录来源、列清单和内容哈希，`--check` 同时检查源数据与页面查询结果，数据或模型变化后需重新导出。
 
