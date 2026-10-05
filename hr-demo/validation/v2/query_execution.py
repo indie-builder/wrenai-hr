@@ -178,3 +178,58 @@ def positive_timeout(value):
     if not math.isfinite(timeout) or timeout <= 0:
         raise ValueError("timeout必须为正有限秒数")
     return timeout
+
+
+def regression_questions(questions, only=None, domain=None):
+    if only is not None and (unknown := set(only) - {q["id"] for q in questions}):
+        raise ValueError("未知题号: " + ", ".join(sorted(unknown)))
+    selected = [q for q in questions if (only is None or q["id"] in only)
+                and (domain is None or q.get("domain") == domain)]
+    if not selected:
+        raise ValueError("没有匹配的题目")
+    return selected
+
+
+def regression_directory(base, questions, only=None, domain=None, output=None, *, domain_key=False):
+    subset = only is not None or domain is not None
+    if output:
+        directory = Path(output).resolve()
+        if subset and directory == base.resolve():
+            raise ValueError("局部运行不能写入全量报告目录；请使用独立--output-dir")
+        return directory
+    if not subset:
+        return base
+    key = domain if domain_key and domain and not only else "-".join(q["id"] for q in questions)
+    limit = 61 if domain_key else 80
+    if not (domain_key and domain and not only) and len(key) >= limit:
+        key = hashlib.sha256(key.encode()).hexdigest()[:16]
+    return base / "runs" / key
+
+
+def run_regression(questions, directory, *, env, timeout=180, tolerance=None,
+                   db_file=None, project=None, wren=None, execution_evidence=False):
+    results = directory / "results" if execution_evidence else directory
+    results.mkdir(parents=True, exist_ok=True)
+    records = []
+    fields = ["id", "domain", "priority", "question", "result", "msg"]
+    for question in questions:
+        qid = question["id"]
+        gt = run_gt(question["gt"], db_file=db_file, timeout=timeout)
+        semantic = run_wren(question["wren"], project=project, wren=wren, env=env, timeout=timeout)
+        ok, message = evaluate(question, gt, semantic, tolerance)
+        write_results(results, qid, {name: result.stdout if (result.ok if execution_evidence else ok) else None
+                                    for name, result in (("gt", gt), ("wren", semantic))})
+        record = {**{key: question.get(key, "") for key in fields[:4]},
+                  "result": "PASS" if ok else "FAIL", "msg": message}
+        records.append(record)
+        if execution_evidence:
+            write_json(results / f"{qid}.execution.json", {"gt": gt.trace(), "wren": semantic.trace()})
+        print(f"{record['result']} {qid} [{record['domain']}] {message}")
+    write_summary(directory, records, fields)
+    passed = sum(record["result"] == "PASS" for record in records)
+    p0 = [record for record in records if record["priority"] == "P0"]
+    print(f"{passed}/{len(records)} PASS；P0口径题 {sum(r['result'] == 'PASS' for r in p0)}/{len(p0)} PASS")
+    if failures := [r["id"] for r in records if r["result"] == "FAIL"]:
+        print("失败题目:", ", ".join(failures))
+    print(f"报告: {directory / 'summary.csv'}")
+    return int(passed != len(records))

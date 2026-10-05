@@ -145,6 +145,13 @@ class RunnerExecutionTests(TemporaryScriptTests):
                 self.assert_run(self.run_runner(*options), [("q_one", "PASS")], self.results / "runs" / key)
                 self.assertEqual((summary.read_bytes(), summary.stat().st_mtime_ns), before)
 
+    def test_subset_cannot_explicitly_overwrite_full_results(self):
+        self.write_questions([self.question("q_one")])
+        self.write("results/summary.csv", "full report sentinel")
+        result = self.run_runner("--only", "q_one", "--output-dir", self.results)
+        self.assert_exit(result, 1, "局部运行不能写入全量报告目录")
+        self.assertEqual((self.results / "summary.csv").read_text(), "full report sentinel")
+
     def test_cli_tolerance_overrides_question_tolerance_including_zero(self):
         for tolerance, options, status in ((0, (), "FAIL"), (0, ("--tol", "0.01"), "PASS"), (0.1, ("--tol", "0"), "FAIL")):
             with self.subTest(tolerance=tolerance, options=options):

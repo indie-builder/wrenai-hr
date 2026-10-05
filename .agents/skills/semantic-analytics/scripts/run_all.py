@@ -15,15 +15,14 @@
   WREN_BIN  wren CLI 路径 (默认取 PATH 上的 wren)
 """
 import argparse
-import hashlib
 import os
 import shutil
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from query_execution import (evaluate, load_env, positive_timeout, run_gt, run_wren,
-                             write_results, write_summary)
+from query_execution import (load_env, positive_timeout, regression_questions,
+                             regression_directory, run_regression)
 from result_contract import numeric_tolerance
 
 DEFAULT_TIMEOUT = 180
@@ -39,13 +38,6 @@ def load_questions(path):
     if not questions:
         sys.exit(f"题库 {path} 未定义 QUESTIONS 列表")
     return questions
-
-
-def subset_key(only, domain, questions):
-    if domain and not only:
-        return domain
-    ids = "-".join(question["id"] for question in questions)
-    return ids if len(ids) <= 60 else hashlib.sha256(ids.encode()).hexdigest()[:16]
 
 
 def main():
@@ -73,50 +65,23 @@ def main():
     project = Path(args.project).resolve()
     if not Path(args.db).exists():
         sys.exit(f"物理库不存在: {args.db}")
-    questions = [question for question in load_questions(questions_path)
-                 if (not args.only or question["id"] in args.only)
-                 and (not args.domain or question.get("domain") == args.domain)]
-    if not questions:
-        sys.exit("没有匹配的题目")
-    if args.output_dir:
-        out = Path(args.output_dir).resolve()
-    else:
+    try:
+        questions = regression_questions(load_questions(questions_path), args.only, args.domain)
         base = Path(args.results).resolve() if args.results else questions_path.parent / "results"
-        subset = args.only is not None or args.domain is not None
-        out = base if not subset else base / "runs" / subset_key(args.only, args.domain, questions)
-    out.mkdir(parents=True, exist_ok=True)
+        out = regression_directory(base, questions, args.only, args.domain, args.output_dir, domain_key=True)
+    except ValueError as exc:
+        sys.exit(str(exc))
     wren = os.environ.get("WREN_BIN", "wren")
     if shutil.which(wren) is None:
-        sys.exit(f"未找到 wren CLI: {wren} (设 WREN_BIN 环境变量, 或先 pip install 'wrenai[memory]==0.13.4')")
+        sys.exit(f"未找到 wren CLI: {wren} (设 WREN_BIN 环境变量, 或先 pip install 'wrenai[memory]==0.15.0')")
     try:
         env = load_env(project)
     except ValueError as exc:
         sys.exit(f"项目 .env 无效: {exc}")
 
-    results_log = []
-    for question in questions:
-        qid = question["id"]
-        gt = run_gt(question["gt"], db_file=args.db, timeout=timeout)
-        execution = run_wren(question["wren"], project=project, wren=wren, env=env, timeout=timeout)
-        ok, msg = evaluate(question, gt, execution, args.tol)
-        # 失败题目不落 CSV, 并清掉上次运行的同名文件, 避免残留过期"证据"
-        write_results(out, qid, {"gt": gt.stdout if ok else None, "wren": execution.stdout if ok else None})
-        results_log.append({"id": qid, "domain": question.get("domain", ""), "priority": question.get("priority", ""),
-                            "question": question.get("question", ""), "result": "PASS" if ok else "FAIL", "msg": msg})
-        print(f"{'✅' if ok else '❌'} {qid:>5} [{question.get('domain','')}|{question.get('priority','')}] {msg}")
-
-    write_summary(out, results_log, ["id", "domain", "priority", "question", "result", "msg"])
-    total = len(results_log)
-    passed = sum(1 for record in results_log if record["result"] == "PASS")
-    p0 = [record for record in results_log if record["priority"] == "P0"]
-    print(f"\n===== 汇总: {passed}/{total} PASS | "
-          f"P0口径题 {sum(1 for record in p0 if record['result'] == 'PASS')}/{len(p0)} PASS =====")
-    fails = [record["id"] for record in results_log if record["result"] == "FAIL"]
-    if fails:
-        print("失败题目:", ", ".join(fails))
-    print(f"报告: {out / 'summary.csv'}")
-    sys.exit(0 if passed == total else 1)
+    return run_regression(questions, out, env=env, timeout=timeout, tolerance=args.tol,
+                          db_file=args.db, project=project, wren=wren)
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

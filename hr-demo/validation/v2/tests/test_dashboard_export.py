@@ -12,6 +12,10 @@ from unittest.mock import MagicMock, patch
 import duckdb
 
 from hr_query.semantic import build_mdl
+import sys
+sys.path.insert(0, str(_support.HR_DEMO / "scripts"))
+import dashboard_queries as queries
+import dashboard_snapshot as snapshot
 exporter = _support.load_module(_support.HR_DEMO / "scripts" / "export_dashboard.py", "dashboard_export_under_test")
 
 
@@ -36,12 +40,12 @@ class DashboardPublicationTests(unittest.TestCase):
                                                DATABASE=self.database, SPEC=self.app / "query-spec.json"))
         self.inputs = self.mock(exporter, "read_inputs", return_value=({}, {
             "snapshot_date": "2026-08-31", "tables": {}, "queries": {"q": {}}}))
-        self.mock(exporter, "input_hashes", return_value={})
-        self.mock(exporter, "prune_mdl", return_value={"models": []})
-        self.mock(exporter, "plan_queries", return_value={})
-        self.mock(exporter, "manifest_for", return_value={})
-        self.check = self.mock(exporter, "check_assets", return_value=self.results)
-        self.validate = self.mock(exporter, "validate_results", return_value=self.results)
+        self.mock(snapshot, "input_hashes", return_value={})
+        self.mock(queries, "prune_mdl", return_value={"models": []})
+        self.mock(queries, "plan_queries", return_value={})
+        self.mock(snapshot, "manifest_for", return_value={})
+        self.check = self.mock(snapshot, "check_assets", return_value=self.results)
+        self.validate = self.mock(snapshot, "validate_results", return_value=self.results)
         self.connect = self.mock(duckdb, "connect", return_value=MagicMock())
 
     def mock(self, module, name, **options):
@@ -77,7 +81,7 @@ class DashboardPublicationTests(unittest.TestCase):
 
     def test_app_inputs_export_modules_and_lock_paths_are_rejected(self):
         self.assert_rejected([self.app, self.app / "index.html", self.app / "new.json", self.app / "data/old.parquet",
-            self.app.parent, self.source, self.database, self.app.parent / ".hr-overview-export.lock", *exporter.EXPORT_SOURCES])
+            self.app.parent, self.source, self.database, self.app.parent / ".hr-overview-export.lock", *snapshot.EXPORT_SOURCES])
 
     def test_symlinks_into_app_or_inputs_are_rejected(self):
         alias, source_alias = self.root / "app-alias", self.root / "source-alias.json"
@@ -91,7 +95,7 @@ class DashboardPublicationTests(unittest.TestCase):
             if kwargs.get("dir") == self.reports:
                 raise PermissionError("result directory is not writable")
             return original(*args, **kwargs)
-        with patch.object(exporter.tempfile, "TemporaryDirectory", side_effect=create):
+        with patch.object(snapshot.tempfile, "TemporaryDirectory", side_effect=create):
             self.assertEqual(self.run_cli(self.result), 1)
         self.assert_preserved()
 
@@ -135,7 +139,7 @@ class DashboardPublicationTests(unittest.TestCase):
                 self.assert_preserved()
 
     def test_export_input_drift_does_not_publish_result(self):
-        with patch.object(exporter, "input_hashes", side_effect=[{}, {"changed": True}]):
+        with patch.object(snapshot, "input_hashes", side_effect=[{}, {"changed": True}]):
             self.assertEqual(self.run_cli(self.result), 1)
         self.assert_preserved()
 
@@ -144,13 +148,13 @@ class DashboardPublicationTests(unittest.TestCase):
         def replace(path, target):
             if Path(target) == self.result:
                 self.assertEqual(self.result.read_bytes(), b"old result")
-                self.assertEqual(path.read_bytes(), exporter.canonical(self.results))
+                self.assertEqual(path.read_bytes(), snapshot.canonical(self.results))
                 replacements.append(target)
             return original(path, target)
         with patch.object(Path, "replace", replace):
             self.assertEqual(self.run_cli(self.result), 0)
         self.assertEqual(replacements, [self.result])
-        self.assertEqual(self.result.read_bytes(), exporter.canonical(self.results))
+        self.assertEqual(self.result.read_bytes(), snapshot.canonical(self.results))
         self.assertEqual((self.app / "index.html").read_text(), "old page")
         self.assertNotEqual(self.app_contents(), self.before)
         self.connect.assert_called_once_with(str(self.database), read_only=True)
@@ -164,7 +168,7 @@ class DashboardPublicationTests(unittest.TestCase):
 
     def test_check_writes_results_atomically_without_changing_app(self):
         self.assertEqual(self.run_cli(self.result, check=True), 0)
-        self.assertEqual(self.result.read_bytes(), exporter.canonical(self.results))
+        self.assertEqual(self.result.read_bytes(), snapshot.canonical(self.results))
         self.assertEqual(self.app_contents(), self.before)
         self.connect.assert_called_once_with(str(self.database), read_only=True)
 
@@ -176,33 +180,35 @@ class DashboardBoundaryTests(unittest.TestCase):
         department = next(m for m in source["models"] if m["name"] == "departments")
         department["properties"]["execution_flag"] = "keep"
         before = copy.deepcopy(source)
-        mdl = exporter.prune_mdl(source, spec)
+        mdl = queries.prune_mdl(source, spec)
         self.assertEqual(source, before)
-        self.assertEqual((len(mdl["models"]), sum(map(len, exporter.physical_columns(mdl).values()))), (12, 53))
+        self.assertEqual((len(mdl["models"]), sum(map(len, queries.physical_columns(mdl).values()))), (12, 53))
         names = {c["name"] for m in mdl["models"] for c in m["columns"]}
         self.assertFalse(names & {"emp_name", "birth_date", "email", "phone", "cand_name"})
         self.assertEqual(mdl["models"][0]["properties"], {"execution_flag": "keep"})
         self.assertNotIn('"description"', json.dumps(mdl))
 
     def test_exporter_fingerprint_covers_all_modules(self):
+        self.assertEqual(set(snapshot.EXPORT_SOURCES), {Path(module.__file__).resolve() for module in
+            (exporter, queries, snapshot, snapshot.result_contract, snapshot.query_execution)})
         with tempfile.TemporaryDirectory() as temporary:
             paths = [Path(temporary) / name for name in ("source", "spec", "cli", "semantics", "snapshot", "compare")]
             for path in paths:
                 path.write_text("initial")
-            with patch.object(exporter, "EXPORT_SOURCES", tuple(paths[2:])), patch.object(exporter, "ROOT", Path(temporary)):
-                initial = exporter.input_hashes(*paths[:2])
+            with patch.object(snapshot, "EXPORT_SOURCES", tuple(paths[2:])), patch.object(snapshot, "ROOT", Path(temporary)):
+                initial = snapshot.input_hashes(*paths[:2])
                 for path in paths[2:]:
                     path.write_text("updated")
-                    self.assertNotEqual(initial["exporter_sha256"], exporter.input_hashes(*paths[:2])["exporter_sha256"])
+                    self.assertNotEqual(initial["exporter_sha256"], snapshot.input_hashes(*paths[:2])["exporter_sha256"])
                     path.write_text("initial")
 
     def test_result_contract_rejects_empty_order_field_and_nonfinite_differences(self):
-        exporter.assert_rows([{"v": 1.011}], [{"v": 1}], "boundary")
+        snapshot.assert_rows([{"v": 1.011}], [{"v": 1}], "boundary")
         for actual, expected in [([], []), ([{"v": 1.01101}], [{"v": 1}]),
             ([{"v": float("nan")}], [{"v": float("nan")}]), ([{"v": None}], [{"v": 0}]),
             ([{"v": 1}], [{"other": 1}]), ([{"v": 1}, {"v": 2}], [{"v": 2}, {"v": 1}])]:
             with self.subTest(actual=actual), self.assertRaises(ValueError):
-                exporter.assert_rows(actual, expected, "invalid")
+                snapshot.assert_rows(actual, expected, "invalid")
 
 
 if __name__ == "__main__":

@@ -21,7 +21,7 @@ from questions import QUESTIONS
 from query_execution import (DUCKDB_FILE, PROJECT, WREN, digest, positive_timeout, run_gt,
                              run_process, write_json, write_results, write_summary)
 from result_contract import compare_tables, comparison_options, parse_csv
-from run_all import select_questions
+from query_execution import regression_questions
 from eval_protocol import export_package, load_records, normalize_display, output_schema
 
 
@@ -125,7 +125,7 @@ def main(argv=None):
             command.add_argument("--timeout", type=positive_timeout, default=180)
     args = parser.parse_args(argv)
     try:
-        questions = select_questions(QUESTIONS, args.only, args.domain)
+        questions = regression_questions(QUESTIONS, args.only, args.domain)
         if args.command == "export":
             export_package(args.output_dir, questions, args.project.resolve())
             print(f"已导出{len(questions)}题；未生成SQL。")

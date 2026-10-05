@@ -119,8 +119,8 @@ class ExecutionTests(unittest.TestCase):
             (root / "summary.csv").write_text("full report sentinel")
             with patch.object(runner, "HERE", root), patch.object(runner, "QUESTIONS", [question]), \
                     patch.object(runner, "load_env", return_value={}), \
-                    patch.object(runner, "run_gt", return_value=execution.Execution("n\n1\n", 0)), \
-                    patch.object(runner, "run_wren", return_value=execution.Execution(status="process_error", returncode=2)), \
+                    patch.object(execution, "run_gt", return_value=execution.Execution("n\n1\n", 0)), \
+                    patch.object(execution, "run_wren", return_value=execution.Execution(status="process_error", returncode=2)), \
                     contextlib.redirect_stdout(io.StringIO()):
                 results = root / "runs/q-test/results"
                 results.mkdir(parents=True)
@@ -130,8 +130,15 @@ class ExecutionTests(unittest.TestCase):
                 self.assertEqual((root / "summary.csv").read_text(), "full report sentinel")
                 self.assertIn("FAIL", (root / "runs/q-test/summary.csv").read_text())
                 self.assertFalse(stale.exists())
+                self.assertEqual((results / "q-test.gt.csv").read_text(), "n\n1\n")
+                trace = json.loads((results / "q-test.execution.json").read_text())
+                self.assertEqual(trace["wren"]["status"], "process_error")
+                with patch.object(execution, "run_wren", return_value=execution.Execution("n\n2\n", 0)):
+                    self.assertEqual(runner.main(["--only", "q-test"]), 1)
+                self.assertEqual(stale.read_text(), "n\n2\n")
+                self.assertEqual((results / "q-test.gt.csv").read_text(), "n\n1\n")
                 with self.assertRaises(ValueError):
-                    runner.output_directory([question], subset=True, output=root)
+                    execution.regression_directory(root, [question], only=["q-test"], output=root)
 
 
 class WorkerTests(unittest.TestCase):
