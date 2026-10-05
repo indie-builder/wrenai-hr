@@ -145,8 +145,13 @@ def evaluate(question, gt, wren, tolerance=None):
         return False, f"题库元数据错误: {exc}"
 
 
+def canonical(value):
+    """唯一的规范化 JSON 序列化：缩进 2、尾随换行、拒绝非有限数。"""
+    return json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False) + "\n"
+
+
 def write_json(path, value):
-    path.write_text(json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False) + "\n", encoding="utf-8")
+    path.write_text(canonical(value), encoding="utf-8")
 
 
 def digest(path):

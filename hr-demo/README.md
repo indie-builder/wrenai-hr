@@ -101,7 +101,7 @@ PY
 )
 ```
 
-Cube 返回结果不承诺顺序；展示趋势时显式按月份排序。模型校验统一使用 `wren context validate` 和 `check_semantics.py --build-check`；完整 `target/mdl.json` 是本地构建缓存，不纳入 Git。MCP 构建直接读取同一份 YAML，CI 将轻量编译结果与 Wren 官方构建逐项核对。
+Cube 返回结果不承诺顺序；展示趋势时显式按月份排序。模型校验统一使用 `wren context validate` 和 `check_semantics.py --build-check`；`target/mdl.json` 的缓存语义与 MCP 构建的关系见[语义项目工作流·已知限制](wren-project/AGENTS.md#已知限制)。
 
 ## 验证
 

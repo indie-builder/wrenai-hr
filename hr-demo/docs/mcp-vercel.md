@@ -20,7 +20,7 @@
 
 数据包格式 v2 只包含 `public.duckdb`、`mdl.json`、`context.json` 和 `manifest.json`；共享 Python 源码保留在 `hr_query/`，不再复制进 `data/`。清单记录各数据文件哈希、确定性种子、语义定义、运行源码、构建脚本及部署配置的来源哈希，并记录应用版本、可取得的 Git 提交（无 Git 元数据时为 null）、锁文件摘要和实际直接依赖版本。仅当前格式的合法包会在检查后替换；构建经过 staging、真实 SQL/Cube 检查和源文件复核后才替换旧包，失败时保留旧包。
 
-MCP 与 Vercel 构建通过 `hr_query/semantic.py` 直接从规范 YAML 生成 MDL，不依赖已提交或本地缓存的 `target/mdl.json`。`check_semantics.py --build-check` 在隔离环境逐项比较轻量编译与 Wren 官方构建，存在本地 target 时也核对缓存。CI 的 `.venv` 安装官方语义工具，`.venv-mcp` 构建并测试查询运行代码；发布前需确认部署提交通过该检查。下方记录不证明分支保护或自动部署已等待全部检查。
+MCP 与 Vercel 构建通过 `hr_query/semantic.py` 直接从规范 YAML 生成 MDL，不依赖已提交或本地缓存的 `target/mdl.json`；缓存与三方比对的权威说明见[语义项目工作流·已知限制](../wren-project/AGENTS.md#已知限制)。CI 的 `.venv` 安装官方语义工具，`.venv-mcp` 构建并测试查询运行代码；发布前需确认部署提交通过该检查。下方记录不证明分支保护或自动部署已等待全部检查。
 
 ## 验收记录（按提交）
 
