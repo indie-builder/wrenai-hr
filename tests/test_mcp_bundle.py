@@ -74,6 +74,9 @@ class BundleTests(ErrorAssertions, unittest.TestCase):
                        "hr_mcp/contracts.py", "hr_mcp/server.py", "scripts/mcp_context.py",
                        "hr-demo/wren-project/wren_project.yml", "pyproject.toml", "uv.lock", "vercel.json"):
             self.assertIn(source, manifest["sources"])
+        seeds = {path for path in manifest["sources"] if path.startswith("hr-demo/db/seed/")}
+        self.assertEqual(seeds, {"hr-demo/db/seed/manifest.json", *(
+            f"hr-demo/db/seed/{table}.parquet" for table in manifest["table_rows"])})
         self.assertEqual((self.data / "public.duckdb").stat().st_mode & 0o222, 0)
         analytics = AnalyticsEngine(self.data)
         self.assertEqual(analytics.query_sql("SELECT COUNT(*) AS n FROM employees")["rows"], [["786"]])

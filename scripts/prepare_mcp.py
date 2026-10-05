@@ -32,7 +32,7 @@ def source_files(root):
     database = root / "hr-demo/db"
     project = root / "hr-demo/wren-project"
     paths = [database / "build_duckdb.py", database / "schema_duckdb.sql",
-             database / "seed/attendance_records.parquet", database / "seed/attendance_manifest.json",
+             database / "seed/manifest.json",
              project / "wren_project.yml", project / "relationships.yml",
              root / "scripts/prepare_mcp.py", root / "pyproject.toml", root / "uv.lock",
              root / "vercel.json"]
@@ -43,8 +43,7 @@ def source_files(root):
     for package in ("hr_mcp", "hr_query"):
         paths.extend(path for path in (root / package).rglob("*.py")
                      if not {"data", "__pycache__"}.intersection(path.relative_to(root / package).parts))
-    for folder in ("seed/out", "seed/out2"):
-        paths.extend((database / folder).glob("*.csv"))
+    paths.extend(path for path in (database / "seed").rglob("*") if path.is_file())
     for folder in ("models", "views", "cubes"):
         paths.extend(path for path in (project / folder).rglob("*")
                      if path.suffix in {".yml", ".yaml", ".sql"})
@@ -100,18 +99,15 @@ def validate_previous_bundle(output_dir):
 
 
 def build_database(root, destination):
-    # Isolated module globals: the source builder retains all input paths; only
-    # its output globals point to staging. Never call load_duckdb.sh/default build.
     path = root / "hr-demo/db/build_duckdb.py"
     spec = importlib.util.spec_from_file_location("_hr_mcp_seed_builder", path)
     builder = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(builder)
-    builder.DB_DIR = destination
-    builder.DB_FILE = destination / "public.duckdb"
-    if builder.build() != 0:
+    database = destination / "public.duckdb"
+    if builder.build(database) != 0:
         raise ValueError("种子装载失败；保留旧 bundle。")
     import duckdb
-    with duckdb.connect(str(builder.DB_FILE), read_only=True) as connection:
+    with duckdb.connect(str(database), read_only=True) as connection:
         return {name: connection.execute(f'SELECT COUNT(*) FROM "{name}"').fetchone()[0]
                 for (name,) in connection.execute("SHOW TABLES").fetchall()}
 

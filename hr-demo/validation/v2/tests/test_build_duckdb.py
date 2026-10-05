@@ -4,6 +4,7 @@ import hashlib
 import io
 import json
 from pathlib import Path
+import shutil
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -15,88 +16,110 @@ builder = _support.load_module(_support.HR_DEMO / "db" / "build_duckdb.py", "bui
 
 class DatabaseBuildTests(unittest.TestCase):
     def setUp(self):
-        self.temporary = tempfile.TemporaryDirectory(prefix="hr-owner's-workspace-")
-        self.addCleanup(self.temporary.cleanup)
-        self.root = Path(self.temporary.name)
-        self.seeds = self.root / "seed/out"
-        self.seeds.mkdir(parents=True)
-        self.database = self.root / "duckdb" / "public.duckdb"
-        attendance = self.seeds / "attendance.parquet"
+        temporary = tempfile.TemporaryDirectory(prefix="hr-owner's-workspace-")
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.seeds = self.root / "seed"
+        self.seeds.mkdir()
+        self.database = self.root / "duckdb/public.duckdb"
+        schema = ("CREATE TABLE departments(dept_id INTEGER PRIMARY KEY, dept_name VARCHAR);"
+                  "CREATE TABLE salary_payments(pay_id INTEGER PRIMARY KEY, emp_id INTEGER, amount DECIMAL(10,2));"
+                  "CREATE TABLE attendance_records(att_id INTEGER PRIMARY KEY, emp_id INTEGER, att_date DATE);")
+        (self.root / "schema_duckdb.sql").write_text(schema)
+        self.manifest = {"format_version": 1, "snapshot_date": "2026-08-31", "tables": {}}
         with duckdb.connect() as con:
-            con.execute("COPY (SELECT 7 AS att_id, 1 AS emp_id, DATE '2026-08-31' AS att_date, "
-                        "'正常' AS status, 8.0 AS work_hours, 0.0 AS overtime_hours) "
-                        "TO ? (FORMAT PARQUET)", [str(attendance)])
-        manifest = self.seeds / "manifest.json"
-        manifest.write_text(json.dumps({"sha256": hashlib.sha256(attendance.read_bytes()).hexdigest()}))
-        (self.seeds / "departments.csv").write_text("dept_id,dept_name\n1,技术部\n", encoding="utf-8")
-        (self.seeds / "salary_payments.csv").write_text("emp_id,amount\n1,123.45\n", encoding="utf-8")
-        (self.root / "schema_duckdb.sql").write_text(
-            "CREATE TABLE departments(dept_id INTEGER PRIMARY KEY, dept_name VARCHAR);"
-            "CREATE TABLE salary_payments(pay_id INTEGER PRIMARY KEY, emp_id INTEGER, amount DECIMAL(10,2));"
-            "CREATE TABLE attendance_records(att_id INTEGER, emp_id INTEGER, att_date DATE, "
-            "status VARCHAR, work_hours DOUBLE, overtime_hours DOUBLE);", encoding="utf-8")
-        self.patch = patch.multiple(builder, HERE=self.root,
-                                    DB_DIR=self.database.parent, DB_FILE=self.database,
-                                    ATT_PARQUET=attendance, ATT_MANIFEST=manifest)
-        self.patch.start()
-        self.addCleanup(self.patch.stop)
+            con.execute(schema)
+            con.execute("INSERT INTO departments VALUES (1, '技术部');"
+                        "INSERT INTO salary_payments VALUES (19, 1, 123.45);"
+                        "INSERT INTO attendance_records VALUES (7, 1, '2026-08-31')")
+            for (table,) in con.execute("SHOW TABLES").fetchall():
+                path = self.seeds / f"{table}.parquet"
+                con.execute(f'COPY "{table}" TO ? (FORMAT PARQUET)', [str(path)])
+                self.manifest["tables"][table] = {
+                    "sha256": hashlib.sha256(path.read_bytes()).hexdigest(), "rows": 1,
+                    "columns": [list(row[:2]) for row in con.execute(f'DESCRIBE "{table}"').fetchall()]}
+        self.write_manifest()
+        self.backup = self.root / "backup"
+        shutil.copytree(self.seeds, self.backup)
+        patched = patch.multiple(builder, HERE=self.root)
+        patched.start()
+        self.addCleanup(patched.stop)
+        self.database.parent.mkdir()
+        with duckdb.connect(str(self.database)) as con:
+            con.execute("CREATE TABLE preserved AS SELECT 42 AS value")
+        self.original = self.database.read_bytes()
 
-    def test_single_quote_workspace_loads_csv_and_parquet(self):
+    def write_manifest(self):
+        (self.seeds / "manifest.json").write_text(json.dumps(self.manifest))
+
+    def assert_preserved(self):
+        with self.assertRaises((ValueError, SystemExit, OSError, duckdb.Error)), contextlib.redirect_stdout(io.StringIO()):
+            builder.build(self.database)
+        self.assertEqual(self.database.read_bytes(), self.original)
+        self.assertEqual(list(self.database.parent.glob(".build-*")), [])
+        shutil.rmtree(self.seeds)
+        shutil.copytree(self.backup, self.seeds)
+
+    def test_single_quote_workspace_preserves_explicit_ids_and_types(self):
         with contextlib.redirect_stdout(io.StringIO()):
-            self.assertEqual(builder.build(), 0)
+            self.assertEqual(builder.build(self.database), 0)
         with duckdb.connect(str(self.database), read_only=True) as con:
             self.assertEqual(con.execute("SELECT * FROM departments").fetchall(), [(1, "技术部")])
             self.assertEqual(con.execute("SELECT pay_id, emp_id, amount::VARCHAR FROM salary_payments").fetchall(),
-                             [(1, 1, "123.45")])
+                             [(19, 1, "123.45")])
             self.assertEqual(con.execute("SELECT att_id FROM attendance_records").fetchall(), [(7,)])
 
-    def preserve_database(self):
-        self.database.parent.mkdir(exist_ok=True)
-        with duckdb.connect(str(self.database)) as con:
-            con.execute("CREATE TABLE preserved AS SELECT 42 AS value")
-        return self.database.read_bytes()
+    def test_invalid_manifest_keeps_existing_database(self):
+        entry = self.manifest["tables"]["salary_payments"]
+        cases = [(self.manifest, "format_version", 2), (self.manifest, "snapshot_date", "2026-09-01"),
+                 (self.manifest, "tables", {}), (entry, "sha256", "wrong"),
+                 (entry, "rows", 2), (entry, "columns", [["wrong", "INTEGER"]])]
+        for target, key, value in cases:
+            with self.subTest(field=key), patch.dict(target, {key: value}):
+                self.write_manifest()
+                self.assert_preserved()
 
-    def test_manifest_wal_and_duplicate_or_missing_csv_keep_existing_database(self):
-        original = self.preserve_database()
-        for failure in ("manifest", "wal", "duplicate", "missing"):
-            with self.subTest(failure=failure):
-                if failure == "manifest":
-                    builder.ATT_MANIFEST.write_text('{"sha256":"wrong"}')
-                    restore = lambda: builder.ATT_MANIFEST.write_text(json.dumps({
-                        "sha256": hashlib.sha256(builder.ATT_PARQUET.read_bytes()).hexdigest()}))
-                elif failure == "wal":
-                    path = self.database.with_suffix(".duckdb.wal")
-                    path.touch()
-                    restore = path.unlink
-                elif failure == "duplicate":
-                    path = self.root / "seed/out2/salary_payments.csv"
-                    path.parent.mkdir()
-                    path.write_bytes((self.seeds / "salary_payments.csv").read_bytes())
-                    restore = path.unlink
-                else:
-                    path = self.seeds / "departments.csv"
-                    contents = path.read_bytes()
-                    path.unlink()
-                    restore = lambda: path.write_bytes(contents)
-                try:
-                    with self.assertRaises(SystemExit), contextlib.redirect_stdout(io.StringIO()):
-                        builder.build()
-                    self.assertEqual(self.database.read_bytes(), original)
-                    self.assertEqual(list(self.database.parent.glob(".build-*")), [])
-                finally:
-                    restore()
+    def test_invalid_seed_files_keep_existing_database(self):
+        seed = self.seeds / "salary_payments.parquet"
+        cases = {"corrupt": lambda: seed.write_bytes(b"not parquet"), "missing": seed.unlink,
+                 "duplicate": lambda: shutil.copytree(self.backup, self.seeds / "other"),
+                 "extra": lambda: (self.seeds / "unknown.parquet").touch(),
+                 "symlink": lambda: (seed.unlink(), seed.symlink_to(self.backup / seed.name))}
+        for name, mutate in cases.items():
+            with self.subTest(failure=name):
+                mutate()
+                self.assert_preserved()
 
-    def test_bad_csv_and_missing_seed_keep_existing_database(self):
-        original = self.preserve_database()
-        (self.seeds / "salary_payments.csv").write_text("wrong_header\n1\n")
-        with contextlib.redirect_stdout(io.StringIO()):
-            self.assertEqual(builder.build(), 1)
-        self.assertEqual(self.database.read_bytes(), original)
-        builder.ATT_PARQUET.unlink()
-        with self.assertRaises(SystemExit):
-            builder.build()
-        self.assertEqual(self.database.read_bytes(), original)
-        self.assertEqual(list(self.database.parent.glob(".build-*")), [])
+    def test_wal_or_publication_failure_keeps_existing_database(self):
+        wal = self.database.with_suffix(".duckdb.wal")
+        wal.touch()
+        self.assert_preserved()
+        wal.unlink()
+        exists = Path.exists
+        checks = 0
+
+        def late_wal(path):
+            nonlocal checks
+            if path == wal:
+                checks += 1
+                return checks == 2
+            return exists(path)
+
+        for failure in (patch.object(Path, "exists", late_wal),
+                        patch.object(Path, "replace", side_effect=OSError("publication failed"))):
+            with failure:
+                self.assert_preserved()
+
+    def test_invalid_parquet_columns_or_constraint_keep_existing_database(self):
+        seed = self.seeds / "salary_payments.parquet"
+        for query in ("SELECT 19 AS wrong", "SELECT 19 AS pay_id, 1 AS emp_id, 123.45::DECIMAL(10,2) AS amount "
+                      "FROM range(2)"):
+            with self.subTest(query=query):
+                with duckdb.connect() as con:
+                    con.execute(f"COPY ({query}) TO ? (FORMAT PARQUET)", [str(seed)])
+                self.manifest["tables"]["salary_payments"]["sha256"] = hashlib.sha256(seed.read_bytes()).hexdigest()
+                self.write_manifest()
+                self.assert_preserved()
 
 
 if __name__ == "__main__":

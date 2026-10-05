@@ -1,8 +1,0 @@
-{
-  "snapshot_date": "2026-08-31",
-  "file": "attendance_records.parquet",
-  "sha256": "96fb3b2bf2386b51ad5071a7bf0a9a3164a749934eaf5c45f7e04fdf7f6e99b7",
-  "rows": 203679,
-  "source": "Existing synthetic HR delivery attendance snapshot, moved without changing bytes from wren-project/apps/hr-overview/data/attendance_records.parquet.",
-  "reproducibility": "This checked-in snapshot is the canonical attendance seed. The historical random generator cannot reproduce these exact rows. Explicit --attendance generate produces a different dataset requiring new regression and dashboard exports."
-}

@@ -95,10 +95,8 @@ def fixture(directory: Path):
     mdl = build_mdl(PROJECT)
     write_json(directory / "mdl.json", mdl)
     write_json(directory / "context.json", public_context(mdl, PROJECT))
-    builder = load_module(ROOT / "hr-demo/db/build_duckdb.py", "_test_seed_builder")
     with duckdb.connect(str(directory / "public.duckdb")) as connection:
-        for statement in builder.split_statements((ROOT / "hr-demo/db/schema_duckdb.sql").read_text()):
-            connection.execute(statement)
+        connection.execute((ROOT / "hr-demo/db/schema_duckdb.sql").read_text())
         connection.execute("""INSERT INTO departments(dept_id, dept_name, location, established_date)
             VALUES (1, '技术部', '北京', DATE '2020-06-01'), (2, '人事部', '北京', DATE '2020-06-01')""")
         connection.execute("""INSERT INTO employees(emp_id,emp_no,name,status,dept_id,hire_date,base_salary,
