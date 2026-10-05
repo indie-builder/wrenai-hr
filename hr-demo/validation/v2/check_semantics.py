@@ -6,6 +6,7 @@
 """
 import argparse
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -105,7 +106,6 @@ def check_build(project, wren=WREN):
                 shutil.copytree(source, isolated / name)
             elif source.exists():
                 shutil.copy2(source, isolated / name)
-        import os
         env = dict(os.environ, WREN_HOME=str(Path(temporary) / "wren"))
         execution = run_process([wren, "context", "build"], cwd=isolated, env=env)
         if not execution.ok:

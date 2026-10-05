@@ -104,13 +104,12 @@ def smoke():
                     process.wait(timeout=5)
 
 
-async def remote():
-    return await verify(os.environ["MCP_URL"], os.environ.get("MCP_AUTH_TOKEN", ""))
-
-
 def main():
     try:
-        result = asyncio.run(remote()) if os.environ.get("MCP_URL") else smoke()
+        if os.environ.get("MCP_URL"):
+            result = asyncio.run(verify(os.environ["MCP_URL"], os.environ.get("MCP_AUTH_TOKEN", "")))
+        else:
+            result = smoke()
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
     except Exception as exc:

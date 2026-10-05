@@ -8,7 +8,6 @@ import threading
 from pathlib import Path
 import shutil
 import subprocess
-import sys
 import tempfile
 import unittest
 from contextlib import asynccontextmanager, contextmanager
