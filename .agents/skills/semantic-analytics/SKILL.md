@@ -62,8 +62,8 @@ WREN_BIN=<wren路径> python3 <本技能>/scripts/run_all.py \
   --db <域>/db/duckdb/<域>.duckdb --results <域>/validation/results
 ```
 
-- 题库 `questions.py`:每题含 `id/domain/priority/question/gt/wren` 五要素;`gt` 直连物理表(标准答案),`wren` 经语义层(被测)
-- 逐值比对:排序后比较,数值容差默认 0.011(`--tol` 可调),空结果判失败
+- 题库 `questions.py`:每题含 `id/domain/priority/question/gt/wren` 五要素,可选 `ordered/allow_empty/tolerance`(默认 False/False/0.011);`gt` 直连物理表(标准答案),`wren` 经语义层(被测)
+- 逐值比对:无序题多重集匹配,`ordered=True` 逐行保序;数值容差默认 0.011(`--tol` 可覆盖),拒绝 NaN/Inf;空结果默认判失败(`allow_empty=True` 放行);子集运行写 `results/runs/<子集>/`,不覆盖全量汇总
 - **纪律**:不为通过测试修改正确口径;报告通过率时区分历史记录与本次实际执行
 
 ### ⑦ 仪表盘(可选)
@@ -84,4 +84,4 @@ context instructions → memory fetch/recall → dry-plan → query → 验证�
 ## 可替换点
 
 - 语义引擎当前耦合 wren CLI(profile/memory/dry-plan)。换引擎时替换 ④⑥⑦ 三步的工具调用,管道形状(造数→库→语义→双路径验证)不变
-- `scripts/run_all.py` 的比对核心(排序+容差+空结果失败)是引擎无关的,gt 侧换成其他执行器只需改 `run_gt`
+- `scripts/run_all.py` 的比对核心已与参考实现对齐(Decimal 数值容差、布尔/空值归一、无序题多重集匹配、题级 ordered/allow_empty/tolerance),与执行引擎无关;gt 侧换成其他执行器只需改 `run_gt`

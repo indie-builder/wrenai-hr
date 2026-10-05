@@ -39,9 +39,9 @@ WREN_BIN=$PWD/.venv/bin/wren .venv/bin/python <技能>/scripts/run_all.py \
   --db <域>/db/duckdb/<域>.duckdb --results <域>/validation/results
 ```
 
-- 输出 `results/qXX.{gt,wren}.csv` 与 `summary.csv`;全过退出码 0
-- 数值容差默认 0.011,排序后比对,空结果判失败;不校验排序原始顺序
-- runner 主要从错误文本判断失败,异常时同时检查输出与底层执行状态
+- 输出 `qXX.{gt,wren}.csv`(仅通过题)与 `summary.csv`(全量运行;子集写 `runs/<子集>/`);全过退出码 0
+- 数值容差默认 0.011,拒绝 NaN/Inf;无序题多重集比对,题级 `ordered=True` 逐行保序;空结果默认判失败(`allow_empty=True` 放行)
+- runner 以子进程退出码与超时判定执行失败;报告只记录错误类别,不写入 stderr 原文
 - 共享模型/关系/口径修改后跑全量;单题/单域修改后至少跑受影响题目
 
 ## 6. 问数闭环
