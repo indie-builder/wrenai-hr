@@ -57,7 +57,7 @@ python3.12 -m venv .venv
 (cd hr-demo/db && ./load_duckdb.sh)
 ```
 
-该命令在临时库装载成功后**替换** `db/duckdb/public.duckdb`，不要对含有需保留人工修改的库执行。默认考勤种子缺失或校验不符会失败，不自动随机回退。`--attendance generate` 明确生成另一批考勤，执行后必须重新回归、导出快照，不能沿用既有验证数字。库名固定为 `public.duckdb`，因为 Wren 按文件名挂载物理 catalog。
+该命令在临时库装载成功后**替换** `db/duckdb/public.duckdb`，不要对含有需保留人工修改的库执行。默认考勤种子缺失或校验不符会失败，不自动随机回退；考勤数据只来自 SHA-256 校验通过的快照。库名固定为 `public.duckdb`，因为 Wren 按文件名挂载物理 catalog。
 
 用户级连接 profile 不随仓库分发。首次在新机器创建 `hr_demo_duck`：
 

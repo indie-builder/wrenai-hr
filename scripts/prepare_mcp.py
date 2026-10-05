@@ -110,7 +110,7 @@ def build_database(root, destination):
     spec.loader.exec_module(builder)
     builder.DB_DIR = destination
     builder.DB_FILE = destination / "public.duckdb"
-    if builder.build("parquet") != 0:
+    if builder.build() != 0:
         raise ValueError("种子装载失败；保留旧 bundle。")
     import duckdb
     with duckdb.connect(str(builder.DB_FILE), read_only=True) as connection:
