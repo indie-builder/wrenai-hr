@@ -14,12 +14,11 @@
 - `scripts/prepare_mcp.py`：构建时从确定性种子与 YAML 生成私有 `hr_mcp/data/`；`mcp_context.py` 裁剪公开 schema 与业务上下文，不替换开发用数据库。
 - `pyproject.toml`、`uv.lock`：独立的 Python 3.12 运行依赖，不携带 Wren CLI、embedding、Arrow 或浏览器仪表盘。
 - `vercel.json`：服务入口及执行时长，排除仅用于构建的源数据和测试；`hr_query/` 随函数源码打包。
-- `scripts/check_mcp.py`：使用官方客户端检验鉴权、工具发现、真实查询与写入拒绝。
-- `scripts/smoke_mcp.py`：使用临时本地端口和内存 Token 启动实际 HTTP 服务，调用官方客户端后关闭；可直接复现本地与 CI 验证。
+- `scripts/smoke_mcp.py`：使用临时本地端口和内存 Token 启动实际 HTTP 服务，调用官方客户端检验鉴权、工具发现、真实查询与写入拒绝后关闭；设置 `MCP_URL` 时改为验证该部署。可直接复现本地与 CI 验证。
 
 快照为 **2026-08-31**。模型与数据更新后需要重新构建和部署。构建输入保留在仓库，但最终数据库放在函数私有目录；没有静态文件路由，不能把该目录移到 Vercel `public/`。
 
-数据包格式 v2 只包含 `public.duckdb`、`mdl.json`、`context.json` 和 `manifest.json`；共享 Python 源码保留在 `hr_query/`，不再复制进 `data/`。清单记录各数据文件哈希、确定性种子、语义定义、运行源码、构建脚本及部署配置的来源哈希，并记录应用版本、可取得的 Git 提交（无 Git 元数据时为 null）、锁文件摘要和实际直接依赖版本。已有 v1 包仅在文件完整、哈希匹配且没有额外文件时升级；合法 v2 包同样检查后替换。构建经过 staging、真实 SQL/Cube 检查和源文件复核后才替换旧包，失败时保留旧包。
+数据包格式 v2 只包含 `public.duckdb`、`mdl.json`、`context.json` 和 `manifest.json`；共享 Python 源码保留在 `hr_query/`，不再复制进 `data/`。清单记录各数据文件哈希、确定性种子、语义定义、运行源码、构建脚本及部署配置的来源哈希，并记录应用版本、可取得的 Git 提交（无 Git 元数据时为 null）、锁文件摘要和实际直接依赖版本。仅当前格式的合法包会在检查后替换；构建经过 staging、真实 SQL/Cube 检查和源文件复核后才替换旧包，失败时保留旧包。
 
 MCP 与 Vercel 构建通过 `hr_query/semantic.py` 直接从规范 YAML 生成 MDL，不依赖已提交或本地缓存的 `target/mdl.json`。`check_semantics.py --build-check` 在隔离环境逐项比较轻量编译与 Wren 官方构建，存在本地 target 时也核对缓存。CI 的 `.venv` 安装官方语义工具，`.venv-mcp` 构建并测试查询运行代码；发布前需确认部署提交通过该检查。下方记录不证明分支保护或自动部署已等待全部检查。
 
@@ -66,7 +65,7 @@ set +a
 
 ```bash
 export MCP_URL=http://127.0.0.1:8320/mcp
-.venv-mcp/bin/python scripts/check_mcp.py
+.venv-mcp/bin/python scripts/smoke_mcp.py
 .venv-mcp/bin/python -m unittest discover -s tests -v
 ```
 
@@ -87,7 +86,7 @@ GitHub Actions 的 pull_request 运行构建 PR 合并进主分支的结果；Ve
 ```bash
 export MCP_URL=https://<生产域名>/mcp
 # 此终端已安全配置和生产相同的 MCP_AUTH_TOKEN
-.venv-mcp/bin/python scripts/check_mcp.py
+.venv-mcp/bin/python scripts/smoke_mcp.py
 ```
 
 不要把 `curl GET /mcp` 当作完整健康检查。无状态 MCP 不需要常驻 SSE 会话，带认证的 GET 或 DELETE 可能返回 `405`；正确验证方式是 MCP 客户端握手、工具发现和调用。
