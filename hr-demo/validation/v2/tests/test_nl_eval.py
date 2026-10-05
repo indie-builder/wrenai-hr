@@ -1,5 +1,7 @@
 """NL evaluation contract and real planner tests; only isolated data/project paths."""
 import _support
+import contextlib
+import io
 import json
 from pathlib import Path
 import tempfile
@@ -9,6 +11,7 @@ from unittest.mock import patch
 import query_execution as execution
 from questions import QUESTIONS
 import nl_eval
+from result_contract import compare
 
 
 class NLEvaluationTests(unittest.TestCase):
@@ -55,19 +58,45 @@ class NLEvaluationTests(unittest.TestCase):
             self.assertNotIn(hidden, json.dumps(schema))
 
     def test_declared_display_precision_handles_unrounded_values_without_relaxing_other_columns(self):
-        offer = next(q for q in QUESTIONS if q["id"] == "q28")
-        gt = "已接受,已拒绝,接受率\n49,8,86.0\n"
-        self.assertTrue(nl_eval.compare_answer(gt, "accepted,rejected,rate\n49,8,85.96491228070175\n", offer)[0])
-        self.assertFalse(nl_eval.compare_answer(gt, "accepted,replied,rate\n49,57,85.96491228070175\n", offer)[0])
-        self.assertFalse(nl_eval.compare_answer(gt, "accepted,rejected,rate\n49.02,8,85.96491228070175\n", offer)[0])
-        cost = next(q for q in QUESTIONS if q["id"] == "q40")
-        raw = "department,cost\n研发,12345.49\n"
-        self.assertTrue(nl_eval.compare_answer("部门,人均月成本\n研发,12345\n", raw, cost)[0])
-        self.assertEqual(raw, "department,cost\n研发,12345.49\n")
-        self.assertFalse(nl_eval.compare_answer("部门,人均月成本\n研发,12345\n", "department,cost\n研发,12345.5\n", cost)[0])
-        for value in ("NaN", "Infinity"):
-            self.assertFalse(nl_eval.compare_answer("部门,人均月成本\n研发,12345\n", f"department,cost\n研发,{value}\n", cost)[0])
-        self.assertEqual(nl_eval.normalize_display([["-1.25"]], [{"name": "v", "round_digits": 1}]), [["-1.3"]])
+        cases = [
+            ("acceptance_rate_rounded", "q28", "已接受,已拒绝,接受率\n49,8,86.0\n",
+             "accepted,rejected,rate\n49,8,85.96491228070175\n", True),
+            ("wrong_rejected_count", "q28", "已接受,已拒绝,接受率\n49,8,86.0\n",
+             "accepted,replied,rate\n49,57,85.96491228070175\n", False),
+            ("unrounded_count_stays_strict", "q28", "已接受,已拒绝,接受率\n49,8,86.0\n",
+             "accepted,rejected,rate\n49.02,8,85.96491228070175\n", False),
+            ("cost_rounds_down", "q40", "部门,人均月成本\n研发,12345\n", "department,cost\n研发,12345.49\n", True),
+            ("cost_rounds_up", "q40", "部门,人均月成本\n研发,12345\n", "department,cost\n研发,12345.5\n", False),
+            ("nan_rejected", "q40", "部门,人均月成本\n研发,12345\n", "department,cost\n研发,NaN\n", False),
+            ("infinity_rejected", "q40", "部门,人均月成本\n研发,12345\n", "department,cost\n研发,Infinity\n", False),
+            ("negative_half_rounds_away_from_zero", None, "v\n-1.3\n", "v\n-1.25\n", True),
+        ]
+        schemas = {q["id"]: nl_eval.output_schema(q) for q in QUESTIONS if q["id"] in ("q28", "q40")}
+        schemas[None] = [{"name": "v", "round_digits": 1}]
+        for name, qid, gt, raw, expected in cases:
+            with self.subTest(case=name):
+                self.assertEqual(compare(gt, raw, output_schema=schemas[qid])[0], expected)
+
+
+    def test_large_finite_rounded_result_completes_batch_and_keeps_raw_evidence(self):
+        question = {**self.question, "gt": "SELECT round(count(*), 0) AS n FROM employees"}
+        manifest = {"models": [{"name": "employees", "tableReference": {"table": "employees"}}]}
+        raw = "n\n1e28\n"
+        with tempfile.TemporaryDirectory() as directory:
+            project = Path(directory)
+            (project / "target").mkdir()
+            (project / "target/mdl.json").write_text(json.dumps(manifest))
+            records = project / "records.jsonl"
+            records.write_text(json.dumps(self.record()))
+            output = project / "evaluation"
+            with patch.object(nl_eval, "run_process", return_value=execution.Execution("SELECT count(*) FROM employees\n", 0)), \
+                    patch.object(nl_eval, "run_gt", return_value=execution.Execution(raw, 0)), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(nl_eval.run_evaluation(output, [question], records, project, project / "unused.duckdb", 1), 0)
+            self.assertEqual(json.loads((output / "run.json").read_text())["counts"], {"PASS": 1})
+            for side in ("generated", "gt"):
+                self.assertEqual((output / f"results/q1.{side}.csv").read_text(), raw)
+            self.assertEqual(json.loads((output / "trace/q1.json").read_text())["status"], "PASS")
 
     def test_no_generation_and_rejected_sql_do_not_start_processes(self):
         with patch.object(nl_eval, "run_process") as process:

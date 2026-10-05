@@ -1,6 +1,6 @@
 -- 星辰科技 HR 演示数据库，快照 2026-08-31。
 -- 物理类型与约束由本文件定义；业务字段说明见 wren-project/models/。
--- INTEGER 主键由装载器生成；关系由 CSV 一致性及 relationships.yml 维护。
+-- 种子保存显式主键与物理类型；关系由种子一致性及 relationships.yml 维护。
 -- 库名 public.duckdb 决定 Wren 挂载的 public catalog。
 
 -- 部门表

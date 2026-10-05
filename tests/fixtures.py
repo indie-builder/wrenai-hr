@@ -1,10 +1,8 @@
 """Deterministic bundles, HTTP test interface, error assertions and process probes."""
 from __future__ import annotations
 
-import importlib.util
 import json
 import os
-import threading
 from pathlib import Path
 import shutil
 import subprocess
@@ -23,7 +21,8 @@ from hr_mcp.contracts import BUNDLE_FILES, BUNDLE_FORMAT_VERSION, MCPQueryError,
 from hr_mcp.engine import AnalyticsEngine, file_digest, worker_command
 from hr_mcp.server import create_app
 from hr_query.semantic import build_mdl
-from scripts.prepare_mcp import public_context, write_json
+from scripts.mcp_context import public_context
+from scripts.prepare_mcp import write_json
 
 ROOT = Path(__file__).resolve().parents[1]
 PROJECT = ROOT / "hr-demo/wren-project"
@@ -83,22 +82,13 @@ WORKER_GUARD_SQL = (
 )
 
 
-def load_module(path: Path, name: str):
-    spec = importlib.util.spec_from_file_location(name, path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
 def fixture(directory: Path):
     directory.mkdir()
     mdl = build_mdl(PROJECT)
     write_json(directory / "mdl.json", mdl)
     write_json(directory / "context.json", public_context(mdl, PROJECT))
-    builder = load_module(ROOT / "hr-demo/db/build_duckdb.py", "_test_seed_builder")
     with duckdb.connect(str(directory / "public.duckdb")) as connection:
-        for statement in builder.split_statements((ROOT / "hr-demo/db/schema_duckdb.sql").read_text()):
-            connection.execute(statement)
+        connection.execute((ROOT / "hr-demo/db/schema_duckdb.sql").read_text())
         connection.execute("""INSERT INTO departments(dept_id, dept_name, location, established_date)
             VALUES (1, '技术部', '北京', DATE '2020-06-01'), (2, '人事部', '北京', DATE '2020-06-01')""")
         connection.execute("""INSERT INTO employees(emp_id,emp_no,name,status,dept_id,hire_date,base_salary,
@@ -142,6 +132,10 @@ def touch_bundle(data):
         (data / name).touch()
 
 
+def temporary_directory(case, *, prefix="hr-test-"):
+    return Path(case.enterContext(tempfile.TemporaryDirectory(prefix=prefix)))
+
+
 class ErrorAssertions:
     @contextmanager
     def error(self, code):
@@ -158,12 +152,11 @@ class ErrorAssertions:
 
 class FakeEngine:
     def __init__(self):
-        self.calls, self.thread_ids, self.failure = [], [], None
+        self.calls, self.failure = [], None
 
     def __getattr__(self, method):
         def call(*args):
             self.calls.append((method, args))
-            self.thread_ids.append(threading.get_ident())
             if self.failure is not None:
                 raise self.failure
             return {
@@ -197,9 +190,7 @@ async def sdk_session(application):
 
 class ServerCase(unittest.TestCase):
     def setUp(self):
-        environment = patch.dict(os.environ, {key: "" for key in ENV_KEYS})
-        environment.start()
-        self.addCleanup(environment.stop)
+        self.enterContext(patch.dict(os.environ, {key: "" for key in ENV_KEYS}))
         self.engine = FakeEngine()
 
     def client(self, **options):

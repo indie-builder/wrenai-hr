@@ -64,7 +64,7 @@ def create_app(
 
     @application.get("/health")
     async def health() -> JSONResponse:
-        ready = await runtime.health()
+        ready = await runtime.ready(check_files=True)
         return JSONResponse(
             {"status": "ready" if ready else "not_ready", "version": VERSION, "snapshot": SNAPSHOT_DATE},
             status_code=200 if ready else 503, headers={"Cache-Control": "no-store"},

@@ -1,64 +1,36 @@
-"""Answer-free NL package, generation-record validation and public display precision."""
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP, localcontext
+"""Answer-free NL package, public result schema and generation-record validation."""
 import json
+import shutil
+
+import sqlglot
+from sqlglot import exp
 
 from query_execution import digest, write_json
 
+RECORD_TYPES = {"id": str, "question": str, "generated_sql": (str, type(None)), "context_refs": list}
+OPTIONAL_TYPES = {"model": str, "run_metadata": dict}
+
 
 def output_schema(question):
-    """Expose only outer labels and explicit ROUND scale; never expressions/answers."""
-    import sqlglot
-    from sqlglot import exp
-
-    tree = sqlglot.parse_one(question["gt"], read="duckdb")
+    """Expose only outer labels and explicit ROUND scale, never expressions/answers."""
     schema = []
-    for item in tree.selects:
+    for item in sqlglot.parse_one(question["gt"], read="duckdb").selects:
         if not isinstance(item, (exp.Alias, exp.Column)) or not item.alias_or_name:
             raise ValueError("标准SQL最外层投影需要显式列标题")
-        expression = item.this if isinstance(item, exp.Alias) else item
-        while isinstance(expression, exp.Paren):
-            expression = expression.this
+        expression = (item.this if isinstance(item, exp.Alias) else item).unnest()
         digits = None
         if isinstance(expression, exp.Round):
-            decimals = expression.args.get("decimals")
-            if decimals is None:
-                digits = 0
-            elif isinstance(decimals, exp.Literal) and decimals.is_int:
-                digits = int(decimals.this)
-            elif isinstance(decimals, exp.Neg) and isinstance(decimals.this, exp.Literal) and decimals.this.is_int:
-                digits = -int(decimals.this.this)
-            else:
+            decimals = expression.args.get("decimals") or exp.Literal.number(0)
+            if not decimals.is_int:
                 raise ValueError("展示精度必须为固定整数")
+            digits = int(decimals.sql())
         schema.append({"name": item.alias_or_name, "round_digits": digits})
     if not schema:
         raise ValueError("标准SQL缺少外层投影")
     return schema
 
 
-def normalize_display(rows, schema):
-    normalized = []
-    for row in rows:
-        values = list(row)
-        for index, column in enumerate(schema):
-            digits = column["round_digits"]
-            if digits is None:
-                continue
-            try:
-                number = Decimal(str(values[index]))
-                if not number.is_finite():
-                    continue  # The comparator rejects nonfinite metrics; do not round them away.
-                with localcontext() as context:
-                    context.prec = max(28, len(number.as_tuple().digits) + abs(digits) + 2)
-                    values[index] = str(number.quantize(Decimal(1).scaleb(-digits), rounding=ROUND_HALF_UP))
-            except InvalidOperation:
-                continue
-        normalized.append(values)
-    return normalized
-
-
 def export_package(directory, questions, project):
-    import sqlglot
-
     directory.mkdir(parents=True, exist_ok=False)
     mdl = project / "target/mdl.json"
     manifest = json.loads(mdl.read_text(encoding="utf-8"))
@@ -81,7 +53,7 @@ def export_package(directory, questions, project):
         for path in sorted((project / "knowledge" / category).glob("*.md")):
             destination = directory / category / path.name
             destination.parent.mkdir(exist_ok=True)
-            destination.write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
+            shutil.copyfile(path, destination)
             refs.append(f"{category}/{path.name}")
     write_json(directory / "protocol.json", {
         "version": 2, "snapshot_date": "2026-08-31", "context_refs": refs,
@@ -90,8 +62,7 @@ def export_package(directory, questions, project):
             "round_digits": "整数为该列公开展示精度，评测按ROUND_HALF_UP规范后比较；null表示不额外取整。",
             "raw_results": "原始生成SQL与查询结果保留，展示规范只应用于比较副本。",
         },
-        "required_record_fields": ["id", "question", "generated_sql", "context_refs"],
-        "optional_record_fields": ["model", "run_metadata"],
+        "required_record_fields": list(RECORD_TYPES), "optional_record_fields": list(OPTIONAL_TYPES),
         "instructions": "仅依据题目包生成MDL SELECT，禁止读取题库/标准SQL/历史结果/knowledge/sql。"
                         "只交付JSONL记录，不能传shell命令。严格按每题output_schema输出固定列形状、指标及顺序；"
                         "遵循round_digits展示精度。列别名不限，列位置需一致。"
@@ -105,10 +76,8 @@ def reject_constant(_):
 
 
 def load_records(path, questions):
-    expected = {question["id"]: question for question in questions}
+    expected = {question["id"]: question["question"] for question in questions}
     records, errors = {}, {}
-    required = {"id", "question", "generated_sql", "context_refs"}
-    types = {"generated_sql": (str, type(None)), "context_refs": list, "model": str, "run_metadata": dict}
     for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
         if not line.strip():
             continue
@@ -123,9 +92,9 @@ def load_records(path, questions):
             errors[qid] = "题号重复"
             continue
         records[qid] = record
-        if (required - set(record) or set(record) - required - {"model", "run_metadata"}
-                or record.get("question") != expected[qid]["question"]
-                or any(not isinstance(record[key], value_type) for key, value_type in types.items() if key in record)
+        if (RECORD_TYPES.keys() - record.keys() or record.keys() - RECORD_TYPES.keys() - OPTIONAL_TYPES.keys()
+                or record.get("question") != expected[qid]
+                or any(not isinstance(record[key], kind) for key, kind in (RECORD_TYPES | OPTIONAL_TYPES).items() if key in record)
                 or not all(isinstance(ref, str) for ref in record.get("context_refs", []))):
             errors[qid] = "记录字段、原始问题或类型不符合protocol.json"
     return records, errors

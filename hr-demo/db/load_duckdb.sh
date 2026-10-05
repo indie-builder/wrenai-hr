@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 构建 DuckDB 版 HR 演示库 (唯一数据层, 无 Docker 依赖)
 # 产物: duckdb/public.duckdb —— 文件名固定, wren 按文件名挂载 catalog
-# 前提: seed/out 与 seed/out2 的 CSV 已由 gen_hr_data*.py 生成 (仓库内已含)
+# 前提: seed/manifest.json 校验仓库内 25 表的 typed Parquet 种子
 set -euo pipefail
 cd "$(dirname "$0")"
 

@@ -23,7 +23,7 @@
 | 业务问数、修改模型或知识 | [语义项目 AGENTS](hr-demo/wren-project/AGENTS.md) 和 [业务规则](hr-demo/wren-project/knowledge/rules/general.md)；进入 `wren-project/` 时同时遵守该目录的约定 |
 | 修改 MCP、共享 SQL 校验或查询执行 | [MCP 说明](hr-demo/docs/mcp-vercel.md)；`hr_mcp/` 维护传输、规划与调度，`hr_query/` 维护共享 SQL policy 与只读执行，`tests/` 验证公开调用行为 |
 | 修改仪表盘、同步页面数据 | [演示 README：仪表盘](hr-demo/README.md#仪表盘快照与本地预览)；需求修改 [query-spec.json](hr-demo/wren-project/apps/hr-overview/query-spec.json)，导出与核对使用 [export_dashboard.py](hr-demo/scripts/export_dashboard.py) |
-| 修改数据种子或装载过程 | [演示 README：数据与初始化](hr-demo/README.md#数据与查询路径)，再定位 `hr-demo/db/`；考勤来源清单校验失败时保留原库并报错 |
+| 修改数据种子或装载过程 | [演示 README：数据与初始化](hr-demo/README.md#数据与查询路径)，再定位 `hr-demo/db/`；任一种子来源清单校验失败时保留原库并报错 |
 | 修改固定 SQL 回归或自然语言评测 | [验证入口](hr-demo/validation/v2/README.md)；题库与标准答案在 [questions.py](hr-demo/validation/v2/questions.py)，运行状态由当次报告判断 |
 | 修改文档、检查导航 | [演示 README：文档检查](hr-demo/README.md#文档检查)；`python3 scripts/check_docs.py`，纯文档修改无需全量数据库回归 |
 | 迁移到新的业务项目 | [复刻指南](hr-demo/docs/replication/README.md)，示例使用新项目 PostgreSQL；复现本 HR 项目使用演示 README |

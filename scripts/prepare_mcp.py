@@ -7,7 +7,8 @@ Requires the locked environment; builds MDL from YAML without a profile or Wren 
 from __future__ import annotations
 
 import argparse
-import importlib.util
+import runpy
+from contextlib import ExitStack
 from importlib.metadata import version
 import json
 from pathlib import Path
@@ -19,7 +20,7 @@ import tomllib
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from hr_mcp.contracts import BUNDLE_FILES, BUNDLE_FORMAT_VERSION, SNAPSHOT_DATE, VERSION
-from hr_mcp.engine import AnalyticsEngine, file_digest
+from hr_mcp.engine import AnalyticsEngine, file_digest, read_bundle_manifest
 from hr_query.semantic import build_mdl
 from scripts.mcp_context import public_context
 
@@ -32,7 +33,7 @@ def source_files(root):
     database = root / "hr-demo/db"
     project = root / "hr-demo/wren-project"
     paths = [database / "build_duckdb.py", database / "schema_duckdb.sql",
-             database / "seed/attendance_records.parquet", database / "seed/attendance_manifest.json",
+             database / "seed/manifest.json",
              project / "wren_project.yml", project / "relationships.yml",
              root / "scripts/prepare_mcp.py", root / "pyproject.toml", root / "uv.lock",
              root / "vercel.json"]
@@ -43,8 +44,7 @@ def source_files(root):
     for package in ("hr_mcp", "hr_query"):
         paths.extend(path for path in (root / package).rglob("*.py")
                      if not {"data", "__pycache__"}.intersection(path.relative_to(root / package).parts))
-    for folder in ("seed/out", "seed/out2"):
-        paths.extend((database / folder).glob("*.csv"))
+    paths.extend(path for path in (database / "seed").rglob("*") if path.is_file())
     for folder in ("models", "views", "cubes"):
         paths.extend(path for path in (project / folder).rglob("*")
                      if path.suffix in {".yml", ".yaml", ".sql"})
@@ -84,34 +84,17 @@ def validate_previous_bundle(output_dir):
     manifest_path = output_dir / "manifest.json"
     if not manifest_path.is_file() or manifest_path.is_symlink():
         raise ValueError("已有输出目录不是 MCP bundle；请选择新目录。")
-    previous = json.loads(manifest_path.read_text(encoding="utf-8"))
-    if not isinstance(previous, dict):
-        raise ValueError("已有 bundle 的清单无效。")
-    files = previous.get("files")
-    if (previous.get("format_version") != BUNDLE_FORMAT_VERSION
-            or previous.get("snapshot_date") != SNAPSHOT_DATE
-            or not isinstance(files, dict) or set(files) != set(BUNDLE_FILES)
-            or {path.name for path in output_dir.iterdir()} != {*BUNDLE_FILES, "manifest.json"}):
+    read_bundle_manifest(output_dir, verify_database=True)
+    if {path.name for path in output_dir.iterdir()} != {*BUNDLE_FILES, "manifest.json"}:
         raise ValueError("已有输出目录不是可替换的 MCP bundle。")
-    for name in BUNDLE_FILES:
-        path = output_dir / name
-        if not path.is_file() or path.is_symlink() or file_digest(path) != files[name]:
-            raise ValueError("已有 bundle 文件不完整或哈希不符；保留原目录。")
 
 
 def build_database(root, destination):
-    # Isolated module globals: the source builder retains all input paths; only
-    # its output globals point to staging. Never call load_duckdb.sh/default build.
-    path = root / "hr-demo/db/build_duckdb.py"
-    spec = importlib.util.spec_from_file_location("_hr_mcp_seed_builder", path)
-    builder = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(builder)
-    builder.DB_DIR = destination
-    builder.DB_FILE = destination / "public.duckdb"
-    if builder.build() != 0:
+    database = destination / "public.duckdb"
+    if runpy.run_path(str(root / "hr-demo/db/build_duckdb.py"))["build"](database) != 0:
         raise ValueError("种子装载失败；保留旧 bundle。")
     import duckdb
-    with duckdb.connect(str(builder.DB_FILE), read_only=True) as connection:
+    with duckdb.connect(str(database), read_only=True) as connection:
         return {name: connection.execute(f'SELECT COUNT(*) FROM "{name}"').fetchone()[0]
                 for (name,) in connection.execute("SHOW TABLES").fetchall()}
 
@@ -150,14 +133,12 @@ def build_bundle(output_dir: Path, *, root: Path = ROOT):
         for path in staged.iterdir():
             path.chmod(0o444)
         backup = Path(temporary) / "previous"
-        if output_dir.exists():
-            output_dir.rename(backup)
-        try:
+        with ExitStack() as rollback:
+            if output_dir.exists():
+                output_dir.rename(backup)
+                rollback.callback(backup.rename, output_dir)
             staged.rename(output_dir)
-        except BaseException:
-            if backup.exists():
-                backup.rename(output_dir)
-            raise
+            rollback.pop_all()
     return manifest
 
 

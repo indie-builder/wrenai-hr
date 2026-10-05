@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 import query_execution as execution
 import run_all as runner
-from result_contract import compare, compare_tables, parse_csv, rows_equal
+from result_contract import compare, compare_tables, parse_csv
 
 
 class ComparisonTests(unittest.TestCase):
@@ -29,15 +29,19 @@ class ComparisonTests(unittest.TestCase):
         self.assertFalse(compare("n\n", "n\n1\n", allow_empty=True)[0])
 
     def test_tolerance_boundary_and_nonfinite_are_not_rounded_away(self):
-        self.assertTrue(rows_equal(["1.000"], ["1.011"]))
-        self.assertFalse(rows_equal(["1.000"], ["1.01101"]))
-        self.assertFalse(rows_equal(["1"], ["1.001"], tolerance=0))
-        self.assertTrue(rows_equal(["9007199254740993"], ["9007199254740993"], tolerance=0))
-        self.assertFalse(rows_equal(["9007199254740992"], ["9007199254740993"], tolerance=0))
+        for left, right, tolerance, expected in (
+            ("1.000", "1.011", 0.011, True),
+            ("1.000", "1.01101", 0.011, False),
+            ("1", "1.001", 0, False),
+            ("9007199254740993", "9007199254740993", 0, True),
+            ("9007199254740992", "9007199254740993", 0, False),
+        ):
+            with self.subTest(left=left, right=right, tolerance=tolerance):
+                self.assertEqual(compare_tables(["n"], [[left]], ["n"], [[right]], tolerance=tolerance)[0], expected)
         for value in ("NaN", "nan", "Infinity", "-inf"):
             with self.subTest(value=value):
-                self.assertFalse(rows_equal([value], [value]))
-                self.assertFalse(rows_equal([value], ["3"]))
+                self.assertFalse(compare_tables(["n"], [[value]], ["n"], [[value]])[0])
+                self.assertFalse(compare_tables(["n"], [[value]], ["n"], [["3"]])[0])
         for tolerance in ("nan", "inf", "-0.01"):
             with self.assertRaises(ValueError):
                 compare("x\n1\n", "x\n1\n", tolerance=tolerance)
@@ -119,8 +123,8 @@ class ExecutionTests(unittest.TestCase):
             (root / "summary.csv").write_text("full report sentinel")
             with patch.object(runner, "HERE", root), patch.object(runner, "QUESTIONS", [question]), \
                     patch.object(runner, "load_env", return_value={}), \
-                    patch.object(runner, "run_gt", return_value=execution.Execution("n\n1\n", 0)), \
-                    patch.object(runner, "run_wren", return_value=execution.Execution(status="process_error", returncode=2)), \
+                    patch.object(execution, "run_gt", return_value=execution.Execution("n\n1\n", 0)), \
+                    patch.object(execution, "run_wren", return_value=execution.Execution(status="process_error", returncode=2)), \
                     contextlib.redirect_stdout(io.StringIO()):
                 results = root / "runs/q-test/results"
                 results.mkdir(parents=True)
@@ -130,8 +134,15 @@ class ExecutionTests(unittest.TestCase):
                 self.assertEqual((root / "summary.csv").read_text(), "full report sentinel")
                 self.assertIn("FAIL", (root / "runs/q-test/summary.csv").read_text())
                 self.assertFalse(stale.exists())
+                self.assertEqual((results / "q-test.gt.csv").read_text(), "n\n1\n")
+                trace = json.loads((results / "q-test.execution.json").read_text())
+                self.assertEqual(trace["wren"]["status"], "process_error")
+                with patch.object(execution, "run_wren", return_value=execution.Execution("n\n2\n", 0)):
+                    self.assertEqual(runner.main(["--only", "q-test"]), 1)
+                self.assertEqual(stale.read_text(), "n\n2\n")
+                self.assertEqual((results / "q-test.gt.csv").read_text(), "n\n1\n")
                 with self.assertRaises(ValueError):
-                    runner.output_directory([question], subset=True, output=root)
+                    execution.regression_directory(root, [question], only=["q-test"], output=root)
 
 
 class WorkerTests(unittest.TestCase):
@@ -145,6 +156,11 @@ class WorkerTests(unittest.TestCase):
             result = execution.run_gt("SELECT count(*) AS n FROM employees", db_file=database, python=sys.executable)
             self.assertTrue(result.ok, result.trace())
             self.assertEqual(parse_csv(result.stdout), (["n"], [["2"]]))
+            padded = execution.run_gt('SELECT 1 AS " n "', db_file=database, python=sys.executable)
+            self.assertTrue(padded.ok, padded.trace())
+            self.assertEqual(padded.stdout.splitlines()[0], " n ")
+            duplicate = execution.run_gt('SELECT 1 AS "n", 2 AS " n "', db_file=database, python=sys.executable)
+            self.assertEqual((duplicate.status, duplicate.stdout), ("invalid_output", ""))
             for sql in _support.WORKER_ATTACK_SQL:
                 with self.subTest(sql=sql):
                     self.assertFalse(execution.run_gt(sql, db_file=database, python=sys.executable).ok)

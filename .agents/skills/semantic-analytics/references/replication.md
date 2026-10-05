@@ -7,8 +7,8 @@ semantic-analytics 技能的展开;各域的领域包(数据、口径、题库)�
 
 ```bash
 python3 -m venv .venv
-.venv/bin/python -m pip install 'wrenai[memory]==0.13.4' duckdb
-.venv/bin/wren --version   # 0.13.4, 核心自带 DuckDB 1.5
+.venv/bin/python -m pip install 'wrenai[memory]==0.15.0' 'duckdb==1.5.6'
+.venv/bin/wren --version
 ```
 
 新机器没有用户级 profile 时,为语义项目绑定数据源:

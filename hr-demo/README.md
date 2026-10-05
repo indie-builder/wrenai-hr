@@ -24,7 +24,7 @@
 
 ## 数据与查询路径
 
-- **数据来源：**基线/扩展 CSV 和 `db/seed/attendance_records.parquet` → DuckDB `public.duckdb`。考勤是保留的确定性种子，附 SHA-256 来源清单，不依赖仪表盘目录。
+- **数据来源：**`db/seed/` 中每张表的有类型 Parquet → DuckDB `public.duckdb`。种子保留显式主键，由统一来源清单校验 SHA-256、列类型和行数，不依赖仪表盘目录。
 - **临时问数：**Agent → 业务规则、上下文检索和历史查询 → Cube 或 MDL SQL → Wren 规划 → DuckDB → 结果解释。
 - **仪表盘：**只读导出脚本 → 必要的 Parquet、裁剪后的 MDL、快照清单 → 浏览器 Wren WASM → ECharts。
 - **固定 SQL 回归：**A 路径直接查询物理表；B 路径经 Wren 查询同一 DuckDB。两路相等证明相应查询的结果一致，不能独立证明业务定义正确。
@@ -51,7 +51,7 @@ python3.14 -m venv .venv
 (cd hr-demo/db && ./load_duckdb.sh)
 ```
 
-该命令在临时库装载成功后**替换** `db/duckdb/public.duckdb`，不要对含有需保留人工修改的库执行。默认考勤种子缺失或校验不符会失败，不自动随机回退；考勤数据只来自 SHA-256 校验通过的快照。库名固定为 `public.duckdb`，因为 Wren 按文件名挂载物理 catalog。
+该命令在临时库装载成功后**替换** `db/duckdb/public.duckdb`，不要对含有需保留人工修改的库执行。任一种子缺失或来源清单校验失败均保留原库，不自动随机回退。全部种子是规范数据源，历史生成器无法重建相同行，修改时须同步清单。库名固定为 `public.duckdb`，因为 Wren 按文件名挂载物理 catalog。
 
 用户级连接 profile 不随仓库分发。首次在新机器创建 `hr_demo_duck`：
 
@@ -160,7 +160,7 @@ python3 -m http.server 8317 --bind 127.0.0.1 \
 
 ```text
 hr-demo/
-  db/                  schema、CSV/考勤种子、DuckDB 构建器
+  db/                  schema、Parquet 种子与来源清单、DuckDB 构建器
   wren-project/
     models/ views/ cubes/ relationships.yml
     knowledge/         业务规则与确认的查询示例

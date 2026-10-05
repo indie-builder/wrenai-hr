@@ -1,0 +1,1085 @@
+{
+  "format_version": 1,
+  "snapshot_date": "2026-08-31",
+  "source_commit": "b00df60",
+  "tables": {
+    "attendance_records": {
+      "sha256": "f5971d0ca6274803053cddc2c3ef9f5fab373aa1273d02ee9815e66117b2a3c9",
+      "rows": 203679,
+      "columns": [
+        [
+          "att_id",
+          "INTEGER"
+        ],
+        [
+          "emp_id",
+          "INTEGER"
+        ],
+        [
+          "att_date",
+          "DATE"
+        ],
+        [
+          "status",
+          "VARCHAR"
+        ],
+        [
+          "work_hours",
+          "DECIMAL(4,1)"
+        ],
+        [
+          "overtime_hours",
+          "DECIMAL(4,1)"
+        ]
+      ],
+      "source": {
+        "path": "seed/attendance_records.parquet",
+        "sha256": "96fb3b2bf2386b51ad5071a7bf0a9a3164a749934eaf5c45f7e04fdf7f6e99b7"
+      }
+    },
+    "awards_penalties": {
+      "sha256": "d6abaa208e142fba50af65432230c5290c63fa91ddd34621fcf050aa03c7f437",
+      "rows": 591,
+      "columns": [
+        [
+          "record_id",
+          "INTEGER"
+        ],
+        [
+          "emp_id",
+          "INTEGER"
+        ],
+        [
+          "record_date",
+          "DATE"
+        ],
+        [
+          "record_type",
+          "VARCHAR"
+        ],
+        [
+          "category",
+          "VARCHAR"
+        ],
+        [
+          "amount",
+          "DECIMAL(10,2)"
+        ],
+        [
+          "reason",
+          "VARCHAR"
+        ],
+        [
+          "approver_id",
+          "INTEGER"
+        ]
+      ],
+      "source": {
+        "path": "seed/out2/awards_penalties.csv",
+        "sha256": "6ca9cf7d19218303866fef0ca0d0fd23497c3e2e2b9510867bb1af101e338ed6"
+      }
+    },
+    "candidates": {
+      "sha256": "5361cc452238e0f3fcae5fd964d7371ca395ee9c5d7b26260e3615b5bb5823b0",
+      "rows": 1523,
+      "columns": [
+        [
+          "cand_id",
+          "INTEGER"
+        ],
+        [
+          "name",
+          "VARCHAR"
+        ],
+        [
+          "gender",
+          "VARCHAR"
+        ],
+        [
+          "opening_id",
+          "INTEGER"
+        ],
+        [
+          "source",
+          "VARCHAR"
+        ],
+        [
+          "stage",
+          "VARCHAR"
+        ],
+        [
+          "applied_at",
+          "DATE"
+        ],
+        [
+          "expected_salary",
+          "DECIMAL(10,2)"
+        ],
+        [
+          "hired_emp_id",
+          "INTEGER"
+        ]
+      ],
+      "source": {
+        "path": "seed/out/candidates.csv",
+        "sha256": "b9841ae27890dd6f66fc62efddc07d90579954e1dd2be214a51cfec9c11fde5b"
+      }
+    },
+    "contracts": {
+      "sha256": "dbda3c4f0893e8b01bd0e26134fb4324e8c3e41fe006cc2323ba6bc06e1ab75f",
+      "rows": 972,
+      "columns": [
+        [
+          "contract_id",
+          "INTEGER"
+        ],
+        [
+          "emp_id",
+          "INTEGER"
+        ],
+        [
+          "contract_no",
+          "VARCHAR"
+        ],
+        [
+          "contract_type",
+          "VARCHAR"
+        ],
+        [
+          "start_date",
+          "DATE"
+        ],
+        [
+          "end_date",
+          "DATE"
+        ],
+        [
+          "renewals",
+          "INTEGER"
+        ],
+        [
+          "status",
+          "VARCHAR"
+        ],
+        [
+          "signed_date",
+          "DATE"
+        ]
+      ],
+      "source": {
+        "path": "seed/out2/contracts.csv",
+        "sha256": "97f3463a3ed4832daa81a3d9fbf6cff813c6aaf6267809cce1634e60cbab8465"
+      }
+    },
+    "departments": {
+      "sha256": "0a36d16bb237e45f03d70377bebf357c40c0939e271a0a52975f6a6e9bbdce9f",
+      "rows": 9,
+      "columns": [
+        [
+          "dept_id",
+          "INTEGER"
+        ],
+        [
+          "dept_name",
+          "VARCHAR"
+        ],
+        [
+          "parent_id",
+          "INTEGER"
+        ],
+        [
+          "location",
+          "VARCHAR"
+        ],
+        [
+          "established_date",
+          "DATE"
+        ]
+      ],
+      "source": {
+        "path": "seed/out/departments.csv",
+        "sha256": "be800d6610295ac277f77ec8648e1584faa19b2b4bee38672c6682d4fa6d96cb"
+      }
+    },
+    "employees": {
+      "sha256": "b13b45724c91d758493a8172c3dcea60aef76f4cf4eadf2adc3a6cd4047aac0d",
+      "rows": 786,
+      "columns": [
+        [
+          "emp_id",
+          "INTEGER"
+        ],
+        [
+          "emp_no",
+          "VARCHAR"
+        ],
+        [
+          "name",
+          "VARCHAR"
+        ],
+        [
+          "gender",
+          "VARCHAR"
+        ],
+        [
+          "birth_date",
+          "DATE"
+        ],
+        [
+          "hire_date",
+          "DATE"
+        ],
+        [
+          "dept_id",
+          "INTEGER"
+        ],
+        [
+          "job_title",
+          "VARCHAR"
+        ],
+        [
+          "job_level",
+          "VARCHAR"
+        ],
+        [
+          "employment_type",
+          "VARCHAR"
+        ],
+        [
+          "status",
+          "VARCHAR"
+        ],
+        [
+          "base_salary",
+          "DECIMAL(10,2)"
+        ],
+        [
+          "manager_id",
+          "INTEGER"
+        ],
+        [
+          "work_city",
+          "VARCHAR"
+        ],
+        [
+          "email",
+          "VARCHAR"
+        ],
+        [
+          "phone",
+          "VARCHAR"
+        ],
+        [
+          "education",
+          "VARCHAR"
+        ],
+        [
+          "termination_date",
+          "DATE"
+        ],
+        [
+          "termination_reason",
+          "VARCHAR"
+        ],
+        [
+          "is_voluntary",
+          "BOOLEAN"
+        ]
+      ],
+      "source": {
+        "path": "seed/out/employees.csv",
+        "sha256": "53024957fa73d589e294ad76cde6127631296965e2a2c6b2f55b5aa353c9d858"
+      }
+    },
+    "engagement_surveys": {
+      "sha256": "782cbe495a7bc2038b7d924940d8fc94d3f3d7da1cd07ccdfae26aa4b4145c66",
+      "rows": 1394,
+      "columns": [
+        [
+          "survey_id",
+          "INTEGER"
+        ],
+        [
+          "emp_id",
+          "INTEGER"
+        ],
+        [
+          "survey_year",
+          "INTEGER"
+        ],
+        [
+          "engagement_score",
+          "DECIMAL(3,1)"
+        ],
+        [
+          "recognition",
+          "DECIMAL(3,1)"
+        ],
+        [
+          "growth",
+          "DECIMAL(3,1)"
+        ],
+        [
+          "pay_satisfaction",
+          "DECIMAL(3,1)"
+        ],
+        [
+          "manager_trust",
+          "DECIMAL(3,1)"
+        ],
+        [
+          "work_life_balance",
+          "DECIMAL(3,1)"
+        ]
+      ],
+      "source": {
+        "path": "seed/out2/engagement_surveys.csv",
+        "sha256": "280bc8b80927ff1c991d55bb755cc28b671181c085bde66dabeebf77308b8794"
+      }
+    },
+    "exit_interviews": {
+      "sha256": "47fd492fdd8a36a9c59d97bc32bb1f40df07f606ca974bd7f127b0da470b5af2",
+      "rows": 196,
+      "columns": [
+        [
+          "exit_id",
+          "INTEGER"
+        ],
+        [
+          "emp_id",
+          "INTEGER"
+        ],
+        [
+          "interview_date",
+          "DATE"
+        ],
+        [
+          "real_reason_category",
+          "VARCHAR"
+        ],
+        [
+          "satisfaction",
+          "DECIMAL(3,1)"
+        ],
+        [
+          "would_recommend",
+          "BOOLEAN"
+        ],
+        [
+          "comment",
+          "VARCHAR"
+        ]
+      ],
+      "source": {
+        "path": "seed/out2/exit_interviews.csv",
+        "sha256": "0307ef0743a869c3fe56c4aff6c31912dd3dc6575593feb5a50937f9a07ebfce"
+      }
+    },
+    "headcount_plan": {
+      "sha256": "bae95db82e3c1abd314c3705eccbf29720245c1f168d514a72091fabfcf977c8",
+      "rows": 36,
+      "columns": [
+        [
+          "plan_id",
+          "INTEGER"
+        ],
+        [
+          "plan_year",
+          "INTEGER"
+        ],
+        [
+          "dept_id",
+          "INTEGER"
+        ],
+        [
+          "planned_headcount",
+          "INTEGER"
+        ],
+        [
+          "budget_labor_cost",
+          "DECIMAL(14,2)"
+        ],
+        [
+          "approved_at",
+          "DATE"
+        ]
+      ],
+      "source": {
+        "path": "seed/out2/headcount_plan.csv",
+        "sha256": "0e4762f7ccad37ca51e7b6d039ed170a6b43de7c5ea4a55a10e6cbaa5ed1d4c3"
+      }
+    },
+    "insurance_payments": {
+      "sha256": "daa99063f154c3e0d5fb827d63e1e2ad125131eb444880a89ea061a44b374a4c",
+      "rows": 18085,
+      "columns": [
+        [
+          "ins_id",
+          "INTEGER"
+        ],
+        [
+          "emp_id",
+          "INTEGER"
+        ],
+        [
+          "pay_period",
+          "VARCHAR"
+        ],
+        [
+          "pension",
+          "DECIMAL(10,2)"
+        ],
+        [
+          "medical",
+          "DECIMAL(10,2)"
+        ],
+        [
+          "unemployment",
+          "DECIMAL(10,2)"
+        ],
+        [
+          "injury",
+          "DECIMAL(10,2)"
+        ],
+        [
+          "maternity",
+          "DECIMAL(10,2)"
+        ],
+        [
+          "housing_fund",
+          "DECIMAL(10,2)"
+        ],
+        [
+          "company_total",
+          "DECIMAL(10,2)"
+        ]
+      ],
+      "source": {
+        "path": "seed/out2/insurance_payments.csv",
+        "sha256": "38761841b54234d719f3244432a9be6551329dbea5a29e9877bdee5e96b336df"
+      }
+    },
+    "interviews": {
+      "sha256": "bfe5a1c1a2349ee787124a110d52e65964ddac07f4b6c2fa44db9fe835dec6a3",
+      "rows": 3119,
+      "columns": [
+        [
+          "interview_id",
+          "INTEGER"
+        ],
+        [
+          "cand_id",
+          "INTEGER"
+        ],
+        [
+          "round",
+          "VARCHAR"
+        ],
+        [
+          "interviewer_id",
+          "INTEGER"
+        ],
+        [
+          "interview_date",
+          "DATE"
+        ],
+        [
+          "score",
+          "DECIMAL(3,1)"
+        ],
+        [
+          "result",
+          "VARCHAR"
+        ]
+      ],
+      "source": {
+        "path": "seed/out/interviews.csv",
+        "sha256": "e82eb94cbd588a83c46e628a126f4ba0ec5164c4bb590aae9e3bc2b4b65669d0"
+      }
+    },
+    "job_openings": {
+      "sha256": "0cd089bb89e3866dd5763b92002eefa839468e78d093f673b10c520bf535b253",
+      "rows": 249,
+      "columns": [
+        [
+          "opening_id",
+          "INTEGER"
+        ],
+        [
+          "dept_id",
+          "INTEGER"
+        ],
+        [
+          "job_title",
+          "VARCHAR"
+        ],
+        [
+          "job_level",
+          "VARCHAR"
+        ],
+        [
+          "headcount",
+          "INTEGER"
+        ],
+        [
+          "salary_min",
+          "DECIMAL(10,2)"
+        ],
+        [
+          "salary_max",
+          "DECIMAL(10,2)"
+        ],
+        [
+          "status",
+          "VARCHAR"
+        ],
+        [
+          "opened_at",
+          "DATE"
+        ],
+        [
+          "closed_at",
+          "DATE"
+        ],
+        [
+          "hired_count",
+          "INTEGER"
+        ]
+      ],
+      "source": {
+        "path": "seed/out/job_openings.csv",
+        "sha256": "da4738bedcbd9c6f5974d2c2e46e5b310c5187f17104743e239b659ea0e5b001"
+      }
+    },
+    "leave_balances": {
+      "sha256": "7bd485773b5acd4cc38b96394b4981c40774a58424f453caa1548fae01fe651e",
+      "rows": 5770,
+      "columns": [
+        [
+          "balance_id",
+          "INTEGER"
+        ],
+        [
+          "emp_id",
+          "INTEGER"
+        ],
+        [
+          "balance_type",
+          "VARCHAR"
+        ],
+        [
+          "as_of_quarter",
+          "VARCHAR"
+        ],
+        [
+          "entitled",
+          "DECIMAL(5,1)"
+        ],
+        [
+          "used",
+          "DECIMAL(5,1)"
+        ],
+        [
+          "remaining",
+          "DECIMAL(5,1)"
+        ],
+        [
+          "expired",
+          "DECIMAL(5,1)"
+        ]
+      ],
+      "source": {
+        "path": "seed/out2/leave_balances.csv",
+        "sha256": "ed1d0bca985a777fb8468b07e775e3f4ac3a0170f1e889194d391c10902e25e5"
+      }
+    },
+    "leave_requests": {
+      "sha256": "2d1a2acca096c8f3d749dc013af3ac294b5b71f2000df7b2b8dc9c8db58283f5",
+      "rows": 2241,
+      "columns": [
+        [
+          "leave_id",
+          "INTEGER"
+        ],
+        [
+          "emp_id",
+          "INTEGER"
+        ],
+        [
+          "leave_type",
+          "VARCHAR"
+        ],
+        [
+          "start_date",
+          "DATE"
+        ],
+        [
+          "end_date",
+          "DATE"
+        ],
+        [
+          "days",
+          "DECIMAL(4,1)"
+        ],
+        [
+          "status",
+          "VARCHAR"
+        ],
+        [
+          "approver_id",
+          "INTEGER"
+        ],
+        [
+          "applied_at",
+          "TIMESTAMP"
+        ]
+      ],
+      "source": {
+        "path": "seed/out/leave_requests.csv",
+        "sha256": "bd52f841da06122af78533e3dea0e2728310b6bf39a5ad3019e5e68dfa30d9ec"
+      }
+    },
+    "offers": {
+      "sha256": "017424f077ed021998342b48d7c744363e0c02a1a1a7e617093c24240801442d",
+      "rows": 573,
+      "columns": [
+        [
+          "offer_id",
+          "INTEGER"
+        ],
+        [
+          "cand_id",
+          "INTEGER"
+        ],
+        [
+          "offer_date",
+          "DATE"
+        ],
+        [
+          "offer_salary",
+          "DECIMAL(10,2)"
+        ],
+        [
+          "status",
+          "VARCHAR"
+        ],
+        [
+          "response_date",
+          "DATE"
+        ],
+        [
+          "reject_reason",
+          "VARCHAR"
+        ]
+      ],
+      "source": {
+        "path": "seed/out2/offers.csv",
+        "sha256": "34f02f3f8e073c697f88269ee461a86ad8ad83d0d7a071d385ab2ba2f82992a8"
+      }
+    },
+    "overtime_requests": {
+      "sha256": "19adda4756a00994589c119549a38e588cb69f14f76571ee5bba37b8dff63791",
+      "rows": 2565,
+      "columns": [
+        [
+          "ot_id",
+          "INTEGER"
+        ],
+        [
+          "emp_id",
+          "INTEGER"
+        ],
+        [
+          "ot_date",
+          "DATE"
+        ],
+        [
+          "planned_hours",
+          "DECIMAL(4,1)"
+        ],
+        [
+          "actual_hours",
+          "DECIMAL(4,1)"
+        ],
+        [
+          "reason",
+          "VARCHAR"
+        ],
+        [
+          "status",
+          "VARCHAR"
+        ],
+        [
+          "compensation",
+          "VARCHAR"
+        ],
+        [
+          "applied_at",
+          "DATE"
+        ]
+      ],
+      "source": {
+        "path": "seed/out2/overtime_requests.csv",
+        "sha256": "15a7bb2b4d4aa32b21b24addf45840419166a27ce42dedb89f630c809ea41b67"
+      }
+    },
+    "performance_goals": {
+      "sha256": "f4b4fb12d7e990d8fde8d37066036a34d54fc5076a3604dfef3fc1e11c8175f6",
+      "rows": 6557,
+      "columns": [
+        [
+          "goal_id",
+          "INTEGER"
+        ],
+        [
+          "emp_id",
+          "INTEGER"
+        ],
+        [
+          "review_period",
+          "VARCHAR"
+        ],
+        [
+          "goal_type",
+          "VARCHAR"
+        ],
+        [
+          "goal_desc",
+          "VARCHAR"
+        ],
+        [
+          "weight",
+          "INTEGER"
+        ],
+        [
+          "completion_pct",
+          "DECIMAL(5,1)"
+        ]
+      ],
+      "source": {
+        "path": "seed/out2/performance_goals.csv",
+        "sha256": "c98af9159ba4aea980d60bdc2eeb294d504aeb6e5ae02e88456e97f81a68c5f0"
+      }
+    },
+    "performance_reviews": {
+      "sha256": "34bcda5102333ec6966f1f7fcd70ed6c09b7e694b722ad5e1385de13ab3ca2ed",
+      "rows": 2820,
+      "columns": [
+        [
+          "review_id",
+          "INTEGER"
+        ],
+        [
+          "emp_id",
+          "INTEGER"
+        ],
+        [
+          "review_period",
+          "VARCHAR"
+        ],
+        [
+          "score",
+          "DECIMAL(4,1)"
+        ],
+        [
+          "grade",
+          "VARCHAR"
+        ],
+        [
+          "reviewer_id",
+          "INTEGER"
+        ],
+        [
+          "comment",
+          "VARCHAR"
+        ]
+      ],
+      "source": {
+        "path": "seed/out/performance_reviews.csv",
+        "sha256": "b82cc8992b2cf5c6d4015b36411c22e4d38299f342920fad834a939bff323122"
+      }
+    },
+    "promotions": {
+      "sha256": "87d5eedd17a22ce749b1a8ceb9ea1826b7eba4b7ce863a25535aae89a72c1c52",
+      "rows": 57,
+      "columns": [
+        [
+          "promo_id",
+          "INTEGER"
+        ],
+        [
+          "emp_id",
+          "INTEGER"
+        ],
+        [
+          "promo_date",
+          "DATE"
+        ],
+        [
+          "from_level",
+          "VARCHAR"
+        ],
+        [
+          "to_level",
+          "VARCHAR"
+        ],
+        [
+          "from_title",
+          "VARCHAR"
+        ],
+        [
+          "to_title",
+          "VARCHAR"
+        ],
+        [
+          "salary_before",
+          "DECIMAL(10,2)"
+        ],
+        [
+          "salary_after",
+          "DECIMAL(10,2)"
+        ],
+        [
+          "reason",
+          "VARCHAR"
+        ]
+      ],
+      "source": {
+        "path": "seed/out2/promotions.csv",
+        "sha256": "b463f852b5198f237f86593b20f2509a63b04f2f8190df6bf1d30af9277064c0"
+      }
+    },
+    "recruitment_costs": {
+      "sha256": "52a62bd03de177b5e3407991713d27a01b7db43c33346996940ca7b3be87eb04",
+      "rows": 137,
+      "columns": [
+        [
+          "cost_id",
+          "INTEGER"
+        ],
+        [
+          "channel",
+          "VARCHAR"
+        ],
+        [
+          "cost_month",
+          "VARCHAR"
+        ],
+        [
+          "amount",
+          "DECIMAL(12,2)"
+        ],
+        [
+          "notes",
+          "VARCHAR"
+        ]
+      ],
+      "source": {
+        "path": "seed/out2/recruitment_costs.csv",
+        "sha256": "7b1066838aa0317fc7b3b50cf315afcd8d1b81f695e2d94e5c752591135aa797"
+      }
+    },
+    "salary_changes": {
+      "sha256": "413b7dfb82a8a5ff81c84e763514556423e0086f9e531a2dc61cdce769978694",
+      "rows": 860,
+      "columns": [
+        [
+          "change_id",
+          "INTEGER"
+        ],
+        [
+          "emp_id",
+          "INTEGER"
+        ],
+        [
+          "effective_date",
+          "DATE"
+        ],
+        [
+          "salary_before",
+          "DECIMAL(10,2)"
+        ],
+        [
+          "salary_after",
+          "DECIMAL(10,2)"
+        ],
+        [
+          "change_pct",
+          "DECIMAL(5,2)"
+        ],
+        [
+          "change_type",
+          "VARCHAR"
+        ]
+      ],
+      "source": {
+        "path": "seed/out2/salary_changes.csv",
+        "sha256": "9eb2c8408687481a79fac5119dad56fd9d31fa22bbf2df7b28a38a752feb931e"
+      }
+    },
+    "salary_payments": {
+      "sha256": "e09b375739a04ad766959b19ff23319b9665890bb6fe181bc453dc38e8669dee",
+      "rows": 18085,
+      "columns": [
+        [
+          "pay_id",
+          "INTEGER"
+        ],
+        [
+          "emp_id",
+          "INTEGER"
+        ],
+        [
+          "pay_period",
+          "VARCHAR"
+        ],
+        [
+          "base_pay",
+          "DECIMAL(12,2)"
+        ],
+        [
+          "overtime_pay",
+          "DECIMAL(12,2)"
+        ],
+        [
+          "bonus",
+          "DECIMAL(12,2)"
+        ],
+        [
+          "social_insurance",
+          "DECIMAL(12,2)"
+        ],
+        [
+          "income_tax",
+          "DECIMAL(12,2)"
+        ],
+        [
+          "net_pay",
+          "DECIMAL(12,2)"
+        ],
+        [
+          "pay_date",
+          "DATE"
+        ]
+      ],
+      "source": {
+        "path": "seed/out/salary_payments.csv",
+        "sha256": "3ff81505c0eb10902415ce179c0b0287857c4fd6d12725006024ce720e6685ab"
+      }
+    },
+    "talent_pool": {
+      "sha256": "965bac43a8f26e5fbd1ac5cd39c01875047fac5ce104db83664ff62bc4ed7a8e",
+      "rows": 22,
+      "columns": [
+        [
+          "pool_id",
+          "INTEGER"
+        ],
+        [
+          "emp_id",
+          "INTEGER"
+        ],
+        [
+          "pool_type",
+          "VARCHAR"
+        ],
+        [
+          "target_position",
+          "VARCHAR"
+        ],
+        [
+          "potential_rating",
+          "VARCHAR"
+        ],
+        [
+          "nominated_date",
+          "DATE"
+        ],
+        [
+          "nominated_by",
+          "INTEGER"
+        ],
+        [
+          "status",
+          "VARCHAR"
+        ]
+      ],
+      "source": {
+        "path": "seed/out2/talent_pool.csv",
+        "sha256": "3122f9e4e33d7809ac4d8ec2adf51d786ae06c4a35d0ebeb0e630c6b167501cd"
+      }
+    },
+    "training_records": {
+      "sha256": "bd156dad5a6537cffc21dd766503c837b63ff075aab9aefe9aa962fab342c556",
+      "rows": 3113,
+      "columns": [
+        [
+          "training_id",
+          "INTEGER"
+        ],
+        [
+          "emp_id",
+          "INTEGER"
+        ],
+        [
+          "course_name",
+          "VARCHAR"
+        ],
+        [
+          "training_date",
+          "DATE"
+        ],
+        [
+          "hours",
+          "DECIMAL(4,1)"
+        ],
+        [
+          "completed",
+          "BOOLEAN"
+        ],
+        [
+          "score",
+          "DECIMAL(4,1)"
+        ]
+      ],
+      "source": {
+        "path": "seed/out/training_records.csv",
+        "sha256": "5f8ea6ac83b02c7f54c06eb8423c9652180ff6876f2c83900776dd4af3bfed48"
+      }
+    },
+    "transfers": {
+      "sha256": "e992c712677cfcfe764763851dc01fd7c0cb6c423014a36032bc83bdb487e570",
+      "rows": 76,
+      "columns": [
+        [
+          "transfer_id",
+          "INTEGER"
+        ],
+        [
+          "emp_id",
+          "INTEGER"
+        ],
+        [
+          "from_dept_id",
+          "INTEGER"
+        ],
+        [
+          "to_dept_id",
+          "INTEGER"
+        ],
+        [
+          "transfer_date",
+          "DATE"
+        ],
+        [
+          "reason",
+          "VARCHAR"
+        ]
+      ],
+      "source": {
+        "path": "seed/out/transfers.csv",
+        "sha256": "d66befc3f64592a0655ba67b2845e230a75a6eb32cef0d9c550524ddb67a10ce"
+      }
+    }
+  }
+}

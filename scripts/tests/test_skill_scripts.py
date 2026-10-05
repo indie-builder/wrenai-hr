@@ -135,6 +135,15 @@ class RunnerExecutionTests(TemporaryScriptTests):
         self.assertEqual(rows[0]["msg"], message)
         self.assertNotIn(self.PRIVATE_ERROR, (self.results / "summary.csv").read_text(encoding="utf-8"))
 
+    def test_invalid_question_module_fails_without_traceback_or_reports(self):
+        for name, source in (("syntax_error", "QUESTIONS = ["), ("import_error", "import missing_question_fixture_module")):
+            with self.subTest(case=name):
+                self.write("questions.py", source)
+                result = self.run_runner()
+                self.assert_exit(result, 1, "题库或项目配置无效")
+                self.assertNotIn("Traceback", result.stderr)
+                self.assertFalse(self.results.exists())
+
     def test_subsets_write_runs_without_overwriting_full_summary(self):
         self.write_questions([self.question("q_one"), self.question("q_two", domain="sales")])
         self.assert_run(self.run_runner(), [("q_one", "PASS"), ("q_two", "PASS")])
@@ -144,6 +153,13 @@ class RunnerExecutionTests(TemporaryScriptTests):
             with self.subTest(options=options):
                 self.assert_run(self.run_runner(*options), [("q_one", "PASS")], self.results / "runs" / key)
                 self.assertEqual((summary.read_bytes(), summary.stat().st_mtime_ns), before)
+
+    def test_subset_cannot_explicitly_overwrite_full_results(self):
+        self.write_questions([self.question("q_one")])
+        self.write("results/summary.csv", "full report sentinel")
+        result = self.run_runner("--only", "q_one", "--output-dir", self.results)
+        self.assert_exit(result, 1, "局部运行不能写入全量报告目录")
+        self.assertEqual((self.results / "summary.csv").read_text(), "full report sentinel")
 
     def test_cli_tolerance_overrides_question_tolerance_including_zero(self):
         for tolerance, options, status in ((0, (), "FAIL"), (0, ("--tol", "0.01"), "PASS"), (0.1, ("--tol", "0"), "FAIL")):

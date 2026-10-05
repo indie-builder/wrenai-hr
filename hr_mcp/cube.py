@@ -15,14 +15,13 @@ def _selection(value, allowed, *, required=False):
     return list(value)
 
 
-def validate_cube_request(mdl, cube, measures, dimensions, filters=None):
-    cubes = {item["name"]: item for item in mdl.get("cubes", [])}
+def validate_cube_request(cubes, cube, measures, dimensions, filters=None):
     if not isinstance(cube, str) or cube not in cubes:
         fail("CUBE_NOT_FOUND")
     definition = cubes[cube]
     measure_names = {item["name"] for item in definition.get("measures", [])}
     dimension_names = {item["name"] for item in definition.get("dimensions", [])}
-    filter_names = dimension_names | {item["name"] for item in definition.get("timeDimensions", [])}
+    filter_names = dimension_names | {item["name"] for item in definition.get("time_dimensions", [])}
     request = {
         "cube": cube,
         "measures": _selection(measures, measure_names, required=True),

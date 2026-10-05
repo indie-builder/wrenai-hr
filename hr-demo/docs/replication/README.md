@@ -1,358 +1,126 @@
-# Wren 业务分析项目复刻指南
+# 将分析流程迁移到新业务
 
 <!-- docs:examples -->
 
-本页包含新业务项目的模板命令，项目路径、连接与生成文件需按新业务替换；文档检查核对链接，不以本仓库是否存在模板目标判断命令有效性。复现当前 HR 演示请读 [演示 README](../../README.md#环境与首次初始化)。
+本页以已有 PostgreSQL 数据库和新项目 `sales-bi` 为例。路径、连接和问题均须替换。复现现有 HR 演示请使用[环境与首次初始化](../../README.md#环境与首次初始化)，不要执行本页的新项目命令。
 
-本指南将 HR 项目的落地过程整理为可复用的操作流程，适合把这套方法迁移到销售、财务、运营等数据分析项目。
+## 准备业务输入
 
-**核心流程：业务问题 → 数据盘点 → 口径与标准答案 → 语义层 → Agent 问数 → 双路径验证 → 仪表盘 → 持续回归。**
+先整理 5 至 10 个首批问题。每题记录日期范围、维度、单位、优先级、数据来源和负责确认口径的人，保存到新项目 `GOAL.md`。未明确的定义保留为待确认项。
 
-## 适用范围与执行约定
+让 Agent 只读盘点相关表，将以下内容写入 `docs/data-dictionary.md`：
 
-- 以下新业务示例以**接入已有 PostgreSQL 数据库**为例，不需要重建业务数据库。现有 HR 参考项目已迁移至 DuckDB，复现它请使用步骤 16 和[交付 README](../../README.md)。
-- 新项目名使用 `sales-bi`，连接配置名使用 `sales_demo`；替换时保持全文一致。
-- CLI 参数依据本 HR 项目安装的 **wrenai 0.15.0** 核对。升级版本后应先检查 `--help` 并回归。
-- `[终端]` 是 Shell 命令；复制时去掉表格边框。末尾的 `\` 表示命令续行。
-- `[Agent]` 是发给新项目 Agent 的执行指令，**不是 Shell 命令**；模型、标准答案、验证器和仪表盘需要它依据新业务实际生成。
-- `[人工]` 是你或业务负责人需要提供或确认的内容。
-- 表内终端命令默认在同一会话执行。新开终端时先恢复环境：
+- 每行的业务含义、主外键、关联基数及 JOIN 是否放大金额。
+- 时间字段、时区、金额单位、状态枚举、软删除规则。
+- 覆盖时间、刷新频率、空值、重复键、缺失关联，以及能否还原历史归属。
+
+口径与标准答案由业务负责人核对。两条 SQL 结果相等不能代替这一步。数据不支持的问题必须记录缺口。
+
+## 创建独立环境和连接
+
+以下命令在同一终端执行。示例以本项目验证过的 Wren 0.15.0 和 Python 3.14 建立基线。不要复制旧虚拟环境。
 
 ```bash
 export PROJECT_ROOT="$HOME/Documents/myself/sales-bi"
+mkdir -p "$PROJECT_ROOT"
 cd "$PROJECT_ROOT"
+python3.14 -m venv .venv
 source .venv/bin/activate
+python -m pip install 'wrenai[postgres,memory]==0.15.0'
+wren --version
+wren context init --path "$PROJECT_ROOT/wren-project" --empty
+mkdir -p docs queries validation/gt validation/results
+cd "$PROJECT_ROOT/wren-project"
+mkdir -p knowledge/rules knowledge/sql
+wren profile add sales_demo --interactive
+wren context set-profile sales_demo
+wren profile debug
 ```
 
-## 完整操作执行表
+交互配置选择 PostgreSQL，使用获得授权的只读账号，并按数据源要求填写 SSL。profile 存在用户配置中，换机器后需要重建。保存成功不能代替连接验证成功。
 
-以下一张 ASCII 表覆盖从初始化到交付、日常扩展的完整流程。
+让 Agent 将 `wren_project.yml` 项目名设为 `sales_demo`，保留该 CLI 版本要求的字段，确认连接没有指向 HR 数据库。升级 CLI 时先核对相关 `--help`。
 
-```text
-+----------------------------------------------------------------------------------------------------+
-| Wren 业务分析项目复刻：完整操作执行表                                                              |
-+--------+-------------------------------------------------------------------------------------------+
-| 步骤   | 操作指令、说明与验收标准                                                                  |
-+--------+-------------------------------------------------------------------------------------------+
-| 00     | 明确范围                                                                                  |
-| 约定   |                                                                                           |
-|        | [人工] 确认新项目名称、数据源、使用者和首批问题。                                         |
-|        | 本流程连接已有 PostgreSQL，不运行 HR 数据生成器或数据库重建脚本。                         |
-|        | 需要模拟数据时，另建专用演示库并单独设计生成与装载流程。                                  |
-|        |                                                                                           |
-|        | 验收：清楚区分演示环境与真实业务环境，明确首轮交付范围。                                  |
-+--------+-------------------------------------------------------------------------------------------+
-| 01     | 确定首批业务问题                                                                          |
-| 需求   |                                                                                           |
-|        | [人工] 准备：                                                                             |
-|        | 1. 首批 5-10 个业务问题。                                                                 |
-|        | 2. 每题的日期范围、分析维度、单位。                                                       |
-|        | 3. 对应数据表、现有报表或已确认数字。                                                     |
-|        | 4. 必须完全正确的核心指标和负责确认口径的人。                                             |
-|        |                                                                                           |
-|        | 示例：q01 月度净销售额；q02 区域销售排名；q03 客户复购率。                                |
-|        |                                                                                           |
-|        | [Agent] 完成步骤 02 创建目录后，将上述资料整理为项目根目录 GOAL.md。                      |
-|        | 每题记录题号、问题、时间范围、维度、单位、优先级和标准答案来源。                          |
-|        | 未明确的定义标为待确认，不自行猜测。                                                      |
-|        |                                                                                           |
-|        | 验收：每题都有明确的数据需求和结果判定方式。                                              |
-+--------+-------------------------------------------------------------------------------------------+
-| 02     | 创建独立目录和 Python 环境                                                                |
-| 环境   |                                                                                           |
-|        | [终端]                                                                                    |
-|        | export PROJECT_ROOT="$HOME/Documents/myself/sales-bi"                                     |
-|        | mkdir -p "$PROJECT_ROOT"                                                                  |
-|        | cd "$PROJECT_ROOT"                                                                        |
-|        | python3 --version                                                                         |
-|        | python3 -m venv .venv                                                                     |
-|        | source .venv/bin/activate                                                                 |
-|        | python -m pip install 'wrenai[postgres,memory]==0.15.0'                                   |
-|        | wren --version                                                                            |
-|        |                                                                                           |
-|        | 0.15.0 是 HR 项目的 CLI 版本，用于建立同版本基线。                                        |
-|        | 若当前 Python 无法安装依赖，使用 Python 3.14 创建新的虚拟环境。                           |
-|        | 不复制旧 .venv，其中可能包含旧绝对路径。                                                  |
-|        |                                                                                           |
-|        | 验收：wren --version 正常输出。                                                           |
-+--------+-------------------------------------------------------------------------------------------+
-| 03     | 初始化空语义项目                                                                          |
-| 初始化 |                                                                                           |
-|        | [终端]                                                                                    |
-|        | cd "$PROJECT_ROOT"                                                                        |
-|        | wren context init --path "$PROJECT_ROOT/wren-project" --empty                             |
-|        | mkdir -p docs queries validation/gt validation/results                                    |
-|        | cd "$PROJECT_ROOT/wren-project"                                                           |
-|        | mkdir -p knowledge/rules knowledge/sql                                                    |
-|        |                                                                                           |
-|        | [Agent] 检查 wren_project.yml，将项目名设为 sales_demo。                                  |
-|        | 保留本版本要求的 schema_version 等字段。                                                  |
-|        | 不添加无关示例模型、HR 规则或历史查询。                                                   |
-|        |                                                                                           |
-|        | 验收：项目独立、配置文件存在，没有混入 HR 业务内容。                                      |
-+--------+-------------------------------------------------------------------------------------------+
-| 04     | 配置数据库连接                                                                            |
-| 数据源 |                                                                                           |
-|        | [人工] 准备主机、端口、库名、用户名、密码、SSL 要求。                                     |
-|        | 真实业务查询使用适当授权的只读账号。                                                      |
-|        |                                                                                           |
-|        | [终端]                                                                                    |
-|        | cd "$PROJECT_ROOT/wren-project"                                                           |
-|        | wren profile add sales_demo --interactive                                                 |
-|        |                                                                                           |
-|        | 根据提示选择 postgres 并填写连接信息。完成后执行：                                        |
-|        |                                                                                           |
-|        | wren context set-profile sales_demo                                                       |
-|        | wren profile debug                                                                        |
-|        |                                                                                           |
-|        | profile 保存在用户级配置中；换电脑后需要重新配置。                                        |
-|        | 添加 profile 时验证失败可能只是警告，不能仅凭“已保存”判定连接成功。                       |
-|        |                                                                                           |
-|        | 验收：连接验证成功，项目绑定新连接，没有指向 hr_demo。                                    |
-+--------+-------------------------------------------------------------------------------------------+
-| 05     | 盘点结构和数据质量                                                                        |
-| 数据   |                                                                                           |
-|        | [Agent] 读取首批问题所需表结构、字段注释和必要的脱敏样本。                                |
-|        | 将结果写入项目根目录 docs/data-dictionary.md，逐表记录：                                  |
-|        | - 一行代表什么，例如订单、支付或订单明细。                                                |
-|        | - 主键、外键、关联基数，以及 JOIN 后是否产生多行。                                        |
-|        | - 时间字段、时区、金额单位、状态枚举、软删除规则。                                        |
-|        | - 数据覆盖时间、刷新频率、空值、重复主键和缺失关联。                                      |
-|        | - 是否能还原历史状态，例如客户当时归属区域。                                              |
-|        | 只读取数据，不修改业务库。                                                                |
-|        |                                                                                           |
-|        | 验收：每题都有来源；不支持的问题明确缺少什么数据。                                        |
-+--------+-------------------------------------------------------------------------------------------+
-| 06     | 定义指标口径和标准答案                                                                    |
-| 口径   |                                                                                           |
-|        | [Agent] 根据 GOAL.md 和数据字典，编写：                                                   |
-|        | wren-project/knowledge/rules/general.md                                                   |
-|        | 每项写明公式、分子、分母、去重键、时间字段、区间边界、                                    |
-|        | 状态过滤、单位、空值与零分母处理。                                                        |
-|        | 明确“当前”采用实际日期还是固定快照日，并统一应用。                                        |
-|        | 编写直接查询物理表的标准 SQL，保存到项目根目录：                                          |
-|        | validation/gt/q01.sql、q02.sql 等。                                                       |
-|        |                                                                                           |
-|        | [人工] 用可信报表或业务核对确认口径和标准结果。                                           |
-|        | 例如：净销售额是否扣退款？按下单日还是支付日统计？                                        |
-|        |                                                                                           |
-|        | 验收：核心问题有已确认口径和独立标准答案。                                                |
-|        | 两条 SQL 结果相等不能替代业务确认。                                                       |
-+--------+-------------------------------------------------------------------------------------------+
-| 07     | 建立 MDL 语义层                                                                           |
-| 建模   |                                                                                           |
-|        | [Agent] 在 wren-project 中：                                                              |
-|        | - 创建 models/<模型名>/metadata.yml。                                                     |
-|        | - 写明物理表映射、主键、字段类型、中文描述、枚举和单位。                                  |
-|        | - 在 relationships.yml 定义关系并核对关联基数。                                           |
-|        | - 将常用关联和筛选放入 views/，按需在 cubes/ 定义复用聚合。                               |
-|        | - 检查一对多关联是否重复计算金额；只建首批问题需要的模型。                                |
-|        |                                                                                           |
-|        | [终端]                                                                                    |
-|        | cd "$PROJECT_ROOT/wren-project"                                                           |
-|        | wren context validate                                                                     |
-|        | wren context build                                                                        |
-|        | wren context show                                                                         |
-|        | wren memory index                                                                         |
-|        |                                                                                           |
-|        | 若失败，先由 Agent 修正再重跑，不继续执行依赖失败产物的步骤。                             |
-|        | 验收：校验通过、target/mdl.json 生成、描述与关联正确。                                    |
-+--------+-------------------------------------------------------------------------------------------+
-| 08     | 接入 Agent 的固定问数流程                                                                 |
-| 问数   |                                                                                           |
-|        | [Agent] 将工作流写入 wren-project/AGENTS.md：                                             |
-|        | 1. 首次查询读取 context instructions。                                                    |
-|        | 2. fetch 相关模型，recall 相似问题。                                                      |
-|        | 3. 用 MDL 模型写 SQL，答案查询经过 Wren。                                                 |
-|        | 4. 先 dry-plan 再 query，返回实际数字、SQL、口径和数据限制。                              |
-|        | 5. 结果确认后 store。                                                                     |
-|        |                                                                                           |
-|        | [终端] 问题文本替换为 GOAL.md 中的原文：                                                  |
-|        | cd "$PROJECT_ROOT/wren-project"                                                           |
-|        | wren context instructions                                                                 |
-|        | wren memory fetch -q "2025 年月度净销售额是多少？"                                        |
-|        | wren memory recall -q "2025 年月度净销售额是多少？" --limit 3                             |
-|        |                                                                                           |
-|        | [Agent] 根据规则与模型，将首题 SQL 保存到根目录 queries/q01.sql。                         |
-|        | 文件只包含 SQL，不包含 Markdown 代码围栏。                                                |
-|        |                                                                                           |
-|        | [终端]                                                                                    |
-|        | wren dry-plan --sql "$(cat "$PROJECT_ROOT/queries/q01.sql")"                              |
-|        | wren query --sql "$(cat "$PROJECT_ROOT/queries/q01.sql")" -o csv -q \                     |
-|        | > "$PROJECT_ROOT/validation/results/q01.wren.csv"                                         |
-|        |                                                                                           |
-|        | 验收：实际执行成功；执行错误不能解释为零或无数据。                                        |
-|        | dry-plan 检查规划问题，不保证业务口径正确。                                               |
-+--------+-------------------------------------------------------------------------------------------+
-| 09     | 建立可重复执行的 SQL 回归                                                                 |
-| 回归   |                                                                                           |
-|        | [Agent] 参考 HR 题库和 runner，建立本项目 validation/run_all.py：                         |
-|        | - 每题有 id、问题、优先级、业务域和两条 SQL 的文件路径。                                  |
-|        | - 标准路径直连数据源；被测路径通过本项目 Wren 执行。                                      |
-|        | - 两条路径使用相同数据时点，避免刷新造成假差异。                                          |
-|        | - 配置从环境或连接配置读取，不沿用 HR 容器、账号、绝对路径。                              |
-|        | - 检查退出码与超时，不只匹配错误文本。                                                    |
-|        | - 比较列名、行数、数值，按指标设置精度。                                                  |
-|        | - 区分合法空结果与失败；排名题检查顺序，普通聚合按稳定键匹配。                            |
-|        | - 支持 --only q01；按运行批次保留汇总与明细，不覆盖全量报告。                             |
-|        | - 失败返回非零退出码；必要依赖记录进项目安装说明。                                        |
-|        |                                                                                           |
-|        | [终端] 以下命令需等 Agent 完成执行器后运行：                                              |
-|        | cd "$PROJECT_ROOT"                                                                        |
-|        | python validation/run_all.py --only q01                                                   |
-|        | python validation/run_all.py                                                              |
-|        |                                                                                           |
-|        | 验收：核心口径题全部通过；失败归因、修复、回归。                                          |
-|        | 不通过修改正确的标准口径来迁就错误结果。                                                  |
-+--------+-------------------------------------------------------------------------------------------+
-| 10     | 验证自然语言生成能力                                                                      |
-| AI测试 |                                                                                           |
-|        | [Agent] 增加独立的自然语言验收流程：                                                      |
-|        | 只接收问题，不读取该题标准 SQL，现场生成 SQL 并经 Wren 查询。                             |
-|        | 生成后由验证程序比对独立标准答案。                                                        |
-|        | 保存问题、生成 SQL、结果、判定和失败原因。                                                |
-|        |                                                                                           |
-|        | [人工] 至少测试：                                                                         |
-|        | 1. 原题。                                                                                 |
-|        | 2. 同义改写；涉及“去年”等词时先固定测试日期。                                             |
-|        | 3. 更换年份、区域、客户类别等新条件。                                                     |
-|        | 4. 数据不支持或含糊的问题，检查是否说明缺口或提出澄清。                                   |
-|        |                                                                                           |
-|        | 保留未存入查询记忆的新题，分别报告已知题与新题通过率。                                    |
-|        | 验收：SQL 回归和自然语言生成测试分别出报告。                                              |
-|        | 不把“固定 SQL 全通过”称为“AI 问数准确率 100%”。                                           |
-+--------+-------------------------------------------------------------------------------------------+
-| 11     | 保存已确认查询                                                                            |
-| 记忆   |                                                                                           |
-|        | [终端] 仅在 q01 结果确认后执行：                                                          |
-|        | cd "$PROJECT_ROOT/wren-project"                                                           |
-|        | wren memory store \                                                                       |
-|        | --nl "2025 年月度净销售额是多少？" \                                                      |
-|        | --sql "$(cat "$PROJECT_ROOT/queries/q01.sql")"                                            |
-|        | wren memory index                                                                         |
-|        | wren memory recall -q "2025 年月度净销售额是多少？" --limit 3                             |
-|        |                                                                                           |
-|        | 检查输出文件路径，确认未覆盖其他问题、SQL 完整。                                          |
-|        | HR 项目记录过中文文件名异常，不能只凭命令执行过判定成功。                                 |
-|        | 验收：文件存在、内容正确、recall 可命中。                                                 |
-+--------+-------------------------------------------------------------------------------------------+
-| 12     | 生成仪表盘                                                                                |
-| 展示   |                                                                                           |
-|        | [人工] 确定指标、图表、时间范围、使用人群和允许展示的数据。                               |
-|        | 快照模式会把展示所需的数据送入浏览器。                                                    |
-|        |                                                                                           |
-|        | [终端]                                                                                    |
-|        | cd "$PROJECT_ROOT/wren-project"                                                           |
-|        | wren genbi build sales-overview --data-mode snapshot \                                    |
-|        | --prompt "制作已验证销售指标的仪表盘，显示口径、截至日期和加载错误" \                     |
-|        | > "$PROJECT_ROOT/docs/dashboard-build-instructions.txt"                                   |
-|        |                                                                                           |
-|        | genbi build 输出给 Agent 的构建说明，不自动生成完整应用。                                 |
-|        |                                                                                           |
-|        | [Agent] 阅读生成的说明，实际创建应用：                                                    |
-|        | - 使用本项目 MDL 和允许展示的数据快照。                                                   |
-|        | - 完成图表、加载和错误处理，展示口径与数据截至日期。                                      |
-|        | - 查看 wren genbi register --help，按实际产物注册 sales-overview。                        |
-|        | - 将快照导出做成可重复执行脚本，在 README 写明具体刷新命令。                              |
-|        |                                                                                           |
-|        | [终端] 应用生成并注册后：                                                                 |
-|        | wren genbi verify sales-overview                                                          |
-|        | wren genbi open sales-overview --port 8318                                                |
-|        |                                                                                           |
-|        | 浏览器打开 http://127.0.0.1:8318；结束预览可在服务终端按 Ctrl+C。                         |
-|        | 验收：图表加载正常，核心数字与回归结果一致。                                              |
-|        | verify 是文件预检，还需要实际打开页面检查。                                               |
-+--------+-------------------------------------------------------------------------------------------+
-| 13     | 固化交付和复现说明                                                                        |
-| 交付   |                                                                                           |
-|        | [终端]                                                                                    |
-|        | cd "$PROJECT_ROOT"                                                                        |
-|        | python -m pip freeze > requirements.lock.txt                                              |
-|        |                                                                                           |
-|        | [Agent] 编写新项目 README.md，包含：                                                      |
-|        | - Python、Wren 版本及依赖安装方法。                                                       |
-|        | - 连接配置、构建、查询、验证、快照刷新、应用启动命令。                                    |
-|        | - 问题、正式口径、验证报告、已知限制。                                                    |
-|        | - 环境变量名称，不写实际密码。                                                            |
-|        | - 应提交的文件，以及不提交的凭据、数据和本地产物。                                        |
-|        | - 从干净环境恢复项目的演练记录。                                                          |
-|        |                                                                                           |
-|        | 验收：另一位使用者按 README 能连接、构建、查询、回归和预览。                              |
-|        | 公网部署另行确定访问控制、数据范围和平台。                                                |
-+--------+-------------------------------------------------------------------------------------------+
-| 14     | 日常增加新问题                                                                            |
-| 扩展   |                                                                                           |
-|        | [Agent] 为新问题分配题号，检查现有模型和数据是否足够。                                    |
-|        | 足够：补口径和标准答案，生成 SQL，验证后保存。                                            |
-|        | 不足：补模型或数据接入，然后执行所有已有回归。                                            |
-|        |                                                                                           |
-|        | [终端] 修改模型或规则后：                                                                 |
-|        | cd "$PROJECT_ROOT/wren-project"                                                           |
-|        | wren context validate                                                                     |
-|        | wren context build                                                                        |
-|        | wren memory index                                                                         |
-|        | cd "$PROJECT_ROOT"                                                                        |
-|        | python validation/run_all.py                                                              |
-|        |                                                                                           |
-|        | 仪表盘依赖变化时，按新项目 README 刷新数据快照并复查页面。                                |
-|        | 验收：新题通过、旧题不退步、仪表盘与查询一致。                                            |
-+--------+-------------------------------------------------------------------------------------------+
-| 15     | HR 项目中不能照搬的内容                                                                   |
-| 注意   |                                                                                           |
-|        | 1. db/load_duckdb.sh 会替换本地演示库，不能用于保留人工修改的数据库。                     |
-|        | 2. 模型 YAML 是业务定义来源，修改后 validate/build/index，再做全量回归。                  |
-|        | 3. 当前 run_all.py 使用本地 DuckDB 与项目 profile；新项目应配置自己的数据源。              |
-|        | 4. DECIMAL 改为 DOUBLE 是特定版本的绕行方案，新业务要验证精度。                           |
-|        | 5. 不沿用旧虚拟环境、凭据、查询记忆索引或 HR 数据快照。                                   |
-|        | 6. 固定快照日与 current_date 应统一；历史部门归属要按新业务定义。                         |
-+--------+-------------------------------------------------------------------------------------------+
-| 16     | 运行现有 HR 参考项目                                                                      |
-| 参考   |                                                                                           |
-|        | [终端] 在 wrenai-hr 仓库根目录：                                                          |
-|        | cd <wrenai-hr 克隆路径>                                                                   |
-|        | python3 hr-demo/validation/v2/run_all.py                                              |
-|        |                                                                                           |
-|        | 当前环境：Python 3.14 + requirements-demo.txt，DuckDB public.duckdb 和项目 profile。      |
-|        | 初始化数据库与 profile 的具体步骤见 hr-demo/README.md；无需 Docker。                 |
-|        | 运行结果以当次退出码、汇总及明细为准；已有 PASS 记录不替代本次执行。                      |
-|        |                                                                                           |
-|        | 当前仪表盘地址：http://127.0.0.1:8317                                                     |
-|        | 如果预览服务未运行，可在另一个终端执行：                                                  |
-|        | cd <wrenai-hr 克隆路径>                                                                   |
-|        | .venv/bin/python hr-demo/scripts/export_dashboard.py                                      |
-|        | python3 -m http.server 8317 --bind 127.0.0.1 \                                            |
-|        | --directory hr-demo/wren-project/apps/hr-overview                                     |
-|        |                                                                                           |
-|        | 已有服务占用 8317 时不重复启动。                                                          |
-+--------+-------------------------------------------------------------------------------------------+
+## 建模与问数
+
+领域无关的[语义分析技能](../../../.agents/skills/semantic-analytics/SKILL.md)维护建模、口径和验证方法。将以下新业务内容交给 Agent 实现：
+
+1. 在 `knowledge/rules/general.md` 写明指标公式、分子分母、去重键、日期边界、状态过滤、单位、空值和零分母处理。统一实际日期或固定快照日期。
+2. 在 `validation/gt/` 保存直接查询物理表的独立标准 SQL。用可信报表或业务核对确认结果，例如净销售额是否扣退款、按支付日还是下单日统计。
+3. 在 `models/` 定义物理映射、主键、类型、描述和枚举，在 `relationships.yml` 核对关联基数。按问题需要补充 `views/` 和 `cubes/`。
+4. 运行以下构建；失败先修正，再使用产物。
+
+```bash
+wren context validate
+wren context build
+wren context show
+wren memory index
 ```
 
-## 本项目落地记录与参考文件
+将[HR Agent 工作流](../../wren-project/AGENTS.md#回答业务数据问题)改为新项目的路径和连接。每个新会话读取业务规则，fetch 模型、recall 已确认查询，使用 MDL 名称编写 SQL，先 dry-plan 再 query。答案包含实际结果、日期、口径和限制，失败不能解释为零。
 
-根据仓库保留的记录，HR 项目先完成了 11 张基础业务表及查询、验证和仪表盘，再在 v2 中扩展到 25 张表、25 个模型、32 条关系、6 个视图和 6 个 Cube。数据由固定种子的生成器与 SQL 构造，业务规则和已验证查询保存在语义项目中。仪表盘加载 MDL 与 Parquet 快照，在浏览器内计算指标。
+首题 SQL 保存到 `$PROJECT_ROOT/queries/q01.sql`，只包含 SQL。查询示例：
 
-原验证器执行预先编写的两条 SQL 并比较结果；它不是自动进行自然语言生成的测试程序。复刻时应按步骤 10 单独补上这一层验证。
+```bash
+wren context instructions
+wren memory fetch -q "2025 年月度净销售额是多少？"
+wren memory recall -q "2025 年月度净销售额是多少？" --limit 3
+wren dry-plan --sql "$(cat "$PROJECT_ROOT/queries/q01.sql")"
+wren query --sql "$(cat "$PROJECT_ROOT/queries/q01.sql")" -o csv -q \
+  > "$PROJECT_ROOT/validation/results/q01.wren.csv"
+```
 
-| 参考文件 | 用途 |
-| --- | --- |
-| [交付主文档](../../README.md) | 架构、范围、环境复现说明 |
-| [目标文档](../../GOAL.md) | 分阶段目标与验收范围 |
-| [项目配置](../../wren-project/wren_project.yml) | 项目名称、数据源和 profile 绑定 |
-| [Agent 工作流](../../wren-project/AGENTS.md) | 问数、模型修改、业务知识记录流程 |
-| [业务规则](../../wren-project/knowledge/rules/general.md) | 指标公式、时间范围和筛选条件 |
-| [员工模型](../../wren-project/models/employees/metadata.yml) | 字段与物理表映射示例 |
-| [离职分析 Cube](../../wren-project/cubes/attrition/metadata.yml) | 聚合指标和分析维度示例 |
-| [双路径题库](../../validation/v2/questions.py) | 标准 SQL 与语义 SQL 的组织方式 |
-| [回归执行器](../../validation/v2/run_all.py) | 现有比较逻辑与报告输出 |
-| [验证与问题处理记录](../../validation/v2/matrix_v2.md) | 验证覆盖、结果和引擎问题 |
-| [演示库装载脚本](../../db/load_duckdb.sh) | 仅用于专用演示库，成功后替换本地 DuckDB 文件 |
-| [快照导出脚本](../../scripts/export_dashboard.py) | 从只读数据库同步页面需要的 MDL 和 Parquet |
+结果确认后再存储，检查生成文件、SQL 完整性和召回结果，避免覆盖其他问题：
 
-## 完成交付的判定
+```bash
+wren memory store --nl "2025 年月度净销售额是多少？" \
+  --sql "$(cat "$PROJECT_ROOT/queries/q01.sql")"
+wren memory recall -q "2025 年月度净销售额是多少？" --limit 3
+```
 
-- 首批问题有业务确认的口径和标准答案。
-- 语义模型校验、构建通过，核心查询实际可运行。
-- SQL 回归与自然语言生成测试分别验收，失败可归因。
-- 已验证问题可保存、召回，新增问题不破坏已有结果。
-- 仪表盘数据与查询一致，刷新流程可执行。
-- 新使用者能按新项目 README 从干净环境完成复现。
+## 建立两种独立验证
+
+让 Agent 参考[题库](../../validation/v2/questions.py)、[共享执行核心](../../validation/v2/query_execution.py)和[比较规则](../../validation/v2/result_contract.py)，创建新项目的 `validation/run_all.py`。标准路径直连 PostgreSQL，被测路径经过 Wren，使用相同数据时点。HR runner 的 DuckDB 连接不能直接复用。
+
+验证器必须检查退出码和超时，区分失败与合法空结果，比较列名、行数、数值精度和必要顺序。保留题号、业务域、两条 SQL、汇总与执行证据；子集运行不得覆盖全量报告，失败返回非零退出码。
+
+```bash
+cd "$PROJECT_ROOT"
+python validation/run_all.py --only q01
+python validation/run_all.py
+```
+
+自然语言生成另行验收，流程参考[评测协议](../../validation/v2/README.md#自然语言评测)。生成者只能看到问题，生成后才与独立答案比较。分别测试原题、同义改写、新日期或维度、含糊及数据不支持的问题；保留未存入查询记忆的新题，分别报告已知题与新题结果。固定 SQL 通过率不是自然语言准确率。
+
+## 交付仪表盘与复现说明
+
+先确定指标、使用人群和允许送入浏览器的字段。快照模式下，获得文件的人能读取其中数据。
+
+```bash
+cd "$PROJECT_ROOT/wren-project"
+wren genbi build sales-overview --data-mode snapshot \
+  --prompt "制作已验证销售指标的仪表盘，显示口径、截至日期和加载错误" \
+  > "$PROJECT_ROOT/docs/dashboard-build-instructions.txt"
+```
+
+`genbi build` 输出构建说明。让 Agent 阅读说明并创建应用、可重跑的快照导出脚本、加载及错误状态，再按 `wren genbi register --help` 注册应用。
+
+```bash
+wren genbi verify sales-overview
+wren genbi open sales-overview --port 8318
+```
+
+打开 <http://127.0.0.1:8318>，核对图表与已验证数字。文件预检不能代替浏览器验收。已有服务占用端口时不要重复启动。
+
+在新项目 README 写明环境安装、profile 配置、构建、查询、回归、快照刷新和预览命令，记录业务范围、失败和已知限制。保存依赖版本，凭据、环境、私有数据及缓存不进 Git。用干净环境实际演练一次复现。公网部署单独确定访问控制和数据范围。
+
+新增问题先检查数据与模型，补独立标准答案后验证。模型、关系或共享口径变化后执行 validate、build、index 和全量回归，刷新受影响仪表盘。
+
+## 不要照搬的 HR 约定
+
+- `db/load_duckdb.sh` 会替换专用演示数据库，不能用于需要保留人工修改的库。
+- HR 快照日、人员归属规则和查询记忆不适用于新业务。
+- 物理金额与语义金额的类型可能不同；本项目的 DOUBLE 绕行不保证新业务的财务精度。
+- 不复制旧环境、凭据、索引或 HR 数据。模型 YAML 是本项目权威来源，生成的 MDL 不是编辑入口。
+
+参考[员工模型](../../wren-project/models/employees/metadata.yml)、[离职 Cube](../../wren-project/cubes/attrition/metadata.yml)、[业务规则](../../wren-project/knowledge/rules/general.md)和[快照导出](../../scripts/export_dashboard.py)。历史目标与验收见 [GOAL.md](../../GOAL.md) 和[验证记录](../../validation/v2/matrix_v2.md)，当前状态以本次执行为准。

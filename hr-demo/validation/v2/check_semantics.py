@@ -23,16 +23,6 @@ SNAPSHOT = "2026-08-31"
 CLOCK = re.compile(r"\b(current_date|current_timestamp|current_time|localtimestamp|now\s*\(|today\s*\()", re.I)
 
 
-def yaml_sources(project):
-    for name in ("wren_project.yml", "relationships.yml"):
-        if (project / name).exists():
-            yield project / name
-    for name in ("models", "views", "cubes", "knowledge"):
-        for path in sorted((project / name).rglob("*")):
-            if path.suffix in (".yml", ".yaml"):
-                yield path
-
-
 def sql_values(value):
     if isinstance(value, dict):
         for key, child in value.items():
@@ -48,30 +38,36 @@ def sql_values(value):
 def check_project(project):
     errors = []
     documents = {}
-    for path in yaml_sources(project):
+    paths = [project / name for name in ("wren_project.yml", "relationships.yml")]
+    paths += [path for root in ("models", "views", "cubes", "knowledge")
+              for path in sorted((project / root).rglob("*")) if path.suffix in (".yml", ".yaml", ".sql")]
+    paths += sorted((project / "knowledge/sql").glob("*.md"))
+    paths.append(project / "target/mdl.json")
+    for path in paths:
+        if not path.is_file():
+            continue
         relative = path.relative_to(project).as_posix()
-        try:
-            documents[relative] = yaml.load(path.read_text(encoding="utf-8"), Loader=UniqueKeyLoader)
-            if any(CLOCK.search(sql) for sql in sql_values(documents[relative])):
-                errors.append(f"{relative}: SQL使用运行时日期，违背快照{SNAPSHOT}")
-        except (ValueError, yaml.YAMLError):
-            errors.append(f"{relative}: YAML无效或含重复键")
-    for root in ("models", "views", "cubes"):
-        for path in (project / root).rglob("*.sql"):
-            if CLOCK.search(path.read_text(encoding="utf-8")):
-                errors.append(f"{path.relative_to(project)}: SQL使用运行时日期")
-    for path in sorted((project / "knowledge/sql").glob("*.md")):
         text = path.read_text(encoding="utf-8")
-        frontmatter = re.match(r"\A---[ \t]*\n(.*?)\n---(?:[ \t]*\n|$)", text, re.S)
-        if frontmatter:
-            try:
-                content = yaml.load(frontmatter.group(1), Loader=UniqueKeyLoader)
-                if any(CLOCK.search(sql) for sql in sql_values(content)):
-                    errors.append(f"{path.relative_to(project)}: 知识示例SQL使用运行时日期")
-            except (ValueError, yaml.YAMLError):
-                errors.append(f"{path.relative_to(project)}: frontmatter无效或含重复键")
-        elif text.startswith("---"):
-            errors.append(f"{path.relative_to(project)}: frontmatter不完整")
+        try:
+            if path.suffix == ".md":
+                frontmatter = re.match(r"\A---[ \t]*\n(.*?)\n---(?:[ \t]*\n|$)", text, re.S)
+                if not frontmatter:
+                    if text.startswith("---"):
+                        errors.append(f"{relative}: frontmatter不完整")
+                    continue
+                text = frontmatter.group(1)
+            if path.suffix == ".sql":
+                values = [text]
+            else:
+                documents[relative] = (json.loads(text) if path.suffix == ".json"
+                                       else yaml.load(text, Loader=UniqueKeyLoader))
+                values = sql_values(documents[relative])
+            if any(CLOCK.search(sql) for sql in values):
+                kind = "知识示例SQL" if path.suffix == ".md" else "SQL"
+                errors.append(f"{relative}: {kind}使用运行时日期，违背快照{SNAPSHOT}")
+        except (ValueError, yaml.YAMLError):
+            kind = "JSON" if path.suffix == ".json" else "frontmatter" if path.suffix == ".md" else "YAML"
+            errors.append(f"{relative}: {kind}无效或含重复键")
     rules = project / "knowledge/rules/general.md"
     if not rules.exists() or SNAPSHOT not in rules.read_text(encoding="utf-8"):
         errors.append(f"knowledge/rules/general.md: 缺少已知快照日期{SNAPSHOT}")
@@ -84,13 +80,6 @@ def check_project(project):
             expression = columns.get(name, {}).get("expression", "")
             if SNAPSHOT not in expression or CLOCK.search(expression):
                 errors.append(f"{path}:{name}: 计算列必须显式使用快照{SNAPSHOT}")
-    target = project / "target/mdl.json"
-    if target.exists():
-        try:
-            if any(CLOCK.search(sql) for sql in sql_values(json.loads(target.read_text(encoding="utf-8")))):
-                errors.append("target/mdl.json: 构建产物仍有运行时日期")
-        except ValueError:
-            errors.append("target/mdl.json: JSON无效")
     return errors
 
 

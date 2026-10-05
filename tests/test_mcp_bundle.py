@@ -4,11 +4,10 @@ import shutil
 import subprocess
 import sys
 import sysconfig
-import tempfile
 import unittest
 from unittest import mock
 
-from fixtures import ErrorAssertions, ROOT, copy_deployment, fixture, load_module, worker_call
+from fixtures import ErrorAssertions, ROOT, copy_deployment, fixture, temporary_directory, worker_call
 from hr_mcp.contracts import BUNDLE_FILES, BUNDLE_FORMAT_VERSION
 from hr_mcp.engine import AnalyticsEngine, file_digest
 from scripts.prepare_mcp import build_bundle
@@ -16,9 +15,7 @@ from scripts.prepare_mcp import build_bundle
 
 class BundleTests(ErrorAssertions, unittest.TestCase):
     def setUp(self):
-        temporary = tempfile.TemporaryDirectory()
-        self.addCleanup(temporary.cleanup)
-        self.directory = Path(temporary.name)
+        self.directory = temporary_directory(self)
         self.data = self.directory / "bundle"
         self.original = ROOT / "hr-demo/db/duckdb/public.duckdb"
         self.original_hash = self.local_hash()
@@ -74,18 +71,20 @@ class BundleTests(ErrorAssertions, unittest.TestCase):
                        "hr_mcp/contracts.py", "hr_mcp/server.py", "scripts/mcp_context.py",
                        "hr-demo/wren-project/wren_project.yml", "pyproject.toml", "uv.lock", "vercel.json"):
             self.assertIn(source, manifest["sources"])
+        seeds = {path for path in manifest["sources"] if path.startswith("hr-demo/db/seed/")}
+        self.assertEqual(seeds, {"hr-demo/db/seed/manifest.json", *(
+            f"hr-demo/db/seed/{table}.parquet" for table in manifest["table_rows"])})
         self.assertEqual((self.data / "public.duckdb").stat().st_mode & 0o222, 0)
         analytics = AnalyticsEngine(self.data)
         self.assertEqual(analytics.query_sql("SELECT COUNT(*) AS n FROM employees")["rows"], [["786"]])
         sys.path.insert(0, str(ROOT / "hr-demo/validation/v2"))
         try:
+            from questions import QUESTIONS
             from result_contract import compare, comparison_options, table_csv
-
-            regression = load_module(ROOT / "hr-demo/validation/v2/run_all.py", "_mcp_regression")
         finally:
             sys.path.pop(0)
-        self.assertEqual(len(regression.QUESTIONS), 41)
-        for question in regression.QUESTIONS:
+        self.assertEqual(len(QUESTIONS), 41)
+        for question in QUESTIONS:
             with self.subTest(question=question["id"]):
                 actual = analytics.query_sql(question["wren"])
                 expected = query(str(self.data / "public.duckdb"), question["gt"])

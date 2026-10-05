@@ -58,9 +58,6 @@ class Runtime:
                 self._ready = False  # Never expose filesystem or driver errors through health.
             return self._ready
 
-    async def health(self) -> bool:
-        return await self.ready(check_files=True)
-
     async def invoke(self, method: str, *args: Any) -> Any:
         if not await self.ready():
             raise MCPQueryError("NOT_READY")

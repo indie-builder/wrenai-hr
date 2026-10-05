@@ -23,17 +23,15 @@ class CodeBlock(NamedTuple):
 
 
 def scan(text: str, error: Callable[[int, str], None] | None = None) -> Iterator[TextLine | CodeBlock]:
-    """Yield prose and closed fences in order; optionally report structural errors.
+    """Yield prose and closed fences; report malformed markers at their source line.
 
-    Raw references follow the latest range marker, while command validation keeps
-    the first unmatched start for diagnostics, including malformed nested ranges.
-    Markers inside fences are literal content. Header exemptions apply from their
-    position onward; links remain visible even in exempt prose.
+    Markers inside fences are literal. Header exemptions apply onward; links
+    remain visible in exempt prose. Nested ranges retain the first start line.
     """
     report = error or (lambda number, message: None)
     fence = None
     block = []
-    exempt = seen_fence = in_history = False
+    exempt = seen_fence = False
     history_start = None
     for number, line in enumerate(text.splitlines(), 1):
         match = FENCE.match(line)
@@ -53,13 +51,11 @@ def scan(text: str, error: Callable[[int, str], None] | None = None) -> Iterator
                 else:
                     exempt = True
             elif kind == "historical:start":
-                in_history = True
                 if history_start is not None:
                     report(number, "历史区段不能嵌套")
                 else:
                     history_start = number
             else:
-                in_history = False
                 if history_start is None:
                     report(number, "历史区段 end 缺少 start")
                 else:
@@ -69,7 +65,7 @@ def scan(text: str, error: Callable[[int, str], None] | None = None) -> Iterator
             fence = (match[1][0], len(match[1]), info[0].lower() if info else "", number)
             seen_fence = True
         else:
-            yield TextLine(number, line, not (marker or exempt or in_history))
+            yield TextLine(number, line, not marker and not exempt and history_start is None)
     if fence:
         report(fence[3], "代码围栏未闭合")
     if history_start is not None:
