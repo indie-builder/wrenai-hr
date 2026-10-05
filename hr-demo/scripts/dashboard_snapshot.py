@@ -49,7 +49,7 @@ def normalize_rows(rows, query):
 
 
 def canonical(value):
-    return (json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False) + "\n").encode()
+    return query_execution.canonical(value).encode()
 
 def input_hashes(source, spec):
     return {"source_mdl_sha256": query_execution.digest(source), "query_spec_sha256": query_execution.digest(spec),
