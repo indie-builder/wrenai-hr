@@ -33,17 +33,17 @@
 
 ## 环境与首次初始化
 
-以下命令从**仓库根目录**执行，推荐 Python 3.12。不要复制其他目录的虚拟环境。
+以下命令从**仓库根目录**执行，推荐 Python 3.14。不要复制其他目录的虚拟环境。
 
 ```bash
-python3.12 -m venv .venv
+python3.14 -m venv .venv
 .venv/bin/python -m pip install -r requirements-demo.txt
 # 需要 embedding 检索时安装；固定 SQL 回归和导出无需此项
-.venv/bin/python -m pip install 'wrenai[memory]==0.13.4'
+.venv/bin/python -m pip install 'wrenai[memory]==0.15.0'
 .venv/bin/wren --version
 ```
 
-[requirements-demo.txt](../requirements-demo.txt)固定 Wren 0.13.4、引擎、DuckDB、SQLGlot、Arrow、YAML 的已验证版本；它不是包含全部传递依赖的锁文件。
+[requirements-demo.txt](../requirements-demo.txt)固定 Wren 0.15.0、引擎、DuckDB、SQLGlot、Arrow、YAML 的已验证版本；它不是包含全部传递依赖的锁文件。
 
 首次创建或明确需要重建演示库时执行：
 

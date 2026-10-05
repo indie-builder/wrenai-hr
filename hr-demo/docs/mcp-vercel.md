@@ -12,7 +12,7 @@
 - `hr_mcp/engine.py`、`worker.py`、`cube.py`：分析 Interface、Wren 原生规划、Cube 请求校验和受限 DuckDB 查询，独立进程执行与超时控制。
 - `hr_query/sql_policy.py`、`duckdb_worker.py`：MCP 与离线验证共用的 SQL 白名单和只读执行代码；`semantic.py` 仅在构建时严格读取 YAML。包导入不加载 MCP SDK、DuckDB 或 YAML。
 - `scripts/prepare_mcp.py`：构建时从确定性种子与 YAML 生成私有 `hr_mcp/data/`；`mcp_context.py` 裁剪公开 schema 与业务上下文，不替换开发用数据库。
-- `pyproject.toml`、`uv.lock`：独立的 Python 3.12 运行依赖，不携带 Wren CLI、embedding、Arrow 或浏览器仪表盘。
+- `pyproject.toml`、`uv.lock`：独立的 Python 3.14 运行依赖，不携带 Wren CLI、embedding、Arrow 或浏览器仪表盘。
 - `vercel.json`：服务入口及执行时长，排除仅用于构建的源数据和测试；`hr_query/` 随函数源码打包。
 - `scripts/smoke_mcp.py`：使用临时本地端口和内存 Token 启动实际 HTTP 服务，调用官方客户端检验鉴权、工具发现、真实查询与写入拒绝后关闭；设置 `MCP_URL` 时改为验证该部署。可直接复现本地与 CI 验证。
 

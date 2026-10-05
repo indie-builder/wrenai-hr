@@ -7,7 +7,7 @@ description: 在语义层(WrenAI MDL)上构建并验证业务分析交付的领�
 
 ## 前置依赖
 
-- wren CLI(`pip install 'wrenai[memory]==0.13.4'`,内含 DuckDB 1.5)
+- wren CLI(`pip install 'wrenai[memory]==0.15.0'`,内含 DuckDB 1.5)
 - Python `duckdb` 模块(A 路径直连物理表用):`pip install duckdb`
 - 独立复制 runner 时同时复制 `scripts/query_execution.py` 与 `scripts/result_contract.py` 的实际内容（仓库内为规范模块链接，指向 `hr-demo/validation/v2/`），保持同目录；GT 执行还需上级 `hr_query/duckdb_worker.py`。仅依赖标准库与 DuckDB。
 - 仿真数据一律固定随机种子,交付物必须完全可复现
