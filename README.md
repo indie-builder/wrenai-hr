@@ -2,11 +2,13 @@
 
 参考 [WrenAI](https://github.com/Canner/WrenAI) 当前 Agent 驱动的 GenBI 架构，以虚构公司“星辰科技”的 HR 数据演示语义问数、固定 SQL 回归与浏览器仪表盘。数据快照日为 **2026-08-31**。
 
-- [交付说明与复现命令](hr-delivery/README.md)
-- [迁移到新业务的操作指南](hr-delivery/docs/replication/README.md)
+`hr-demo/` 是 HR 分析演示工作区，集中维护数据种子、Wren 语义定义、仪表盘、回归题库和复现文档。MCP 构建从这里读取数据与业务定义，运行时使用 `hr_mcp/data/` 中的私有数据包。
+
+- [演示说明与复现命令](hr-demo/README.md)
+- [迁移到新业务的操作指南](hr-demo/docs/replication/README.md)
 - [Agent 工作约定](AGENTS.md)
-- [验证与问题处理记录](hr-delivery/validation/v2/matrix_v2.md)
-- [Vercel MCP 服务与 Token 接入](hr-delivery/docs/mcp-vercel.md)
+- [验证与问题处理记录](hr-demo/validation/v2/matrix_v2.md)
+- [Vercel MCP 服务与 Token 接入](hr-demo/docs/mcp-vercel.md)
 
 数据层为 DuckDB 单文件，25 张表、273,515 行仿真数据，覆盖八类 HR 业务。语义层包括 25 个模型、32 条关系、6 个视图、6 个 Cube，以及业务规则和查询示例。
 
@@ -16,10 +18,10 @@
 
 ```bash
 # 在已按交付说明完成环境、数据库和 profile 初始化后
-python3 hr-delivery/validation/v2/run_all.py
-.venv/bin/python hr-delivery/scripts/export_dashboard.py --check
+python3 hr-demo/validation/v2/run_all.py
+.venv/bin/python hr-demo/scripts/export_dashboard.py --check
 python3 -m http.server 8317 --bind 127.0.0.1 \
-  --directory hr-delivery/wren-project/apps/hr-overview
+  --directory hr-demo/wren-project/apps/hr-overview
 ```
 
 打开 <http://127.0.0.1:8317>。另提供带 Bearer Token 的只读 MCP Streamable HTTP 服务：`hr_mcp/` 负责传输与语义规划，`hr_query/` 提供 MCP 和离线验证共用的 SQL 校验与只读执行，`scripts/prepare_mcp.py` 构建私有数据包。Vercel 构建配置与接入方法见上述服务文档，实际部署状态以部署记录为准。

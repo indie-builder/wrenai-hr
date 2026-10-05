@@ -13,7 +13,7 @@ from hr_mcp.engine import file_digest
 from scripts.prepare_mcp import public_context, write_json
 
 ROOT = Path(__file__).resolve().parents[1]
-PROJECT = ROOT / "hr-delivery/wren-project"
+PROJECT = ROOT / "hr-demo/wren-project"
 
 
 def load_module(path: Path, name: str):
@@ -28,9 +28,9 @@ def fixture(directory: Path):
     shutil.copyfile(PROJECT / "target/mdl.json", directory / "mdl.json")
     mdl = json.loads((directory / "mdl.json").read_text(encoding="utf-8"))
     write_json(directory / "context.json", public_context(mdl, PROJECT))
-    builder = load_module(ROOT / "hr-delivery/db/build_duckdb.py", "_test_seed_builder")
+    builder = load_module(ROOT / "hr-demo/db/build_duckdb.py", "_test_seed_builder")
     with duckdb.connect(str(directory / "public.duckdb")) as connection:
-        for statement in builder.split_statements((ROOT / "hr-delivery/db/schema_duckdb.sql").read_text()):
+        for statement in builder.split_statements((ROOT / "hr-demo/db/schema_duckdb.sql").read_text()):
             connection.execute(statement)
         connection.execute("""INSERT INTO departments(dept_id, dept_name, location, established_date)
             VALUES (1, '技术部', '北京', DATE '2020-06-01'), (2, '人事部', '北京', DATE '2020-06-01')""")

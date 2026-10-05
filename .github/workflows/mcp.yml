@@ -29,7 +29,7 @@ jobs:
           uv venv .venv --python 3.12
           uv pip install --python .venv/bin/python -r requirements-demo.txt
       - name: Semantic sources and checked-in target agree
-        run: .venv/bin/python hr-delivery/validation/v2/check_semantics.py --build-check
+        run: .venv/bin/python hr-demo/validation/v2/check_semantics.py --build-check
       - name: Build private read-only data bundle
         run: uv run --no-sync python scripts/prepare_mcp.py
       - name: Authentication, protocol and query tests

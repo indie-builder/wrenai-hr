@@ -30,8 +30,8 @@ def write_json(path, value):
 
 
 def source_files(root):
-    database = root / "hr-delivery/db"
-    project = root / "hr-delivery/wren-project"
+    database = root / "hr-demo/db"
+    project = root / "hr-demo/wren-project"
     paths = [database / "build_duckdb.py", database / "schema_duckdb.sql",
              database / "seed/attendance_records.parquet", database / "seed/attendance_manifest.json",
              project / "target/mdl.json", project / "wren_project.yml", project / "relationships.yml",
@@ -147,7 +147,7 @@ def public_context(mdl, project):
 def build_database(root, destination):
     # Isolated module globals: the source builder retains all input paths; only
     # its output globals point to staging. Never call load_duckdb.sh/default build.
-    path = root / "hr-delivery/db/build_duckdb.py"
+    path = root / "hr-demo/db/build_duckdb.py"
     spec = importlib.util.spec_from_file_location("_hr_mcp_seed_builder", path)
     builder = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(builder)
@@ -168,7 +168,7 @@ def build_bundle(output_dir: Path, *, root: Path = ROOT):
     before = {str(path.relative_to(root)): file_digest(path) for path in paths}
     release, dependencies = release_info(root)
     output_dir.parent.mkdir(parents=True, exist_ok=True)
-    project = root / "hr-delivery/wren-project"
+    project = root / "hr-demo/wren-project"
     with tempfile.TemporaryDirectory(prefix=".mcp-build-", dir=output_dir.parent) as temporary:
         staged = Path(temporary) / "bundle"
         staged.mkdir()

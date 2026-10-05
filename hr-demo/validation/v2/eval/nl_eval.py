@@ -2,9 +2,9 @@
 """Provider-neutral, offline NL→SQL evaluation. Never calls an LLM.
 
 Export an answer-free package for a real agent:
-  .venv/bin/python hr-delivery/validation/v2/eval/nl_eval.py export --output-dir /tmp/hr-questions
+  .venv/bin/python hr-demo/validation/v2/eval/nl_eval.py export --output-dir /tmp/hr-questions
 Evaluate that agent's JSONL records:
-  .venv/bin/python hr-delivery/validation/v2/eval/nl_eval.py run --records /tmp/generated.jsonl --output-dir /tmp/hr-eval
+  .venv/bin/python hr-demo/validation/v2/eval/nl_eval.py run --records /tmp/generated.jsonl --output-dir /tmp/hr-eval
 
 JSONL: {"id":"q01", "question":"<原始题目>", "generated_sql":"SELECT ...",
         "context_refs":["schema.json", "rules/general.md"],

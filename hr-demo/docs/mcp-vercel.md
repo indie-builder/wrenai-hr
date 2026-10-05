@@ -41,7 +41,7 @@ MCP CI 在独立的 `.venv` 中安装语义验证工具，先执行 `check_seman
 - 本地官方 SDK 经真实 HTTP 完成工具发现、认证查询及写入拒绝。测试确认缺失/错误 Token 为 401，正确 Token 返回在职人数 528（快照 2026-08-31）。
 - 2026-10-05 已通过 Vercel 控制台导入 GitHub 主分支并部署，生产地址为 `https://wrenai-hr-mcp.vercel.app/mcp`。生产 Token 以敏感环境变量保存；预览环境不复用生产 Token。
 - [生产部署 67LwAqwAWUbq1Qcr5vtoKy4Rerda](https://vercel.com/lovemyrmbb-3480s-projects/wrenai-hr-mcp/67LwAqwAWUbq1Qcr5vtoKy4Rerda) 对应提交 `3a1205f`，已完成公网官方 SDK 验证：`/health` 200、缺失/错误 Token 401、8 个工具发现、SQL 与 Cube 均返回在职人数 528、DELETE 返回 `SQL_REJECTED`、数据库静态路径返回 404。
-- 公网 MCP 固定 SQL 回归 **41/41 通过**：逐题经 HTTPS `query_sql` 查询，并与本地只读数据库标准 SQL 比对。本地证据为 `hr-delivery/validation/v2/runs/mcp-production-20261005/regression.json`（不提交）。这是固定 SQL 执行对照，不代表实时自然语言生成准确率。
+- 公网 MCP 固定 SQL 回归 **41/41 通过**：逐题经 HTTPS `query_sql` 查询，并与本地只读数据库标准 SQL 比对。本地证据为 `hr-demo/validation/v2/runs/mcp-production-20261005/regression.json`（不提交）。这是固定 SQL 执行对照，不代表实时自然语言生成准确率。
 - 首次部署发现隔离查询进程未加载平台依赖目录，已在 [PR #5](https://github.com/indie-builder/wrenai-hr/pull/5) 修复：显式加入部署包 `_vendor` 和平台外置依赖 `/tmp/_vc_deps/lib/python3.12/site-packages`，保留 `-I` 与严格环境变量隔离。不能只用部署 Ready、健康检查或工具发现代替真实查询验收。
 
 ## 本地运行

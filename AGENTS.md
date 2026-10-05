@@ -2,39 +2,39 @@
 
 ## 项目定位与范围
 
-本仓库是 WrenAI HR 数据分析演示与验证交付，主要工作区为 `hr-delivery/`。使用 DuckDB 单文件仿真数据、Wren MDL 语义层、Agent 问数和浏览器仪表盘，不是完整的人事业务管理系统。
+本仓库是 WrenAI HR 数据分析演示与验证交付，主要工作区为 `hr-demo/`。使用 DuckDB 单文件仿真数据、Wren MDL 语义层、Agent 问数和浏览器仪表盘，不是完整的人事业务管理系统。
 
 - 演示公司为虚构的“星辰科技”，数据快照截至 **2026-08-31**。
 - 交付基线：25 张表、25 个模型、32 条关系、6 个视图、6 个 Cube。
 - 仪表盘基线：9 个 KPI、12 张图；使用裁剪后的 MDL、共享查询配置与必要 Parquet 快照在浏览器内计算。
 - 已有 41 道固定 SQL 双路径回归题。历史通过记录不能替代当前运行结果，也不能等同于自然语言生成准确率。
 - 默认使用中文解释业务结果与项目变更。
-- 本文件适用于整个仓库；进入 `hr-delivery/wren-project/` 工作时，同时遵守其 `AGENTS.md`。
+- 本文件适用于整个仓库；进入 `hr-demo/wren-project/` 工作时，同时遵守其 `AGENTS.md`。
 
 ## 先读哪些文件
 
 | 路径 | 用途 |
 | --- | --- |
 | `README.md` | 总入口 |
-| `hr-delivery/README.md` | 架构、复现步骤、已知限制 |
-| `hr-delivery/GOAL.md` | 历史目标与验收记录；部分规划名称以实际文件为准 |
-| `hr-delivery/docs/replication/README.md` | 迁移到新项目的完整操作指南 |
-| `hr-delivery/wren-project/AGENTS.md` | 语义项目的 Agent 工作流 |
-| `hr-delivery/wren-project/knowledge/rules/general.md` | 业务口径 |
-| `hr-delivery/validation/v2/questions.py` | 题库、标准 SQL 与语义 SQL |
-| `hr-delivery/validation/v2/matrix_v2.md` | 验证与问题处理记录 |
+| `hr-demo/README.md` | 架构、复现步骤、已知限制 |
+| `hr-demo/GOAL.md` | 历史目标与验收记录；部分规划名称以实际文件为准 |
+| `hr-demo/docs/replication/README.md` | 迁移到新项目的完整操作指南 |
+| `hr-demo/wren-project/AGENTS.md` | 语义项目的 Agent 工作流 |
+| `hr-demo/wren-project/knowledge/rules/general.md` | 业务口径 |
+| `hr-demo/validation/v2/questions.py` | 题库、标准 SQL 与语义 SQL |
+| `hr-demo/validation/v2/matrix_v2.md` | 验证与问题处理记录 |
 
 ## 目录职责
 
-- `hr-delivery/db/`：数据库 schema、模拟数据生成器、CSV 和装载脚本。
-- `hr-delivery/wren-project/models/`：物理表映射、字段类型和描述。
-- `hr-delivery/wren-project/relationships.yml`：模型关系。
-- `hr-delivery/wren-project/views/`、`cubes/`：复用视图、聚合指标和分析维度。
-- `hr-delivery/wren-project/knowledge/`：业务规则、词汇与已确认的自然语言/SQL 示例。
-- `hr-delivery/wren-project/target/mdl.json`：语义模型构建产物，优先修改 YAML 源文件后构建。
-- `hr-delivery/wren-project/apps/hr-overview/`：仪表盘 HTML、共享查询配置、裁剪后的 MDL、所需 Parquet 和快照清单。
-- `hr-delivery/scripts/export_dashboard.py`：从只读 DuckDB 导出并校验仪表盘依赖；数据库种子不依赖仪表盘产物。
-- `hr-delivery/validation/v2/`：当前统一验证入口；旧版脚本与过时输出已移除。
+- `hr-demo/db/`：数据库 schema、模拟数据生成器、CSV 和装载脚本。
+- `hr-demo/wren-project/models/`：物理表映射、字段类型和描述。
+- `hr-demo/wren-project/relationships.yml`：模型关系。
+- `hr-demo/wren-project/views/`、`cubes/`：复用视图、聚合指标和分析维度。
+- `hr-demo/wren-project/knowledge/`：业务规则、词汇与已确认的自然语言/SQL 示例。
+- `hr-demo/wren-project/target/mdl.json`：语义模型构建产物，优先修改 YAML 源文件后构建。
+- `hr-demo/wren-project/apps/hr-overview/`：仪表盘 HTML、共享查询配置、裁剪后的 MDL、所需 Parquet 和快照清单。
+- `hr-demo/scripts/export_dashboard.py`：从只读 DuckDB 导出并校验仪表盘依赖；数据库种子不依赖仪表盘产物。
+- `hr-demo/validation/v2/`：当前统一验证入口；旧版脚本与过时输出已移除。
 - `hr_mcp/`：只读 Streamable HTTP 运行代码；`contracts.py` 统一版本、快照日期、数据包格式与执行上限，`data/` 仅存忽略提交的私有数据产物。
 - `hr_query/`：MCP 与离线验证共用的 SQL policy 和 DuckDB 只读 worker；共享执行代码在此维护。
 - `scripts/prepare_mcp.py`：从确定性种子构建 MCP 数据包，校验来源与查询后替换，保留开发数据库。
@@ -56,17 +56,17 @@ python3 -m venv .venv
 
 如果当前 Python 与依赖不兼容，使用 Python 3.12 建立独立环境。不要复制其他目录的 `.venv`。
 
-数据层是 DuckDB 单文件 `hr-delivery/db/duckdb/public.duckdb`（Git 忽略，可重建）。文件名固定不可改：wren 的 duckdb 连接器按文件名为挂载 catalog 别名，MDL 规划 SQL 以 `"public"` 前缀限定物理表。重建或首次创建：
+数据层是 DuckDB 单文件 `hr-demo/db/duckdb/public.duckdb`（Git 忽略，可重建）。文件名固定不可改：wren 的 duckdb 连接器按文件名为挂载 catalog 别名，MDL 规划 SQL 以 `"public"` 前缀限定物理表。重建或首次创建：
 
 ```bash
-cd hr-delivery/db && ./load_duckdb.sh
+cd hr-demo/db && ./load_duckdb.sh
 ```
 
 项目绑定的连接 profile 为 `hr_demo_duck`（duckdb，url 指向 `db/duckdb/` 目录）。语义查询命令需要在语义项目目录运行，在单独子 Shell 中执行，避免改变后续根目录命令的工作目录：
 
 ```bash
 (
-  cd hr-delivery/wren-project
+  cd hr-demo/wren-project
   ../../.venv/bin/wren profile debug
 )
 ```
@@ -137,12 +137,12 @@ cd hr-delivery/db && ./load_duckdb.sh
 从仓库根目录执行：
 
 ```bash
-python3 hr-delivery/validation/v2/run_all.py --only q03
-python3 hr-delivery/validation/v2/run_all.py --domain 人效分析
-python3 hr-delivery/validation/v2/run_all.py
-.venv/bin/python -m unittest discover -s hr-delivery/validation/v2/tests
-.venv/bin/python hr-delivery/validation/v2/check_semantics.py --build-check
-.venv/bin/python hr-delivery/scripts/export_dashboard.py --check
+python3 hr-demo/validation/v2/run_all.py --only q03
+python3 hr-demo/validation/v2/run_all.py --domain 人效分析
+python3 hr-demo/validation/v2/run_all.py
+.venv/bin/python -m unittest discover -s hr-demo/validation/v2/tests
+.venv/bin/python hr-demo/validation/v2/check_semantics.py --build-check
+.venv/bin/python hr-demo/scripts/export_dashboard.py --check
 ```
 
 - 自然语言评测使用 `validation/v2/eval/nl_eval.py`，先 export 无答案题包，再由独立 Agent 生成 JSONL，最后 run 评分。只公开输出列与展示精度，保留原始生成 SQL、执行结果及失败记录；操作命令见交付 README。
@@ -162,18 +162,18 @@ python3 hr-delivery/validation/v2/run_all.py
 
 ```bash
 python3 -m http.server 8317 --bind 127.0.0.1 \
-  --directory hr-delivery/wren-project/apps/hr-overview
+  --directory hr-demo/wren-project/apps/hr-overview
 ```
 
 打开 `http://127.0.0.1:8317`；若已有服务占用该端口，先检查，不重复启动。
 
 也可在语义目录执行 `../../.venv/bin/wren genbi verify hr-overview` 检查已注册应用文件。文件预检不能替代浏览器图表、加载错误和数字一致性检查。
 
-页面使用 ECharts 和 `@wrenai/wren-core-wasm` 的 CDN 资源，首次加载需要网络。数据库更新不会自动刷新 Parquet；修改数据后，从根目录运行 `.venv/bin/python hr-delivery/scripts/export_dashboard.py`，再以 `--check` 核对快照哈希、源数据与全部页面查询。表列和查询需求统一修改 `apps/hr-overview/query-spec.json`，不要直接向产物目录复制整库数据。`wren genbi build` 输出构建指令，不会自动写出完整应用。
+页面使用 ECharts 和 `@wrenai/wren-core-wasm` 的 CDN 资源，首次加载需要网络。数据库更新不会自动刷新 Parquet；修改数据后，从根目录运行 `.venv/bin/python hr-demo/scripts/export_dashboard.py`，再以 `--check` 核对快照哈希、源数据与全部页面查询。表列和查询需求统一修改 `apps/hr-overview/query-spec.json`，不要直接向产物目录复制整库数据。`wren genbi build` 输出构建指令，不会自动写出完整应用。
 
 ## MCP 服务
 
-- 部署与接入见 `hr-delivery/docs/mcp-vercel.md`。运行依赖单独使用根 `pyproject.toml` / `uv.lock`，本地使用 `.venv-mcp`，避免覆盖分析演示环境。
+- 部署与接入见 `hr-demo/docs/mcp-vercel.md`。运行依赖单独使用根 `pyproject.toml` / `uv.lock`，本地使用 `.venv-mcp`，避免覆盖分析演示环境。
 - Vercel 从仓库根构建 `scripts/prepare_mcp.py`。v2 包在 `hr_mcp/data/` 函数私有目录，仅含数据库、MDL、公开业务上下文和来源清单；共享 Python 源码随 `hr_query/` 打包。不得将数据库或业务上下文放进 `public/` 或配置静态文件路由。
 - 修改语义定义后先通过 `check_semantics.py --build-check`，再构建 MCP 包。MCP CI 在独立语义环境执行该检查，Vercel 轻量构建使用已提交 MDL；发布前确认同一部署提交通过检查，不能把来源哈希当作编译一致性的证明。构建支持完整合法 v1 包升级，目录含额外文件或哈希不符时保留原目录并报错。
 - `/mcp` 使用 Streamable HTTP 与 Bearer Token；`MCP_AUTH_TOKEN` 缺失时必须拒绝服务，不添加开发后门。Token 不提交、不打印、不写入URL；`.env.mcp` 是本地忽略文件。
@@ -182,7 +182,7 @@ python3 -m http.server 8317 --bind 127.0.0.1 \
 
 ## 数据与版本管理
 
-- DuckDB 版 `hr-delivery/db/load_duckdb.sh` 在临时库成功装载后替换本地 `db/duckdb/public.duckdb`，只在该文件可丢弃时运行；普通查询、文档修改或验证不运行它。默认考勤源为 `db/seed/attendance_records.parquet`，先检查来源清单的 SHA-256；缺失或不符直接失败，不自动随机重生成。
+- DuckDB 版 `hr-demo/db/load_duckdb.sh` 在临时库成功装载后替换本地 `db/duckdb/public.duckdb`，只在该文件可丢弃时运行；普通查询、文档修改或验证不运行它。默认考勤源为 `db/seed/attendance_records.parquet`，先检查来源清单的 SHA-256；缺失或不符直接失败，不自动随机重生成。
 - 仿真 CSV、仪表盘 Parquet、验证结果是交付物；修改时关注来源、时间范围和可复现性。
 - 不提交 `.env`、虚拟环境、用户级连接凭据和 `.wren/memory/` 缓存；保持 `.gitignore` 生效。
 - 本项目已发布到公开仓库，提交前检查差异中是否混入实际凭据、真实个人数据或本地产物。

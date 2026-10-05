@@ -23,10 +23,10 @@ import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
-DELIVERY = ROOT / "hr-delivery"
-APP = DELIVERY / "wren-project/apps/hr-overview"
-SOURCE_MDL = DELIVERY / "wren-project/target/mdl.json"
-DATABASE = DELIVERY / "db/duckdb/public.duckdb"
+DEMO = ROOT / "hr-demo"
+APP = DEMO / "wren-project/apps/hr-overview"
+SOURCE_MDL = DEMO / "wren-project/target/mdl.json"
+DATABASE = DEMO / "db/duckdb/public.duckdb"
 SPEC = APP / "query-spec.json"
 TOLERANCE = 0.011
 

@@ -35,7 +35,7 @@ class BundleTests(unittest.TestCase):
             data = Path(temporary) / "bundle"
             fixture(data)
             before = file_digest(data / "public.duckdb")
-            original = ROOT / "hr-delivery/db/duckdb/public.duckdb"
+            original = ROOT / "hr-demo/db/duckdb/public.duckdb"
             original_hash = file_digest(original) if original.exists() else None
             with mock.patch("scripts.prepare_mcp.build_database", side_effect=ValueError("invalid seed")):
                 with self.assertRaises(ValueError):
@@ -68,7 +68,7 @@ class BundleTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as temporary:
             data = Path(temporary) / "bundle"
-            original = ROOT / "hr-delivery/db/duckdb/public.duckdb"
+            original = ROOT / "hr-demo/db/duckdb/public.duckdb"
             original_hash = file_digest(original) if original.exists() else None
             fixture(data)
             # An intact previous bundle can be upgraded without retaining code
@@ -95,9 +95,9 @@ class BundleTests(unittest.TestCase):
             self.assertEqual(file_digest(original) if original.exists() else None, original_hash)
             analytics = AnalyticsEngine(data)
             self.assertEqual(analytics.query_sql("SELECT COUNT(*) AS n FROM employees")["rows"], [["786"]])
-            sys.path.insert(0, str(ROOT / "hr-delivery/validation/v2"))
+            sys.path.insert(0, str(ROOT / "hr-demo/validation/v2"))
             try:
-                regression = load_module(ROOT / "hr-delivery/validation/v2/run_all.py", "_mcp_regression")
+                regression = load_module(ROOT / "hr-demo/validation/v2/run_all.py", "_mcp_regression")
             finally:
                 sys.path.pop(0)
             self.assertEqual(len(regression.QUESTIONS), 41)

@@ -100,7 +100,7 @@
 ## 复现
 
 ```bash
-cd hr-delivery/validation/v2
+cd hr-demo/validation/v2
 python3 run_all.py                 # 全量 41 题
 python3 run_all.py --only q13 q37  # 单题
 python3 run_all.py --domain 人效分析

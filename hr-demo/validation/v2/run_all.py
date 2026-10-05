@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """固定 SQL 双路径回归；局部运行默认写 runs/<subset>/，不会覆盖全量报告。
 
-python3 hr-delivery/validation/v2/run_all.py [--only q03] [--output-dir PATH]
+python3 hr-demo/validation/v2/run_all.py [--only q03] [--output-dir PATH]
 每题可声明 ordered=False、allow_empty=False、tolerance=0.011。
 本脚本不会调用模型；NL 生成评测见 eval/nl_eval.py。
 """
