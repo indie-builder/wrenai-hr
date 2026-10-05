@@ -128,6 +128,7 @@ class EngineTests(BundleCase):
 class WorkerTests(BundleCase):
     def call(self, request):
         return worker_call(self.data, request)
+
     def test_plan_query_and_cube_return_complete_results(self):
         for request, rows in (
             ({"operation": "plan", "sql": "SELECT COUNT(*) FROM employees"}, []),
