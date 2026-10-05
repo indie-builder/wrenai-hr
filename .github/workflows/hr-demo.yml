@@ -44,6 +44,8 @@ jobs:
           .venv/bin/wren --version
       - name: Offline unit and temporary database tests
         run: .venv/bin/python -m unittest discover -s hr-demo/validation/v2/tests -v
+      - name: Skill script regression tests
+        run: .venv/bin/python -m unittest discover -s scripts/tests -p 'test_skill_scripts.py' -v
       - name: Semantic sources and checked-in target agree
         run: .venv/bin/python hr-demo/validation/v2/check_semantics.py --build-check
       - name: Build demo database from committed deterministic seeds
