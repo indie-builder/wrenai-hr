@@ -23,6 +23,12 @@ external CLIs and environment executables are not inspected. Angle-bracket
 placeholders are exempt. Dynamic paths, shell control flow and substitutions
 require manual rewriting (or an explicitly justified examples marker); this is
 not a shell interpreter, heading validator or complete Markdown parser.
+
+Every tracked text file is additionally scanned for the retired path segment
+``hr-delivery``: whole-file history/template markers exempt the remainder only
+before the first fence, history ranges are skipped, fenced lines are ignored,
+and the checker with its own tests is exempt by name. The scan reports raw
+references; it does not parse each file's syntax.
 """
 from __future__ import annotations
 
@@ -52,6 +58,10 @@ HEREDOC = re.compile(r"<<(-?)\s*(?:'([\w-]+)'|\"([\w-]+)\"|([\w-]+))(?=$|\s|[;)&
 ENV_EXECUTABLE = re.compile(r"(?:^|/)\.venv(?:-[\w-]+)?/bin/[\w.-]+$")
 PYTHON = re.compile(r"python(?:\d+(?:\.\d+)*)?$")
 RETIRED = {"run_wren.sh", "load.sh"}
+RETIRED_SEGMENT = "hr-delivery"
+TEXT_SUFFIXES = frozenset({".md", ".py", ".yml", ".yaml", ".json", ".toml", ".txt", ".sh", ".html", ".sql", ".cfg", ".example"})
+CHECKER_FIXTURES = frozenset({"scripts/check_docs.py", "scripts/tests/test_check_docs.py"})
+SEGMENT = re.compile(r"[^\w.-]+")
 CONTROL_FLOW = {"if", "then", "else", "elif", "fi", "for", "while", "until", "do", "done", "case", "esac", "function", "{", "}"}
 
 
@@ -173,7 +183,7 @@ class Checker:
             return None
         for token in args:
             value = token.partition("=")[2] if token.startswith("--") and "=" in token else token
-            if not placeholder(value) and "hr-delivery" in value.split("/"):
+            if not placeholder(value) and RETIRED_SEGMENT in SEGMENT.split(value):
                 self.error(document, line, f"活跃命令使用已废弃目录: {value}")
         if program in RETIRED:
             self.error(document, line, f"活跃命令使用已废弃入口: {executable}")
@@ -351,6 +361,49 @@ class Checker:
             self.error(path, history_start, "历史区段 start 缺少 end")
 
 
+def deprecated_segments(root: Path, sources: set[str]) -> list[str]:
+    """Report the retired path segment in tracked text files outside history markers."""
+    errors: list[str] = []
+    for name in sorted(sources):
+        if name in CHECKER_FIXTURES or Path(name).suffix not in TEXT_SUFFIXES:
+            continue
+        try:
+            lines = (root / name).read_text(encoding="utf-8").splitlines()
+        except (OSError, UnicodeError):
+            continue
+        exempt_rest = False
+        in_history = False
+        seen_fence = False
+        fence: tuple[str, int] | None = None
+        for number, line in enumerate(lines, 1):
+            if fence:
+                match = FENCE.match(line)
+                if match and match[1][0] == fence[0] and len(match[1]) >= fence[1] and not match[2].strip():
+                    fence = None
+                continue
+            match = FENCE.match(line)
+            if match:
+                fence = (match[1][0], len(match[1]))
+                seen_fence = True
+                continue
+            marker = MARKER.match(line)
+            if marker:
+                kind = marker[1]
+                if kind in {"historical", "examples"}:
+                    if not seen_fence:
+                        exempt_rest = True
+                elif kind == "historical:start":
+                    in_history = True
+                else:
+                    in_history = False
+                continue
+            if exempt_rest or in_history:
+                continue
+            if RETIRED_SEGMENT in SEGMENT.split(line):
+                errors.append(f"{name}:{number}: 引用已废弃路径段: {RETIRED_SEGMENT}；仅历史或模板标记可豁免")
+    return errors
+
+
 def check_repository(root: Path, sources: set[str] | None = None) -> list[str]:
     root = root.resolve()
     checker = Checker(root, source_files(root) if sources is None else sources)
@@ -362,6 +415,7 @@ def check_repository(root: Path, sources: set[str] | None = None) -> list[str]:
             checker.document(path)
         except (OSError, UnicodeError, ValueError) as error:
             checker.error(path, 1, f"无法检查文档: {error}")
+    checker.errors.extend(deprecated_segments(root, checker.sources))
     return checker.errors
 
 

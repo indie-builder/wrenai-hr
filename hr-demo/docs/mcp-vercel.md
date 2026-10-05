@@ -74,6 +74,10 @@ export MCP_URL=http://127.0.0.1:8320/mcp
 
 ## 部署到 Vercel
 
+### 分支基线与构建差异
+
+GitHub Actions 的 pull_request 运行构建 PR 合并进主分支的结果；Vercel 预览部署构建分支自身的提交快照。基于旧 `main` 的分支会同时出现 CI 通过而 Vercel 预览失败（旧树缺少当前入口配置），这不代表合并结果有问题。合并前把分支更新到最新 `main`（变基或合并 `main`）；预览失败先核对分支基线，再用部署日志定位。
+
 1. 在已登录的 Vercel 控制台导入 GitHub 仓库，或通过 `npx vercel@latest login` / `npx vercel@latest link` 建立项目。项目 Root Directory 使用仓库根目录，Framework 选择 FastAPI。当前项目 `wrenai-hr-mcp` 绑定 GitHub `main`，合并代码后自动部署生产。
 2. 在 Vercel Project Settings → Environment Variables 中添加 `MCP_AUTH_TOKEN`，使用至少 32 字符的高熵随机值；建议生成 48 个随机字节的 URL-safe Token。生产与预览使用不同 Token。不要把 Token 放进 `vercel.json`、命令行参数或客户端前端代码。
 3. 默认识别 `VERCEL_URL` 和 `VERCEL_PROJECT_PRODUCTION_URL`。使用自定义域名时，把准确域名加入 `MCP_ALLOWED_HOSTS`（逗号分隔，示例 `hr-api.example.com`）。通常服务端调用不带 `Origin`，无需设置 CORS；若客户端确实发送 Origin，使用 `MCP_ALLOWED_ORIGINS` 指定完整源，例如 `https://your-app.example.com`。Origin 允许名单不等于开启跨域浏览器调用。

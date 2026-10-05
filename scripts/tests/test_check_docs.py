@@ -273,6 +273,33 @@ python hr-delivery/validation/v2/run_all.py
         self.assertTrue(any("已废弃入口: load.sh" in error for error in errors))
         self.assertTrue(any("已废弃目录" in error for error in errors))
 
+    def test_deprecated_segment_scan_covers_tracked_text_files(self):
+        self.write("hr-demo/wren-project/apps/notes.md", "参见 hr-delivery/validation 的旧题库。\n")
+        self.write("scripts/legacy.py", "OLD = 'hr-delivery/db/duckdb'\n")
+        errors = self.check("# Root\n")
+        self.assertEqual(sorted(errors), [
+            "hr-demo/wren-project/apps/notes.md:1: 引用已废弃路径段: hr-delivery；仅历史或模板标记可豁免",
+            "scripts/legacy.py:1: 引用已废弃路径段: hr-delivery；仅历史或模板标记可豁免",
+        ])
+
+    def test_deprecated_segment_scan_exempts_markers_and_non_text_files(self):
+        self.write("hr-demo/docs/old.md",
+                   "<!-- docs:historical -->\n历史记录引用 hr-delivery/。\n```bash\n./run_wren.sh\n```\n后续 hr-delivery 也不报。\n")
+        self.write("hr-demo/docs/mixed.md",
+                   "<!-- docs:historical:start -->\n区段内 hr-delivery 不报。\n<!-- docs:historical:end -->\n区段外 hr-delivery 报。\n")
+        self.write("scripts/check_docs.py", "RETIRED_SEGMENT = 'hr-delivery'\n")
+        self.write("notes.txt.bin", "hr-delivery")
+        errors = self.check("# Root\n")
+        self.assertEqual(errors, ["hr-demo/docs/mixed.md:4: 引用已废弃路径段: hr-delivery；仅历史或模板标记可豁免"])
+
+    def test_deprecated_segment_scan_ignores_markers_in_fences_and_similar_names(self):
+        self.write("hr-demo/docs/tricky.md", "解释 `<!-- docs:historical -->` 的含义。\n"
+                   "```text\n<!-- docs:historical -->\n```\n"
+                   "围栏后的整篇标记不豁免：hr-delivery/\n"
+                   "相似名称不报：hr-demo/、ahr-delivery、hr-deliverys。\n")
+        errors = self.check("# Root\n")
+        self.assertEqual(errors, ["hr-demo/docs/tricky.md:5: 引用已废弃路径段: hr-delivery；仅历史或模板标记可豁免"])
+
     def test_environment_executables_do_not_require_local_environments(self):
         self.write("scripts/check.py")
         markdown = "```bash\n.venv/bin/python scripts/check.py\n.venv/bin/wren context build\n```\n"
