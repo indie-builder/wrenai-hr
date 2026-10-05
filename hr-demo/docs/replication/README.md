@@ -12,7 +12,7 @@
 
 - 以下新业务示例以**接入已有 PostgreSQL 数据库**为例，不需要重建业务数据库。现有 HR 参考项目已迁移至 DuckDB，复现它请使用步骤 16 和[交付 README](../../README.md)。
 - 新项目名使用 `sales-bi`，连接配置名使用 `sales_demo`；替换时保持全文一致。
-- CLI 参数依据本 HR 项目安装的 **wrenai 0.13.4** 核对。升级版本后应先检查 `--help` 并回归。
+- CLI 参数依据本 HR 项目安装的 **wrenai 0.15.0** 核对。升级版本后应先检查 `--help` 并回归。
 - `[终端]` 是 Shell 命令；复制时去掉表格边框。末尾的 `\` 表示命令续行。
 - `[Agent]` 是发给新项目 Agent 的执行指令，**不是 Shell 命令**；模型、标准答案、验证器和仪表盘需要它依据新业务实际生成。
 - `[人工]` 是你或业务负责人需要提供或确认的内容。
@@ -67,11 +67,11 @@ source .venv/bin/activate
 |        | python3 --version                                                                         |
 |        | python3 -m venv .venv                                                                     |
 |        | source .venv/bin/activate                                                                 |
-|        | python -m pip install 'wrenai[postgres,memory]==0.13.4'                                   |
+|        | python -m pip install 'wrenai[postgres,memory]==0.15.0'                                   |
 |        | wren --version                                                                            |
 |        |                                                                                           |
-|        | 0.13.4 是 HR 项目的 CLI 版本，用于建立同版本基线。                                        |
-|        | 若当前 Python 无法安装依赖，使用 Python 3.12 创建新的虚拟环境。                           |
+|        | 0.15.0 是 HR 项目的 CLI 版本，用于建立同版本基线。                                        |
+|        | 若当前 Python 无法安装依赖，使用 Python 3.14 创建新的虚拟环境。                           |
 |        | 不复制旧 .venv，其中可能包含旧绝对路径。                                                  |
 |        |                                                                                           |
 |        | 验收：wren --version 正常输出。                                                           |
@@ -312,7 +312,7 @@ source .venv/bin/activate
 |        | cd <wrenai-hr 克隆路径>                                                                   |
 |        | python3 hr-demo/validation/v2/run_all.py                                              |
 |        |                                                                                           |
-|        | 当前环境：Python 3.12 + requirements-demo.txt，DuckDB public.duckdb 和项目 profile。      |
+|        | 当前环境：Python 3.14 + requirements-demo.txt，DuckDB public.duckdb 和项目 profile。      |
 |        | 初始化数据库与 profile 的具体步骤见 hr-demo/README.md；无需 Docker。                 |
 |        | 运行结果以当次退出码、汇总及明细为准；已有 PASS 记录不替代本次执行。                      |
 |        |                                                                                           |

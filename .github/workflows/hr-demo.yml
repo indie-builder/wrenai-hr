@@ -14,10 +14,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
-          python-version: "3.12"
+          python-version: "3.14"
       - name: Documentation checker tests
         run: python -m unittest discover -s scripts/tests -p 'test_check_docs.py' -v
       - name: Current documentation links and command paths
@@ -31,10 +31,10 @@ jobs:
       WREN_HOME: ${{ github.workspace }}/.ci/wren
       PYTHONDONTWRITEBYTECODE: "1"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
-          python-version: "3.12"
+          python-version: "3.14"
           cache: pip
           cache-dependency-path: requirements-demo.txt
       - name: Install pinned demo tools
@@ -76,7 +76,7 @@ jobs:
         run: .venv/bin/python hr-demo/validation/v2/eval/nl_eval.py export --output-dir .ci/nl-package
       - name: Upload verification outputs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: hr-demo-validation
           path: |
@@ -84,7 +84,7 @@ jobs:
             .ci/nl-package
           if-no-files-found: ignore
       - name: Upload complete generated dashboard
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: hr-dashboard
           path: hr-demo/wren-project/apps/hr-overview

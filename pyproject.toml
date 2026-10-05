@@ -2,14 +2,14 @@
 name = "wrenai-hr-mcp"
 version = "0.1.0"
 description = "Authenticated read-only HR analytics over MCP Streamable HTTP"
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.14,<3.15"
 dependencies = [
   "mcp==2.3.0",
   "fastapi==0.142.2",
   "uvicorn==0.54.0",
-  "duckdb==1.5.5",
-  "wren-core-py==0.7.6",
-  "sqlglot==30.18.0",
+  "duckdb==1.5.6",
+  "wren-core-py==0.8.0",
+  "sqlglot==30.21.0",
   "PyYAML==6.0.3",
 ]
 

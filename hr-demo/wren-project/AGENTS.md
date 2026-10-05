@@ -20,7 +20,7 @@
    ../../.venv/bin/wren memory recall -q "用户问题" --limit 3
    ```
 
-   若 schema 输出过大，将**完整结果**保存到仓库外临时文件，再按模型或节分段读取；保留读取状态直至所需模型、关联与字段已确认。instructions、fetch、recall 分开调用，便于识别截断和执行失败。Wren 0.13.4 的 fetch 可能选择 full 策略，此时 `--model`、`--type` 不会缩小输出；它们只作用于 search 策略。使用搜索策略前核对 `memory fetch --help`、可选 memory 依赖与索引状态。
+   若 schema 输出过大，将**完整结果**保存到仓库外临时文件，再按模型或节分段读取；保留读取状态直至所需模型、关联与字段已确认。instructions、fetch、recall 分开调用，便于识别截断和执行失败。Wren 0.15.0 的 `recall` 直接以 `knowledge/sql/` 为索引（grep 后端，始终同步）；`fetch` 按规模选择 full 或 search 策略（`--threshold` 控制），`--model`、`--type` 只作用于 search 策略。使用搜索策略前核对 `memory fetch --help` 与可选 memory 依赖。
 
 3. 聚合问题先检查 `cube list` 和 `cube describe <name>`；已有指标及维度覆盖时优先 `cube query`，用 `--sql-only` 检查 SQL。其他问题编写 MDL SQL，依次验证并执行：
 

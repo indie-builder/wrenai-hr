@@ -17,16 +17,16 @@ jobs:
       UV_PROJECT_ENVIRONMENT: .venv-mcp
       PYTHONDONTWRITEBYTECODE: "1"
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
         with:
           enable-cache: true
-          python-version: '3.12'
+          python-version: '3.14'
       - name: Install locked MCP dependencies
         run: uv sync --locked
       - name: Install semantic verification tools in a separate environment
         run: |
-          uv venv .venv --python 3.12
+          uv venv .venv --python 3.14
           uv pip install --python .venv/bin/python -r requirements-demo.txt
       - name: YAML compiler agrees with isolated Wren build
         run: .venv/bin/python hr-demo/validation/v2/check_semantics.py --build-check
