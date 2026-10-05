@@ -29,3 +29,6 @@ hr-demo/validation/v2/results/*.execution.json
 
 # Unmodified upstream reference clone; install Wren separately
 /vendor/
+
+# Local agent worktrees
+.claude/worktrees/
