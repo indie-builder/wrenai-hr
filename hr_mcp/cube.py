@@ -4,7 +4,7 @@ from __future__ import annotations
 import copy
 import math
 
-from hr_mcp.contracts import MAX_FILTER_VALUES, MAX_MEMBERS, fail
+from hr_mcp.contracts import CUBE_OPERATORS, MAX_FILTER_VALUES, MAX_MEMBERS, fail
 
 
 def _selection(value, allowed, *, required=False):
@@ -32,8 +32,6 @@ def validate_cube_request(mdl, cube, measures, dimensions, filters=None):
         filters = []
     if not isinstance(filters, list) or len(filters) > MAX_MEMBERS:
         fail("INVALID_ARGUMENT")
-    operators = {"eq", "neq", "gt", "gte", "lt", "lte", "in", "not_in",
-                 "contains", "starts_with", "is_null", "is_not_null"}
 
     def scalar(value):
         return ((isinstance(value, str) and len(value) <= 1000)
@@ -45,7 +43,7 @@ def validate_cube_request(mdl, cube, measures, dimensions, filters=None):
     for item in filters:
         if (not isinstance(item, dict) or set(item) - {"dimension", "operator", "value"}
                 or not isinstance(item.get("dimension"), str) or item["dimension"] not in filter_names
-                or not isinstance(item.get("operator"), str) or item["operator"] not in operators):
+                or not isinstance(item.get("operator"), str) or item["operator"] not in CUBE_OPERATORS):
             fail("INVALID_ARGUMENT")
         operator, value = item["operator"], item.get("value")
         if operator in {"is_null", "is_not_null"}:

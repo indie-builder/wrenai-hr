@@ -23,8 +23,6 @@ from hr_mcp.engine import AnalyticsEngine, file_digest
 from hr_query.semantic import build_mdl
 from scripts.mcp_context import public_context
 
-LEGACY_BUNDLE_FILES = (*BUNDLE_FILES, "sql_policy.py", "sql_worker.py")
-
 
 def write_json(path, value):
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False) + "\n", encoding="utf-8")
@@ -59,10 +57,10 @@ def release_info(root):
     project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["project"]
     if project["version"] != VERSION:
         raise ValueError("应用版本与 pyproject.toml 不一致。")
-    dependencies = {requirement.split("==", 1)[0]: version(requirement.split("==", 1)[0])
-                    for requirement in project["dependencies"]}
+    dependencies = {}
     for requirement in project["dependencies"]:
         name, expected = requirement.split("==", 1)
+        dependencies[name] = version(name)
         if dependencies[name] != expected:
             raise ValueError("构建环境依赖与声明版本不一致。")
     try:
@@ -76,7 +74,7 @@ def release_info(root):
 
 
 def validate_previous_bundle(output_dir):
-    """Replace only a complete, intact v1/v2 bundle, never unrelated files."""
+    """Replace only a complete, intact current-format bundle, never unrelated files."""
     if output_dir.is_symlink():
         raise ValueError("输出目录不能是符号链接。")
     if not output_dir.exists():
@@ -89,13 +87,13 @@ def validate_previous_bundle(output_dir):
     previous = json.loads(manifest_path.read_text(encoding="utf-8"))
     if not isinstance(previous, dict):
         raise ValueError("已有 bundle 的清单无效。")
-    expected_files = {1: LEGACY_BUNDLE_FILES, BUNDLE_FORMAT_VERSION: BUNDLE_FILES}.get(previous.get("format_version"))
     files = previous.get("files")
-    if (expected_files is None or previous.get("snapshot_date") != SNAPSHOT_DATE
-            or not isinstance(files, dict) or set(files) != set(expected_files)
-            or {path.name for path in output_dir.iterdir()} != {*expected_files, "manifest.json"}):
+    if (previous.get("format_version") != BUNDLE_FORMAT_VERSION
+            or previous.get("snapshot_date") != SNAPSHOT_DATE
+            or not isinstance(files, dict) or set(files) != set(BUNDLE_FILES)
+            or {path.name for path in output_dir.iterdir()} != {*BUNDLE_FILES, "manifest.json"}):
         raise ValueError("已有输出目录不是可替换的 MCP bundle。")
-    for name in expected_files:
+    for name in BUNDLE_FILES:
         path = output_dir / name
         if not path.is_file() or path.is_symlink() or file_digest(path) != files[name]:
             raise ValueError("已有 bundle 文件不完整或哈希不符；保留原目录。")

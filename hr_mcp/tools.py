@@ -5,10 +5,18 @@ from typing import Any
 
 from mcp.types import CallToolResult, TextContent, ToolAnnotations
 
-from hr_mcp.contracts import MCPQueryError
+from hr_mcp.contracts import CUBE_OPERATORS, MAX_FILTER_VALUES, MAX_MEMBERS, MCPQueryError
 
 READ_ONLY = ToolAnnotations(
     readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False
+)
+
+OPERATOR_PROSE = "、".join(CUBE_OPERATORS[:-1]) + f" 或 {CUBE_OPERATORS[-1]}"
+CUBE_DESCRIPTION = (
+    f"查询 Cube。measures 需 1–{MAX_MEMBERS} 项；dimensions 可空、最多 {MAX_MEMBERS} 项。\n"
+    f"filters 最多 {MAX_MEMBERS} 项，每项 {{dimension, operator, value}}。operator 为 {OPERATOR_PROSE}。\n"
+    f"普通比较 value 为标量，in/not_in 为 1–{MAX_FILTER_VALUES} 值的数组；is_null/is_not_null 无需 value。"
+    "模型成员来自 describe_cube；日期时间维度也可以用于 filters。"
 )
 
 
@@ -44,12 +52,7 @@ TOOLS = (
      "校验并规划单条只读 MDL SQL，不执行查询；禁止写入、外部文件和网络访问。"),
     ("query_sql", "query_sql", _sql, None,
      "执行单条只读 MDL SQL，返回有界结果与快照日期；执行前应先 plan_sql。"),
-    ("query_cube", "query_cube", _cube, None,
-     "查询 Cube。measures 需 1–16 项；dimensions 可空、最多 16 项。\n"
-     "filters 最多 16 项，每项 {dimension, operator, value}。operator 为 eq、neq、"
-     "gt、gte、lt、lte、in、not_in、contains、starts_with、is_null 或 is_not_null。\n"
-     "普通比较 value 为标量，in/not_in 为 1–50 值的数组；is_null/is_not_null 无需 value。"
-     "模型成员来自 describe_cube；日期时间维度也可以用于 filters。"),
+    ("query_cube", "query_cube", _cube, None, CUBE_DESCRIPTION),
 )
 
 
