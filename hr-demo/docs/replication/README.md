@@ -80,7 +80,7 @@ wren memory recall -q "2025 年月度净销售额是多少？" --limit 3
 
 ## 建立两种独立验证
 
-让 Agent 参考[题库](../../validation/v2/questions.py)、[共享执行核心](../../validation/v2/query_execution.py)和[比较规则](../../validation/v2/result_contract.py)，创建新项目的 `validation/run_all.py`。标准路径直连 PostgreSQL，被测路径经过 Wren，使用相同数据时点。HR runner 的 DuckDB 连接不能直接复用。
+让 Agent 参考[题库](../../validation/v2/questions.py)、[共享执行核心](../../../src/hr_analytics/execution.py)和[比较规则](../../../src/hr_contracts/tables.py)，创建新项目的 `validation/run_all.py`。标准路径直连 PostgreSQL，被测路径经过 Wren，使用相同数据时点。HR runner 的 DuckDB 连接不能直接复用。
 
 验证器必须检查退出码和超时，区分失败与合法空结果，比较列名、行数、数值精度和必要顺序。保留题号、业务域、两条 SQL、汇总与执行证据；子集运行不得覆盖全量报告，失败返回非零退出码。
 

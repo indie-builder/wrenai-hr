@@ -67,8 +67,8 @@ class BundleTests(ErrorAssertions, unittest.TestCase):
         self.assertEqual((len(manifest["table_rows"]), sum(manifest["table_rows"].values())), (25, 273515))
         self.assertEqual(manifest["files"]["public.duckdb"], file_digest(self.data / "public.duckdb"))
         self.assertFalse(any("knowledge/sql" in path or "/target/" in path for path in manifest["sources"]))
-        for source in ("hr_query/sql_policy.py", "hr_query/duckdb_worker.py", "hr_query/semantic.py",
-                       "hr_mcp/contracts.py", "hr_mcp/server.py", "scripts/mcp_context.py",
+        for source in ("src/hr_query/sql_policy.py", "src/hr_query/duckdb_worker.py", "src/hr_query/semantic.py",
+                       "src/hr_mcp/contracts.py", "src/hr_mcp/server.py", "scripts/mcp_context.py",
                        "hr-demo/wren-project/wren_project.yml", "pyproject.toml", "uv.lock", "vercel.json"):
             self.assertIn(source, manifest["sources"])
         seeds = {path for path in manifest["sources"] if path.startswith("hr-demo/db/seed/")}
@@ -80,7 +80,7 @@ class BundleTests(ErrorAssertions, unittest.TestCase):
         sys.path.insert(0, str(ROOT / "hr-demo/validation/v2"))
         try:
             from questions import QUESTIONS
-            from result_contract import compare, comparison_options, table_csv
+            from hr_contracts.tables import compare, comparison_options, table_csv
         finally:
             sys.path.pop(0)
         self.assertEqual(len(QUESTIONS), 41)

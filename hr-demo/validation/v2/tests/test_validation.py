@@ -9,9 +9,9 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-import query_execution as execution
+from hr_analytics import execution
 import run_all as runner
-from result_contract import compare, compare_tables, parse_csv
+from hr_contracts.tables import compare, compare_tables, parse_csv
 
 
 class ComparisonTests(unittest.TestCase):
@@ -89,7 +89,7 @@ class ExecutionTests(unittest.TestCase):
         self.assertTrue(result.ok)
         self.assertTrue(result.stderr_present)
         with patch.object(execution, "run_process", return_value=execution.Execution("n\n1", 0)):
-            self.assertEqual(execution.run_wren("SELECT 1", env={}).status, "invalid_output")
+            self.assertEqual(execution.run_wren("SELECT 1", project=Path("/unused"), env={}).status, "invalid_output")
 
     def test_missing_env_and_literal_values_preserve_existing_environment(self):
         with tempfile.TemporaryDirectory() as directory:

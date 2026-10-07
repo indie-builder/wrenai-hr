@@ -2,9 +2,9 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "fastapi",
   "functions": {
-    "hr_mcp/server.py": {
+    "backend/server.py": {
       "maxDuration": 60,
-      "excludeFiles": "{.git/**,.github/**,.agents/**,.claude/**,.venv/**,.venv-mcp/**,vendor/**,tests/**,scripts/**,hr-demo/**,**/__pycache__/**,**/*.pyc}"
+      "excludeFiles": "{.audit/**,dist/**,.git/**,.github/**,.agents/**,.claude/**,.venv/**,.venv-mcp/**,vendor/**,tests/**,scripts/**,hr-demo/**,**/__pycache__/**,**/*.pyc}"
     }
   }
 }

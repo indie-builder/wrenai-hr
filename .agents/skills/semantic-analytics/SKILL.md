@@ -9,7 +9,7 @@ description: 在语义层(WrenAI MDL)上构建并验证业务分析交付的领�
 
 - wren CLI(`pip install 'wrenai[memory]==0.15.0'`,内含 DuckDB 1.5)
 - Python `duckdb` 模块(A 路径直连物理表用):`pip install duckdb`
-- 独立复制 runner 时同时复制 `scripts/query_execution.py` 与 `scripts/result_contract.py` 的实际内容（仓库内为规范模块链接，指向 `hr-demo/validation/v2/`），保持同目录；GT 执行还需上级 `hr_query/duckdb_worker.py`。仅依赖标准库与 DuckDB。
+- 仓库内先安装分析环境。向其他项目交付 runner 时，从仓库根运行 `python3 scripts/export_runner.py /tmp/hr-offline-runner`，移动整个输出目录并执行其中 `run_all.py`。导出携带规范 `hr_contracts`、`hr_analytics` 与只读 worker，无符号链接、HR 题库或私有数据库。目标解释器仍需 DuckDB，Wren CLI 通过 `WREN_BIN` 指定。
 - 仿真数据一律固定随机种子,交付物必须完全可复现
 
 ## 工作流(7 阶段)
@@ -85,4 +85,4 @@ context instructions → memory fetch/recall → dry-plan → query → 验证�
 ## 可替换点
 
 - 语义引擎当前耦合 wren CLI(profile/memory/dry-plan)。换引擎时替换 ④⑥⑦ 三步的工具调用,管道形状(造数→库→语义→双路径验证)不变
-- `scripts/run_all.py` 与 HR 验证共用 `result_contract.py` 与 `query_execution.py` 核心：完整 CSV、Decimal 容差、布尔/空值归一、有序或多重集比较，进程纪律与证据写入也在共享核心。缺失或截断输出失败；合法空结果需保留表头并声明 `allow_empty=True`。更换 GT 执行器修改共享核心的 `run_gt`。
+- `scripts/run_all.py` 与 HR 验证共用 `hr_contracts.tables` 与 `hr_analytics.execution` 核心：完整 CSV、Decimal 容差、布尔/空值归一、有序或多重集比较，进程纪律与证据写入也在共享核心。缺失或截断输出失败；合法空结果需保留表头并声明 `allow_empty=True`。更换 GT 执行器修改共享核心的 `run_gt`。

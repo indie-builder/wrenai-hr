@@ -5,7 +5,7 @@ import shutil
 import sqlglot
 from sqlglot import exp
 
-from query_execution import digest, write_json
+from hr_analytics.execution import digest, write_json
 
 RECORD_TYPES = {"id": str, "question": str, "generated_sql": (str, type(None)), "context_refs": list}
 OPTIONAL_TYPES = {"model": str, "run_metadata": dict}

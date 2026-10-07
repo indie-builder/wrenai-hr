@@ -6,21 +6,19 @@ import importlib.metadata
 import json
 from pathlib import Path
 import shutil
-import sys
 import tempfile
 
 import duckdb
 import dashboard_queries as queries
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "hr-demo/validation/v2"))
-import result_contract
-import query_execution
+from hr_contracts import tables as result_contract
+from hr_contracts import serialization
 
 GENERATED = ("data", "mdl.json", "snapshot-manifest.json")
 EXPORT_SOURCES = tuple(Path(path).resolve() for path in (
     Path(__file__).with_name("export_dashboard.py"), queries.__file__, __file__,
-    result_contract.__file__, query_execution.__file__))
+    result_contract.__file__, serialization.__file__))
 
 def field_value(row, rule):
     if isinstance(rule, str):
@@ -49,11 +47,11 @@ def normalize_rows(rows, query):
 
 
 def canonical(value):
-    return query_execution.canonical(value).encode()
+    return serialization.canonical(value).encode()
 
 def input_hashes(source, spec):
-    return {"source_mdl_sha256": query_execution.digest(source), "query_spec_sha256": query_execution.digest(spec),
-            "exporter_sha256": hashlib.sha256(canonical({str(p.relative_to(ROOT)): query_execution.digest(p)
+    return {"source_mdl_sha256": serialization.digest(source), "query_spec_sha256": serialization.digest(spec),
+            "exporter_sha256": hashlib.sha256(canonical({p.name: serialization.digest(p)
                                                         for p in EXPORT_SOURCES})).hexdigest()}
 
 def sql_string(value):
@@ -99,10 +97,10 @@ def manifest_for(con, directory, mdl, spec, inputs):
                       f"快照内容与源数据不一致: {name}")
         count, source_digest = table_digest(con, queries.quote(name), columns)
         entries.append({"name": name, "file": f"data/{name}.parquet", "columns": columns,
-                        "rows": count, "sha256": query_execution.digest(path), "bytes": path.stat().st_size,
+                        "rows": count, "sha256": serialization.digest(path), "bytes": path.stat().st_size,
                         "source_content_sha256": source_digest})
     return {"version": 1, "snapshot_date": spec["snapshot_date"], **inputs,
-            "mdl_sha256": query_execution.digest(directory / "mdl.json"),
+            "mdl_sha256": serialization.digest(directory / "mdl.json"),
             "duckdb_version": importlib.metadata.version("duckdb"),
             "wren_core_version": importlib.metadata.version("wren-core-py"),
             "row_policy": "all_rows_no_time_filter", "tables": entries}
@@ -178,7 +176,7 @@ def staged_results(destination, results):
             yield staged
 
 def authored_hashes(app):
-    return {str(p.relative_to(app)): query_execution.digest(p) for p in app.rglob("*")
+    return {str(p.relative_to(app)): serialization.digest(p) for p in app.rglob("*")
             if p.is_file() and p.relative_to(app).parts[0] not in GENERATED}
 
 def export(con, app, source, mdl, spec, plans, inputs, input_paths, results_path=None):

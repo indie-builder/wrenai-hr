@@ -21,7 +21,7 @@
 | 了解交付范围 | [根 README](README.md)，再按任务选择下方入口 |
 | 初始化环境、复现 HR 演示、修复 profile | [演示 README：环境与首次初始化](hr-demo/README.md#环境与首次初始化)；分析使用 `.venv`，MCP 使用 `.venv-mcp` |
 | 业务问数、修改模型或知识 | [语义项目 AGENTS](hr-demo/wren-project/AGENTS.md) 和 [业务规则](hr-demo/wren-project/knowledge/rules/general.md)；进入 `wren-project/` 时同时遵守该目录的约定 |
-| 修改 MCP、共享 SQL 校验或查询执行 | [MCP 说明](hr-demo/docs/mcp-vercel.md)；`hr_mcp/` 维护传输、规划与调度，`hr_query/` 维护共享 SQL policy 与只读执行，`tests/` 验证公开调用行为 |
+| 修改 MCP、共享 SQL 校验或查询执行 | [MCP 说明](hr-demo/docs/mcp-vercel.md)；`src/hr_mcp/` 维护传输、规划与调度，`src/hr_query/` 维护共享 SQL policy 与只读执行，`tests/` 验证公开调用行为 |
 | 修改仪表盘、同步页面数据 | [演示 README：仪表盘](hr-demo/README.md#仪表盘快照与本地预览)；需求修改 [query-spec.json](hr-demo/wren-project/apps/hr-overview/query-spec.json)，导出与核对使用 [export_dashboard.py](hr-demo/scripts/export_dashboard.py) |
 | 修改数据种子或装载过程 | [演示 README：数据与初始化](hr-demo/README.md#数据与查询路径)，再定位 `hr-demo/db/`；任一种子来源清单校验失败时保留原库并报错 |
 | 修改固定 SQL 回归或自然语言评测 | [验证入口](hr-demo/validation/v2/README.md)；题库与标准答案在 [questions.py](hr-demo/validation/v2/questions.py)，运行状态由当次报告判断 |
@@ -36,3 +36,6 @@
 - 合并 PR 前确认分支基于最新 `main`：CI 构建合并结果，Vercel 预览构建分支自身快照；旧基线分支出现"CI 通过但预览失败"时先变基再重查，不能只看 CI 通过。
 - 文件预检、SQL 对照、自然语言评测、本地 HTTP、Linux CI 和公网调用分别报告；完成时说明修改文件、实际验证与未验证范围。
 - 大输出先限定文件、节或条目；检索完整输出保存后分段读取。续接摘要保留已读文件、已加载技能、验证结果和待办，未变内容沿用已有结果。依赖诊断从当前任务的依赖声明取得发行包名，导入名和第三方源码位置从当前解释器确认后再枚举文件。
+
+- Python 包从 `src/` 安装后使用。纯结果契约在 `src/hr_contracts/`，离线进程与评分在 `src/hr_analytics/`；仓库路径默认值留在 CLI，包内导入方向由 `scripts/check_architecture.py` 检查。
+- 本地与 CI 共用 `python3 scripts/verify.py docs analysis data mcp installation`。全新环境加 `--fresh-data` 使用临时库和隔离 profile；安装产物另跑 `python3 scripts/verify.py installation`。环境同步见演示 README。

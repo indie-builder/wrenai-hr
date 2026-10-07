@@ -2,7 +2,7 @@
 
 基于 WrenAI 当前 Agent 驱动的 GenBI 架构，演示 HR 数据建模、业务问数、固定 SQL 回归和浏览器仪表盘。公司“星辰科技”与全部人员数据均为虚构，数据快照日固定为 **2026-08-31**。
 
-`hr-demo/` 集中维护演示的数据源、语义定义、仪表盘、验证程序和文档，包含规范源与可重建交付产物。根目录 `hr_mcp/`、`hr_query/` 维护查询运行代码；MCP 构建使用本工作区，线上函数不打包整个目录。
+`hr-demo/` 集中维护演示的数据源、语义定义、仪表盘、验证程序和文档，包含规范源与可重建交付产物。`src/hr_mcp/`、`src/hr_query/` 维护查询运行代码；MCP 构建使用本工作区，线上函数不打包整个目录。
 
 - 完整的按任务路由见根 [AGENTS.md](../AGENTS.md#按任务读取)。
 - 本页章节：[环境与首次初始化](#环境与首次初始化)、[构建、问数与更新](#构建问数与更新)、[验证](#验证)、[文档检查](#文档检查)、[仪表盘快照与本地预览](#仪表盘快照与本地预览)。
@@ -36,14 +36,11 @@
 以下命令从**仓库根目录**执行，推荐 Python 3.14。不要复制其他目录的虚拟环境。
 
 ```bash
-python3.14 -m venv .venv
-.venv/bin/python -m pip install -r requirements-demo.txt
-# 需要 embedding 检索时安装；固定 SQL 回归和导出无需此项
-.venv/bin/python -m pip install 'wrenai[memory]==0.15.0'
+UV_PROJECT_ENVIRONMENT=.venv uv sync --locked --no-default-groups --group analysis
 .venv/bin/wren --version
 ```
 
-[requirements-demo.txt](../requirements-demo.txt)固定 Wren 0.15.0、引擎、DuckDB、SQLGlot、Arrow、YAML 的已验证版本；它不是包含全部传递依赖的锁文件。
+[pyproject.toml](../pyproject.toml) 声明共享依赖、默认 `service` 组与 `analysis` 组，[uv.lock](../uv.lock) 锁定全部传递依赖。两个环境安装同一源码包，分析环境不安装服务组。需要 embedding 检索时，运行 `uv pip install --python .venv/bin/python 'wrenai[memory]==0.15.0'`。该可选扩展不属于当前分析锁定集合，后续 exact sync 会移除扩展；固定 SQL 与仪表盘不依赖它。
 
 首次创建或明确需要重建演示库时执行：
 
@@ -105,7 +102,9 @@ Cube 返回结果不承诺顺序；展示趋势时显式按月份排序。模型
 
 ## 验证
 
-[当前验证入口](validation/v2/README.md) 维护固定 SQL 全量/子集回归、比较规则、工具测试、语义构建检查与独立自然语言评测的命令；回归、自然语言评测与仪表盘导出共用 [result_contract.py](validation/v2/result_contract.py) 的比较与输出约定。根据改动选择检查，使用当次退出码和报告判断结果；历史记录仅用于追溯。
+[当前验证入口](validation/v2/README.md) 维护固定 SQL 全量/子集回归、比较规则、工具测试、语义构建检查与独立自然语言评测的命令；回归、自然语言评测与仪表盘导出共用 [hr_contracts.tables](../src/hr_contracts/tables.py) 的比较与输出约定。根据改动选择检查，使用当次退出码和报告判断结果；历史记录仅用于追溯。
+
+先按上文安装分析环境，并按 [MCP 本地运行](docs/mcp-vercel.md#本地运行) 安装服务环境。统一执行 `python3 scripts/verify.py docs analysis data mcp installation`。首次检出加 `--fresh-data`，从种子构建临时库并创建隔离 profile，再构建语义产物、导出和核对页面。默认 `data` 只读现库并检查已有快照。`installation` 检查非 editable 包、隔离依赖和真实 worker。
 
 CI 配置见 [hr-demo.yml](../.github/workflows/hr-demo.yml)：文档检查独立运行；分析检查在新工作区安装依赖、建库、配置隔离 profile、运行回归和快照检查。云端 CI 是否通过以 GitHub 实际运行记录为准。
 

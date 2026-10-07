@@ -7,8 +7,10 @@ import unittest
 from _support import TemporaryScriptTests, cases, load_module
 
 SKILL_SCRIPTS = Path(__file__).resolve().parents[2] / ".agents/skills/semantic-analytics/scripts"
-RUN_ALL, LOAD_DB, SCAFFOLD, CONTRACT = (
-    load_module(SKILL_SCRIPTS / f"{name}.py") for name in ("run_all", "load_db", "scaffold", "result_contract"))
+from hr_contracts import tables as CONTRACT
+
+RUN_ALL, LOAD_DB, SCAFFOLD = (
+    load_module(SKILL_SCRIPTS / f"{name}.py") for name in ("run_all", "load_db", "scaffold"))
 HAS_DUCKDB = importlib.util.find_spec("duckdb") is not None
 HAS_YAML = importlib.util.find_spec("yaml") is not None
 
@@ -65,9 +67,6 @@ class LoadDatabaseTests(TemporaryScriptTests):
 
 
 class CompareTests(unittest.TestCase):
-    # 冒烟：仅验证技能 runner 的实际调用形态 CONTRACT.compare(...)[:2]；被测
-    # result_contract.py 是指向 hr-demo/validation/v2/result_contract.py 的符号链接，
-    # 完整比对契约矩阵的权威用例在 hr-demo/validation/v2/tests/test_validation.py 维护。
     def test_compare_tuple_slice_call_shape(self):
         ok, message = CONTRACT.compare("v\n2\n1\n2\n", "v\n2\n2\n1\n", ordered=False, tolerance=0)[:2]
         self.assertTrue(ok, message)

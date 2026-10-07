@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""双路径 SQL 回归。共享执行与比较核心同目录，可独立复制。
+"""双路径 SQL 回归。使用已安装包或 export_runner.py 生成的完整目录。
 
 全量写题库同级 results/；子集写其 runs/，失败清理该题 CSV。
 WREN_BIN 指定 Wren CLI，默认使用 PATH 上的 wren。
@@ -11,10 +11,9 @@ import runpy
 import shutil
 import sys
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from query_execution import (load_env, positive_timeout, regression_questions,
+from hr_analytics.execution import (load_env, positive_timeout, regression_questions,
                              regression_directory, run_regression)
-from result_contract import numeric_tolerance
+from hr_contracts.tables import numeric_tolerance
 
 
 def main(argv=None):

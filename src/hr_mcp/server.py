@@ -29,9 +29,7 @@ def create_app(
     """Create one runtime; None reads configuration once from the environment."""
     runtime = Runtime(
         engine, os.environ.get("MCP_AUTH_TOKEN") if token is None else token,
-        data_dir=data_dir if data_dir is not None else Path(
-            os.environ.get("MCP_DATA_DIR", str(Path(__file__).parent / "data"))
-        ),
+        data_dir=data_dir if data_dir is not None else os.environ.get("MCP_DATA_DIR"),
         engine_factory=engine_factory,
     )
     hosts, origins = allowlists(allowed_hosts, allowed_origins)

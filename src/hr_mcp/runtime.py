@@ -17,14 +17,14 @@ def load_engine(data_dir: Path) -> Any:
 class Runtime:
     """Keep query slots until synchronous work ends, including after cancellation."""
 
-    def __init__(self, engine: Any, token: str | None, *, data_dir: Path,
+    def __init__(self, engine: Any, token: str | None, *, data_dir: Path | None,
                  engine_factory: Callable[[Path], Any] | None = None):
         self.token = token
         self.token_ready = bool(token and len(token) >= 32 and token.isascii()
                                 and not any(character.isspace() for character in token))
         self._engine = engine
         self._injected_engine = engine is not None
-        self._data_dir = Path(data_dir)
+        self._data_dir = Path(data_dir) if data_dir is not None else None
         self._engine_factory = engine_factory or load_engine
         self._ready = self._injected_engine
         self._readiness_lock = anyio.Lock()
@@ -36,7 +36,7 @@ class Runtime:
     def _load(self):
         if self._injected_engine:
             return self._engine
-        if not all((self._data_dir / name).is_file() for name in (*BUNDLE_FILES, "manifest.json")):
+        if self._data_dir is None or not all((self._data_dir / name).is_file() for name in (*BUNDLE_FILES, "manifest.json")):
             return None
         return self._engine if self._engine is not None else self._engine_factory(self._data_dir)
 

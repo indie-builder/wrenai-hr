@@ -69,7 +69,7 @@ def smoke():
         listener.listen()
         base = f"http://127.0.0.1:{listener.getsockname()[1]}"
         with subprocess.Popen(
-            [sys.executable, "-m", "uvicorn", "hr_mcp.server:app", "--fd", str(listener.fileno()),
+            [sys.executable, "-m", "uvicorn", "backend.server:app", "--fd", str(listener.fileno()),
              "--log-level", "warning", "--no-access-log"], cwd=ROOT,
             env={"PATH": os.defpath, "LANG": "C.UTF-8", "MCP_AUTH_TOKEN": token},
             pass_fds=(listener.fileno(),), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,

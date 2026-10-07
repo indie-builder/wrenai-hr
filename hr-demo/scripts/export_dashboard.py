@@ -25,13 +25,14 @@ def main(argv=None):
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--check", action="store_true", help="只读检查过期、文件完整性及全部查询结果")
     mode.add_argument("--validate-spec", action="store_true", help="检查配置、依赖闭包与 SQL 规划；不读数据库/不导出")
+    parser.add_argument("--database", type=Path, default=DATABASE)
     parser.add_argument("--results-json", type=Path, help="通过后将标准化聚合结果写到指定路径，供浏览器结果比对")
     args = parser.parse_args(argv)
     lock = None
     try:
         export_lock = APP.parent / ".hr-overview-export.lock"
         results_path = snapshot.results_destination(args.results_json.resolve(), APP,
-            [SOURCE_MDL, SPEC, DATABASE, export_lock]) if args.results_json else None
+            [SOURCE_MDL, SPEC, args.database, export_lock]) if args.results_json else None
         source, spec = read_inputs()
         inputs = snapshot.input_hashes(SOURCE_MDL, SPEC)
         mdl = queries.prune_mdl(source, spec)
@@ -39,7 +40,7 @@ def main(argv=None):
         if args.validate_spec:
             print(f"PASS: {len(mdl['models'])} 表 / {len(mdl['views'])} 视图 / {len(mdl['cubes'])} Cube / {len(plans)} 查询规划；未导出")
             return 0
-        if not DATABASE.is_file():
+        if not args.database.is_file():
             raise ValueError("缺少 db/duckdb/public.duckdb；请先构建数据库")
         if not args.check:
             try:
@@ -47,7 +48,7 @@ def main(argv=None):
             except FileExistsError as exc:
                 raise ValueError("已有仪表盘导出在运行；若上次进程中断，请确认后清理导出锁") from exc
             lock = export_lock
-        with duckdb.connect(str(DATABASE), read_only=True) as con:
+        with duckdb.connect(str(args.database), read_only=True) as con:
             con.execute("BEGIN TRANSACTION")
             results = (snapshot.check_assets(con, APP, source, mdl, spec, plans, inputs) if args.check else
                        snapshot.export(con, APP, source, mdl, spec, plans, inputs, (SOURCE_MDL, SPEC), results_path))

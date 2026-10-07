@@ -26,6 +26,8 @@ hr-demo/db/duckdb/
 hr-demo/validation/v2/runs/
 hr-demo/validation/v2/results/*.execution.json
 .ci/
+.audit/
+dist/
 
 # Unmodified upstream reference clone; install Wren separately
 /vendor/

@@ -48,6 +48,13 @@ class DashboardPublicationTests(unittest.TestCase):
         self.validate = self.mock(snapshot, "validate_results", return_value=self.results)
         self.connect = self.mock(duckdb, "connect", return_value=MagicMock())
 
+    def test_explicit_database_works_without_development_database(self):
+        missing = self.root / "missing/public.duckdb"
+        with patch.object(exporter, "DATABASE", missing), contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(exporter.main(["--check", "--database", str(self.database)]), 0)
+        self.connect.assert_called_once_with(str(self.database), read_only=True)
+        self.assertFalse(missing.exists())
+
     def mock(self, module, name, **options):
         return self.stack.enter_context(patch.object(module, name, **options))
 
@@ -187,7 +194,7 @@ class DashboardBoundaryTests(unittest.TestCase):
 
     def test_exporter_fingerprint_covers_all_modules(self):
         self.assertEqual(set(snapshot.EXPORT_SOURCES), {Path(module.__file__).resolve() for module in
-            (exporter, queries, snapshot, snapshot.result_contract, snapshot.query_execution)})
+            (exporter, queries, snapshot, snapshot.result_contract, snapshot.serialization)})
         with tempfile.TemporaryDirectory() as temporary:
             paths = [Path(temporary) / name for name in ("source", "spec", "cli", "semantics", "snapshot", "compare")]
             for path in paths:

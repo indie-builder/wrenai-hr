@@ -6,21 +6,21 @@
 
 ## 组成
 
-- `hr_mcp/server.py`、`tools.py`：FastAPI 与官方 MCP SDK 2.3.0 的装配；工具注册表集中声明名称、参数和引擎方法，无状态 HTTP 返回 JSON。
-- `hr_mcp/contracts.py`：应用版本、快照日期、数据包格式与执行上限的统一定义。
-- `hr_mcp/runtime.py`、`transport.py`：查询容量、就绪检查与 HTTP 认证/请求防护。
-- `hr_mcp/engine.py`、`worker.py`、`cube.py`：分析 Interface、Wren 原生规划、Cube 请求校验和受限 DuckDB 查询，独立进程执行与超时控制。
-- `hr_query/sql_policy.py`、`duckdb_worker.py`：MCP 与离线验证共用的 SQL 白名单和只读执行代码；`semantic.py` 仅在构建时严格读取 YAML。包导入不加载 MCP SDK、DuckDB 或 YAML。
+- `src/hr_mcp/server.py`、`tools.py`：FastAPI 与官方 MCP SDK 2.3.0 的装配；工具注册表集中声明名称、参数和引擎方法，无状态 HTTP 返回 JSON。
+- `src/hr_mcp/contracts.py`：应用版本、快照日期、数据包格式与执行上限的统一定义。
+- `src/hr_mcp/runtime.py`、`transport.py`：查询容量、就绪检查与 HTTP 认证/请求防护。
+- `src/hr_mcp/engine.py`、`worker.py`、`cube.py`：分析 Interface、Wren 原生规划、Cube 请求校验和受限 DuckDB 查询，独立进程执行与超时控制。
+- `src/hr_query/sql_policy.py`、`duckdb_worker.py`：MCP 与离线验证共用的 SQL 白名单和只读执行代码；`semantic.py` 仅在构建时严格读取 YAML。包导入不加载 MCP SDK、DuckDB 或 YAML。
 - `scripts/prepare_mcp.py`：构建时从确定性种子与 YAML 生成私有 `hr_mcp/data/`；`mcp_context.py` 裁剪公开 schema 与业务上下文，不替换开发用数据库。
-- `pyproject.toml`、`uv.lock`：独立的 Python 3.14 运行依赖，不携带 Wren CLI、embedding、Arrow 或浏览器仪表盘。
-- `vercel.json`：服务入口及执行时长，排除仅用于构建的源数据和测试；`hr_query/` 随函数源码打包。
+- `pyproject.toml`、`uv.lock`：Python 3.14 的共享依赖与完整锁。默认 `service` 组安装 MCP、FastAPI、Uvicorn；分析组另装 Wren CLI 与 Arrow。wheel 包含四个代码包，服务环境不安装分析专属依赖。
+- `vercel.json`：文件入口 `backend/server.py` 及执行时长，排除仅用于构建的源数据和测试；`src/hr_query/` 随函数源码打包。
 - `scripts/smoke_mcp.py`：使用临时本地端口和内存 Token 启动实际 HTTP 服务，调用官方客户端检验鉴权、工具发现、真实查询与写入拒绝后关闭；设置 `MCP_URL` 时改为验证该部署。可直接复现本地与 CI 验证。
 
 快照为 **2026-08-31**。模型与数据更新后需要重新构建和部署。构建输入保留在仓库，但最终数据库放在函数私有目录；没有静态文件路由，不能把该目录移到 Vercel `public/`。
 
-数据包格式 v2 只包含 `public.duckdb`、`mdl.json`、`context.json` 和 `manifest.json`；共享 Python 源码保留在 `hr_query/`，不再复制进 `data/`。清单记录各数据文件哈希、确定性种子、语义定义、运行源码、构建脚本及部署配置的来源哈希，并记录应用版本、可取得的 Git 提交（无 Git 元数据时为 null）、锁文件摘要和实际直接依赖版本。仅当前格式的合法包会在检查后替换；构建经过 staging、真实 SQL/Cube 检查和源文件复核后才替换旧包，失败时保留旧包。
+数据包格式 v2 只包含 `public.duckdb`、`mdl.json`、`context.json` 和 `manifest.json`；共享 Python 源码保留在 `src/hr_query/`，不再复制进 `data/`。清单记录各数据文件哈希、确定性种子、语义定义、运行源码、构建脚本及部署配置的来源哈希，并记录应用版本、可取得的 Git 提交（无 Git 元数据时为 null）、锁文件摘要和实际直接依赖版本。仅当前格式的合法包会在检查后替换；构建经过 staging、真实 SQL/Cube 检查和源文件复核后才替换旧包，失败时保留旧包。
 
-MCP 与 Vercel 构建通过 `hr_query/semantic.py` 直接从规范 YAML 生成 MDL，不依赖已提交或本地缓存的 `target/mdl.json`；缓存与三方比对的权威说明见[语义项目工作流·已知限制](../wren-project/AGENTS.md#已知限制)。CI 的 `.venv` 安装官方语义工具，`.venv-mcp` 构建并测试查询运行代码；发布前需确认部署提交通过该检查。下方记录不证明分支保护或自动部署已等待全部检查。
+MCP 与 Vercel 构建通过 `src/hr_query/semantic.py` 直接从规范 YAML 生成 MDL，不依赖已提交或本地缓存的 `target/mdl.json`；缓存与三方比对的权威说明见[语义项目工作流·已知限制](../wren-project/AGENTS.md#已知限制)。CI 的 `.venv` 安装官方语义工具，`.venv-mcp` 构建并测试查询运行代码；发布前需确认部署提交通过该检查。下方记录不证明分支保护或自动部署已等待全部检查。
 
 ## 验收记录（按提交）
 
@@ -51,14 +51,14 @@ MCP 与 Vercel 构建通过 `hr_query/semantic.py` 直接从规范 YAML 生成 M
 以下命令从仓库根目录执行。使用独立环境，避免覆盖现有演示工具环境：
 
 ```bash
-UV_PROJECT_ENVIRONMENT=.venv-mcp uv sync --locked
-.venv-mcp/bin/python scripts/prepare_mcp.py
+UV_PROJECT_ENVIRONMENT=.venv-mcp uv sync --locked --group dev
+.venv-mcp/bin/python -m scripts.prepare_mcp
 # 创建被 Git 忽略、权限 0600 的 .env.mcp，不打印 Token，不覆盖已有文件
 .venv-mcp/bin/python scripts/create_mcp_token.py
 set -a
 . ./.env.mcp
 set +a
-.venv-mcp/bin/python -m uvicorn hr_mcp.server:app --host 127.0.0.1 --port 8320
+.venv-mcp/bin/python -m uvicorn backend.server:app --host 127.0.0.1 --port 8320
 ```
 
 另一个终端也可加载同一份由上述脚本创建的 `.env.mcp`，共享本地测试 Token。仅创建文件不会自动注入 Uvicorn，启动前需加载环境变量。不要 source 来历不明的 env 文件。环境变量说明在根 `.env.example`。
@@ -68,6 +68,8 @@ export MCP_URL=http://127.0.0.1:8320/mcp
 .venv-mcp/bin/python scripts/smoke_mcp.py
 .venv-mcp/bin/python -m unittest discover -s tests -v
 ```
+
+安装包 `create_app` 使用显式 `data_dir` 或 `MCP_DATA_DIR`。配置缺失时保持未就绪。`backend/server.py` 是部署适配入口，默认指向根 `hr_mcp/data/`，无需把私有数据放入 wheel。
 
 `GET /health` 仅返回服务状态、版本和快照日，不包含业务数据。Token 缺失或配置无效、数据包未准备好时服务不能报告 ready。未携带或携带错误 Token 的 `/mcp` 请求返回 `401`；Token 配置缺失返回 `503`。
 
@@ -80,7 +82,7 @@ GitHub Actions 的 pull_request 运行构建 PR 合并进主分支的结果；Ve
 1. 在已登录的 Vercel 控制台导入 GitHub 仓库，或通过 `npx vercel@latest login` / `npx vercel@latest link` 建立项目。项目 Root Directory 使用仓库根目录，Framework 选择 FastAPI。当前项目 `wrenai-hr-mcp` 绑定 GitHub `main`，合并代码后自动部署生产。
 2. 在 Vercel Project Settings → Environment Variables 中添加 `MCP_AUTH_TOKEN`，使用至少 32 字符的高熵随机值；建议生成 48 个随机字节的 URL-safe Token。生产与预览使用不同 Token。不要把 Token 放进 `vercel.json`、命令行参数或客户端前端代码。
 3. 默认识别 `VERCEL_URL` 和 `VERCEL_PROJECT_PRODUCTION_URL`。使用自定义域名时，把准确域名加入 `MCP_ALLOWED_HOSTS`（逗号分隔，示例 `hr-api.example.com`）。通常服务端调用不带 `Origin`，无需设置 CORS；若客户端确实发送 Origin，使用 `MCP_ALLOWED_ORIGINS` 指定完整源，例如 `https://your-app.example.com`。Origin 允许名单不等于开启跨域浏览器调用。
-4. 执行 `npx vercel@latest deploy --prod`。Vercel 安装锁定依赖后运行 `python scripts/prepare_mcp.py`，生成只读数据库及语义包，随后打包函数。无需上传本地 `.venv`、DuckDB、凭据或检索缓存。
+4. 执行 `npx vercel@latest deploy --prod`。Vercel 安装锁定依赖后运行 `python -m scripts.prepare_mcp`，生成只读数据库及语义包，随后打包函数。无需上传本地 `.venv`、DuckDB、凭据或检索缓存。
 5. 检查部署日志、`/health` 和远端 MCP。若 Vercel Deployment Protection 在 MCP 前面返回登录页或平台 `401`，需为此项目的生产访问选择允许服务端调用的保护设置，或配置 Vercel 官方 Automation Bypass；该平台访问层与本服务 Bearer Token 是两层独立控制。
 
 ```bash

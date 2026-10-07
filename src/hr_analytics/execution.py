@@ -1,8 +1,4 @@
-"""Restricted query processes, execution evidence and scoring; no DuckDB import here.
-
-Also the shared home for regression IO helpers: the skill runner reaches this
-module through a sibling symlink, so evidence writers must live beside Execution.
-"""
+"""Explicit-path query processes, regression scoring and execution evidence."""
 import csv
 from dataclasses import dataclass
 import hashlib
@@ -11,20 +7,14 @@ import math
 import os
 from pathlib import Path
 import re
-import shutil
 import subprocess
 import sys
 
-from result_contract import compare, comparison_options, parse_csv, table_csv, validate_table
+from hr_contracts.serialization import canonical, digest, write_json
+from hr_query import duckdb_worker
 
-ROOT = Path(__file__).resolve().parents[2]
-PROJECT = ROOT / "wren-project"
-WREN = ROOT.parent / ".venv/bin/wren"
-if not WREN.is_file():  # worktree 等缺仓库内 venv 时回退 PATH 上的 wren
-    WREN = shutil.which("wren") or WREN
-VENV_PY = ROOT.parent / ".venv/bin/python"
-DUCKDB_FILE = ROOT / "db/duckdb/public.duckdb"
-DUCKDB_WORKER = ROOT.parent / "hr_query/duckdb_worker.py"
+from hr_contracts.tables import compare, comparison_options, parse_csv, table_csv, validate_table
+
 SAFE_ERRORS = {"BinderException", "CatalogException", "ParserException", "IOException",
                "OutOfMemoryException", "PermissionException", "InvalidInputException",
                "ConversionException", "ValueError", "RowLimitExceeded", "KeyError", "TypeError",
@@ -52,7 +42,7 @@ class Execution:
         return f"{self.status} (exit={self.returncode}{detail})"
 
 
-def load_env(project=PROJECT, base=None):
+def load_env(project, base=None):
     """Literal dotenv; existing values win, and project files cannot alter runtime paths."""
     env = dict(os.environ if base is None else base)
     path = Path(project) / ".env"
@@ -99,11 +89,11 @@ def run_process(argv, *, cwd=None, env=None, timeout=180, input_text=None):
                      stderr_present=bool(error), error_type=error if error in SAFE_ERRORS else None)
 
 
-def run_gt(sql, *, db_file=None, python=None, timeout=180):
-    database = Path(db_file or DUCKDB_FILE)
+def run_gt(sql, *, db_file, python=None, timeout=180):
+    database = Path(db_file)
     if not database.is_file():
         return Execution(status="missing_database")
-    execution = run_process([python or (VENV_PY if VENV_PY.exists() else sys.executable), DUCKDB_WORKER],
+    execution = run_process([python or sys.executable, "-I", duckdb_worker.__file__],
                             timeout=timeout, input_text=json.dumps({"database": str(database), "sql": sql}))
     if execution.ok:
         try:
@@ -120,9 +110,9 @@ def run_gt(sql, *, db_file=None, python=None, timeout=180):
     return execution
 
 
-def run_wren(sql, *, project=None, wren=None, env=None, timeout=180):
-    project = Path(project or PROJECT)
-    execution = run_process([wren or WREN, "query", "--sql", sql, "-o", "csv", "-q"],
+def run_wren(sql, *, project, wren="wren", env=None, timeout=180):
+    project = Path(project)
+    execution = run_process([wren, "query", "--sql", sql, "-o", "csv", "-q"],
                             cwd=project, env=load_env(project) if env is None else env, timeout=timeout)
     if execution.ok:
         try:
@@ -143,19 +133,6 @@ def evaluate(question, gt, wren, tolerance=None):
         return ok, message
     except ValueError as exc:
         return False, f"题库元数据错误: {exc}"
-
-
-def canonical(value):
-    """唯一的规范化 JSON 序列化：缩进 2、尾随换行、拒绝非有限数。"""
-    return json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False) + "\n"
-
-
-def write_json(path, value):
-    path.write_text(canonical(value), encoding="utf-8")
-
-
-def digest(path):
-    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def write_results(directory, qid, outputs):
@@ -209,14 +186,14 @@ def regression_directory(base, questions, only=None, domain=None, output=None, *
 
 
 def run_regression(questions, directory, *, env, timeout=180, tolerance=None,
-                   db_file=None, project=None, wren=None, execution_evidence=False):
+                   db_file, project, wren="wren", python=None, execution_evidence=False):
     results = directory / "results" if execution_evidence else directory
     results.mkdir(parents=True, exist_ok=True)
     records = []
     fields = ["id", "domain", "priority", "question", "result", "msg"]
     for question in questions:
         qid = question["id"]
-        gt = run_gt(question["gt"], db_file=db_file, timeout=timeout)
+        gt = run_gt(question["gt"], db_file=db_file, python=python, timeout=timeout)
         semantic = run_wren(question["wren"], project=project, wren=wren, env=env, timeout=timeout)
         ok, message = evaluate(question, gt, semantic, tolerance)
         write_results(results, qid, {name: result.stdout if (result.ok if execution_evidence else ok) else None
