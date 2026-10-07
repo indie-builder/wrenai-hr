@@ -112,11 +112,11 @@ def copy_deployment(destination: Path):
     for name in ("hr_mcp", "hr_query"):
         package = destination / name
         package.mkdir(parents=True)
-        for source in (ROOT / name).glob("*.py"):
+        for source in (ROOT / "src" / name).glob("*.py"):
             shutil.copyfile(source, package / source.name)
 
 
-def worker_call(data, request, *, root=ROOT, python=None, **options):
+def worker_call(data, request, *, root=None, python=None, **options):
     raw = request if isinstance(request, bytes) else json.dumps(request).encode()
     command, environment = worker_command(data, root=root, python=python)
     result = subprocess.run(

@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import patch
 
 import check_semantics as semantics
-import query_execution as execution
+from hr_analytics import execution
 
 
 class SemanticCheckTests(unittest.TestCase):

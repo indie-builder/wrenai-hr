@@ -19,4 +19,6 @@
 
 全部数据均为仿真数据；接入、授权与数据访问边界见 [交付范围](hr-demo/README.md#交付范围)。
 
-本地上游参考克隆 `vendor/WrenAI/` 不纳入仓库；运行时使用独立安装的 Wren CLI，关键依赖版本见 [requirements-demo.txt](requirements-demo.txt)。
+本地上游参考克隆 `vendor/WrenAI/` 不纳入仓库；运行时使用独立安装的 Wren CLI，关键依赖版本见 [pyproject.toml](pyproject.toml) 与完整锁文件 [uv.lock](uv.lock)。
+
+Python 代码安装为一个 `src` 发行包。`hr_contracts` 维护纯结果契约，`hr_query` 维护安全执行，`hr_analytics` 维护离线运行，`hr_mcp` 维护服务。统一验证运行 `python3 scripts/verify.py docs analysis data mcp installation`；首次检出使用 `--fresh-data` 构建临时验证库，不替换开发库。

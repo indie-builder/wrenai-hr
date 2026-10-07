@@ -13,6 +13,8 @@ vendor
 **/__pycache__
 **/*.pyc
 .ci
+.audit
+dist
 hr-demo/db/duckdb
 hr-demo/validation/v2/runs
 hr-demo/validation/v2/results

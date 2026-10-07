@@ -1,7 +1,0 @@
-# This pins the analytics toolchain, not every transitive dependency.
-wrenai==0.15.0
-wren-core-py==0.8.0
-duckdb==1.5.6
-sqlglot==30.21.0
-pyarrow==25.0.1
-PyYAML==6.0.3

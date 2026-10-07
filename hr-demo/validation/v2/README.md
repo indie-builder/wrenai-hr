@@ -12,12 +12,12 @@
 
 ```bash
 # 子集默认写 runs/<题号组合>/，保留完整汇总
-python3 hr-demo/validation/v2/run_all.py --only q03
-python3 hr-demo/validation/v2/run_all.py --domain 人效分析
+.venv/bin/python hr-demo/validation/v2/run_all.py --only q03
+.venv/bin/python hr-demo/validation/v2/run_all.py --domain 人效分析
 # 完整回归更新 summary.csv 和 results/qXX.{gt,wren}.csv
-python3 hr-demo/validation/v2/run_all.py
+.venv/bin/python hr-demo/validation/v2/run_all.py
 # 需要独立保存全量证据时，指定报告目录
-python3 hr-demo/validation/v2/run_all.py --output-dir hr-demo/validation/v2/runs/local-check
+.venv/bin/python hr-demo/validation/v2/run_all.py --output-dir hr-demo/validation/v2/runs/local-check
 ```
 
 以当次退出码、汇总和明细判断结果。失败时移除对应旧 CSV 并保留执行状态，退出码非零；连接异常原文不写入可提交报告。runner 检查返回码、超时、完整 CSV/JSON 和有限数值，执行错误不作为数据。

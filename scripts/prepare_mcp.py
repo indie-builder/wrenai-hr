@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build the private MCP bundle from deterministic seeds, without touching the local DB.
 
-Run after uv sync --locked: uv run --no-sync python scripts/prepare_mcp.py
+Run after service synchronization with python -m scripts.prepare_mcp.
 Requires the locked environment; builds MDL from YAML without a profile or Wren CLI.
 """
 from __future__ import annotations
@@ -18,7 +18,6 @@ import tempfile
 import tomllib
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
 from hr_mcp.contracts import BUNDLE_FILES, BUNDLE_FORMAT_VERSION, SNAPSHOT_DATE, VERSION
 from hr_mcp.engine import AnalyticsEngine, file_digest, read_bundle_manifest
 from hr_query.semantic import build_mdl
@@ -41,7 +40,7 @@ def source_files(root):
     paths.extend(database.glob("*.py"))
     # Include every runtime source, including new files in a local checkout. The
     # private bundle and interpreter caches are outputs, never source inputs.
-    for package in ("hr_mcp", "hr_query"):
+    for package in ("src/hr_mcp", "src/hr_query", "src/hr_contracts", "backend"):
         paths.extend(path for path in (root / package).rglob("*.py")
                      if not {"data", "__pycache__"}.intersection(path.relative_to(root / package).parts))
     paths.extend(path for path in (database / "seed").rglob("*") if path.is_file())
@@ -58,7 +57,8 @@ def release_info(root):
     if project["version"] != VERSION:
         raise ValueError("应用版本与 pyproject.toml 不一致。")
     dependencies = {}
-    for requirement in project["dependencies"]:
+    metadata = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+    for requirement in project["dependencies"] + metadata["dependency-groups"]["service"]:
         name, expected = requirement.split("==", 1)
         dependencies[name] = version(name)
         if dependencies[name] != expected:

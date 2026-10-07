@@ -8,10 +8,10 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-import query_execution as execution
+from hr_analytics import execution
 from questions import QUESTIONS
 import nl_eval
-from result_contract import compare
+from hr_contracts.tables import compare
 
 
 class NLEvaluationTests(unittest.TestCase):

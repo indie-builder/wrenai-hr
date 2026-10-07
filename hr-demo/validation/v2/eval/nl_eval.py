@@ -11,13 +11,13 @@ import json
 from pathlib import Path
 import sys
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from hr_query.sql_policy import PolicyError, mdl_tables, validate_sql
 from questions import QUESTIONS
-from query_execution import (DUCKDB_FILE, PROJECT, WREN, digest, positive_timeout, regression_questions,
+from project_paths import DUCKDB_FILE, PROJECT, WREN
+from hr_analytics.execution import (digest, positive_timeout, regression_questions,
                              run_gt, run_process, write_json, write_results, write_summary)
-from result_contract import compare, comparison_options
+from hr_contracts.tables import compare, comparison_options
 from eval_protocol import export_package, load_records, output_schema
 
 

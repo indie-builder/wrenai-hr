@@ -1,12 +1,13 @@
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"
+
 [project]
-name = "wrenai-hr-mcp"
+name = "wrenai-hr"
 version = "0.1.0"
-description = "Authenticated read-only HR analytics over MCP Streamable HTTP"
+description = "Read-only HR analytics, semantic validation and MCP service"
 requires-python = ">=3.14,<3.15"
 dependencies = [
-  "mcp==2.3.0",
-  "fastapi==0.142.2",
-  "uvicorn==0.54.0",
   "duckdb==1.5.6",
   "wren-core-py==0.8.0",
   "sqlglot==30.21.0",
@@ -14,13 +15,18 @@ dependencies = [
 ]
 
 [dependency-groups]
+service = ["mcp==2.3.0", "fastapi==0.142.2", "uvicorn==0.54.0"]
+analysis = ["wrenai==0.15.0", "pyarrow==25.0.1"]
 dev = ["httpx==0.28.1"]
 
 [tool.uv]
-package = false
+default-groups = ["service"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/hr_contracts", "src/hr_query", "src/hr_mcp", "src/hr_analytics"]
 
 [tool.vercel]
-entrypoint = "hr_mcp.server:app"
+entrypoint = "backend.server:app"
 
 [tool.vercel.scripts]
-build = "python scripts/prepare_mcp.py"
+build = "python -m scripts.prepare_mcp"
